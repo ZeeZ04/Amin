@@ -88,7 +88,13 @@ def make_document(path: Path, root: Path) -> tuple[Document, str]:
         path=rel,
         tier=tier,
         lang=parsed.meta.get("lang", "en"),
-        meta={k: v for k, v in parsed.meta.items() if k not in {"id", "title", "tier", "lang"}},
+        subject=str(parsed.meta.get("about", "")),
+        superseded=str(parsed.meta.get("status", "")).lower() == "superseded",
+        meta={
+            k: v
+            for k, v in parsed.meta.items()
+            if k not in {"id", "title", "tier", "lang", "status", "about"}
+        },
     )
     return doc, parsed.body
 
@@ -167,6 +173,8 @@ def chunk_document(doc: Document, body: str) -> list[Chunk]:
                     text=piece,
                     heading=heading,
                     tier=doc.tier,
+                    subject=doc.subject,
+                    superseded=doc.superseded,
                 )
             )
             ordinal += 1

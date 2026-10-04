@@ -49,7 +49,7 @@ def test_eval_set_is_wellformed():
     questions = [i.question for i in items]
     assert len(questions) == len(set(questions)), "duplicate questions inflate apparent n"
     for item in items:
-        assert item.kind in {"answerable", "unanswerable", "out_of_scope"}
+        assert item.kind in {"answerable", "unanswerable", "out_of_scope", "conflict"}
         if item.kind == "answerable":
             assert item.expect_any, f"{item.id} has no expected fact"
             assert item.expect_doc, f"{item.id} does not pin a source document"
@@ -63,18 +63,29 @@ def test_eval_set_slices_are_large_enough_to_be_useful():
     items = load_items(EVAL_SET)
     counts = {
         k: sum(i.kind == k for i in items)
-        for k in ("answerable", "unanswerable", "out_of_scope")
+        for k in ("answerable", "unanswerable", "out_of_scope", "conflict")
     }
-    # The unanswerable slice is the hallucination metric. It is the whole point.
-    assert counts["unanswerable"] >= 30
+    # Both of these carry a headline metric, so both need the n for a ±10pp
+    # interval. The unanswerable slice is the hallucination rate.
     assert counts["answerable"] >= 97, "below the n needed for a ±10pp interval"
+    assert counts["unanswerable"] >= 97, "the hallucination metric needs this most"
     assert counts["out_of_scope"] >= 20
+    # Conflict items are a capability check, not a rate - see docs/EVAL.md.
+    assert counts["conflict"] >= 4
 
 
 def test_eval_set_covers_the_designed_traps():
     tags = {t for i in load_items(EVAL_SET) for t in i.tags}
     for trap in ("near-miss", "false-premise", "prior-leak", "silent"):
         assert trap in tags, f"no {trap} items — the set cannot catch that failure mode"
+
+
+def test_conflict_items_name_their_disagreeing_documents():
+    for item in load_items(EVAL_SET):
+        if item.kind == "conflict":
+            assert len(item.expect_docs) >= 2, f"{item.id} needs both sides"
+            assert item.expect_outcome in {"conflict", "version_skew"}
+            assert item.note, f"{item.id} must say what the disagreement is"
 
 
 def test_eval_set_has_arabic_on_both_sides():

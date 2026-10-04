@@ -4,6 +4,7 @@ title: ملخص دليل الثلاجة أركتيك لاين FR-440
 tier: primary
 lang: ar
 note: Synthetic Arabic companion to fridge-manual.md, for bilingual retrieval tests.
+about: arcticline-fr440
 ---
 
 # الضمان

@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     top_k_dense: int = 12
     top_k_lexical: int = 12
     top_k_final: int = 6
+    # Conflict detection looks deeper than generation does: a contradicting
+    # passage sitting at rank 7 is exactly the one that must not be missed,
+    # and checking it costs no model call.
+    top_k_conflict: int = 14
+    # A chunk joins the conflict comparison if its coverage is at least this
+    # fraction of the best coverage seen. Tuned in docs/EXPERIMENTS.md E14
+    # against the whole eval set, counting false conflicts on answerable items -
+    # not against the conflict items alone, which would reward over-firing.
+    conflict_relative_floor: float = 0.7
+    conflict_min_coverage: float = 0.25
     rrf_k: int = 60
     # Minimum IDF-weighted share of the question's distinctive terms that some
     # retrieved chunk must contain before Amin will answer at all. This single
@@ -44,6 +54,9 @@ class Settings(BaseSettings):
     # nothing", and it is tuned by the eval harness, not by vibes.
     # See docs/EXPERIMENTS.md for the sweep that chose this value.
     evidence_floor: float = 0.45
+    # Multiplier applied to a chunk from a document marked `status: superseded`.
+    # Strong enough to lose a tie, too weak to hide a clearly better match.
+    superseded_penalty: float = 0.7
 
     # -- hosted-API pricing, for the cost column in the benchmark ------------
     # USD per million tokens. Left at zero so a local run never reports a

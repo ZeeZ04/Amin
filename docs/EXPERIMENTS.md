@@ -16,6 +16,12 @@ lexical extractor with **no language model** — so these numbers measure the
 | E4 | 2026-10-04 | **eval set 30 → 173 items, corpus 6 → 13 documents; added Wilson CIs and paired tests** | 173 | CI half-width on answerable 18.9pp → 9.1pp |
 | E5 | 2026-10-04 | **ablation study: bare vs naive RAG vs Amin** | 173 | the headline result, below |
 | E6 | 2026-10-04 | fix: paired tests were comparing across mixed item kinds | 173 | invalidated E5's first p-values; rerun |
+| E7 | 2026-10-04 | **conflict detection built in code**; supersession; 14th document | 237 | 5/6 conflict items; no metric moved — see below |
+| E8 | 2026-10-04 | **unanswerable slice 38 → 99 items** | 237 | hallucination CI ±15.2pp → ±9.0pp |
+| E9 | 2026-10-04 | fix: monetary figures were split on the comma | 237 | prerequisite for E7 |
+| E10 | 2026-10-04 | document relatedness via declared `about:` subjects | 237 | 4 false conflicts → 0 |
+| E11 | 2026-10-04 | conflict coverage band swept against the whole eval set | 237 | **adopted 0.70** |
+| E12 | 2026-10-04 | **indexing document titles — tested and rejected** | 237 | +2.7pp facts, **+13.1pp hallucination** |
 
 ---
 
@@ -127,32 +133,165 @@ produced a number that looked fine and meant nothing.
 
 ---
 
+## E7 — a documented capability that did not exist
+
+The README advertised conflict mode. The implementation was one line: if the
+model's draft happened to begin with the word `CONFLICT`, believe it. The
+deterministic test provider never says it, no eval item tested it, and a real
+model would say it unreliably. Asked "what is the coursework weighting for
+PHY-104?" with two handbooks giving 30% and 40%, Amin retrieved **both at
+coverage 1.00** and answered "30 percent" with a clean citation.
+
+That is the worst output this system can produce. The citation is what makes
+the arbitrary choice look sourced.
+
+Conflict detection now runs in `amin/conflict.py`, **before** generation, on the
+retrieved passages. Two sources conflict when they both substantially cover the
+question, come from different documents, are *about the same thing*, and put
+different numbers next to the question's own terms. Two shapes are handled
+differently on purpose:
+
+- **version skew** — one live source contradicted only by a `status: superseded`
+  one. Answer from the current source, append the old one as a visible note.
+  Refusing here would make Amin useless every time a contract was renewed.
+- **genuine conflict** — two live sources disagree. Show both, pick neither.
+
+**The headline result of E7 is that no metric moved at all.** Fact accuracy,
+refusal, hallucination, routing: identical to three decimal places. The
+capability did not exist, was built, and the scoreboard did not notice — because
+nothing measured it. That is the clearest demonstration in this project of why
+the eval set is the instrument and not the paperwork. Six conflict items were
+then written, and the path scores 5/6.
+
+## E9 — every monetary figure in the corpus was nonsense
+
+Detection kept returning nothing. The tokeniser was `[A-Za-z0-9]+`, which splits
+on the comma:
+
+```
+"AED 3,900"  ->  "3", "900"
+"AED 1,000"  ->  "1", "000"   -> normalised -> "1", "0"
+"AED 82,000" ->  "82", "000"
+```
+
+So the contract's 3,900 and the agency sheet's 4,100 were being compared as
+`{3, 900}` against `{4, 100}` — disjoint, but meaninglessly so, and the real
+figures never entered the comparison at all. Fixed by tokenising a number as a
+unit, keeping decimals (`11.1` must not collapse onto `11`) while dropping
+thousands separators.
+
+Two related fixes fell out: numbers appearing in the *question* are excluded
+(`PHY-104` put `104` in every passage and made contradictory handbooks look like
+they agreed), and values are scoped to the **sentence** rather than a five-word
+window (which missed "...for this unit is AED 4,100" by one word).
+
+## E10 — vocabulary overlap cannot tell a conflict from a coincidence
+
+First attempt gated conflicts on chunk-level word overlap: two passages must be
+similar to each other before their disagreement counts. Measured on the real
+pair and the obvious false pair:
+
+| pair | chunk overlap |
+|---|---|
+| tenancy contract vs agency summary (**real conflict**) | 0.167 |
+| tenancy contract vs electricity tariff (**false**) | **0.172** |
+
+The false pair scored *higher*. Both documents have a section headed "Security
+deposit" with different figures; they are about different deposits. No threshold
+on this signal can work.
+
+Document-level overlap separates cleanly (0.19 and 0.24 for the two genuinely
+related pairs, ≤0.12 for every unrelated pair) — but a threshold tuned on
+fourteen documents is not a law. So relatedness is **declared**: documents carry
+`about: <subject>` in front matter, and only documents sharing a subject can
+contradict each other. Document-level overlap at 0.15 is the fallback for
+undeclared documents, with its failure mode written down.
+
+## E11 — tuning the conflict band against the whole eval set
+
+The coverage band decides which retrieved chunks enter the comparison. Tuned by
+counting *false* conflicts on answerable items, not by maximising conflict-item
+passes — which would reward over-firing:
+
+| relative floor | conflict items passed | false conflicts on 110 answerable |
+|---|---|---|
+| 0.90 | 4/6 | 0 |
+| 0.80 | 4/6 | 0 |
+| **0.70** | **5/6** | **0** |
+| 0.60 | 5/6 | 4 |
+| 0.50 | 5/6 | 6 |
+
+Adopted 0.70. All four false positives at 0.60 were inspected and all four were
+spurious — in one, neither cited document was the one holding the answer.
+
+**Known limitation, not fixed.** The detector compares *numbers in answer
+position*, not *typed quantities*. Two sections of the same subject that discuss
+different quantities can still look like a contradiction — at 0.60 the fridge
+manual's error codes were "contradicted" by the Arabic summary's warranty
+period. Tightening the band suppresses this; it does not solve it. A real fix
+needs the quantity's type (a currency, a duration, a percentage), not just its
+digits.
+
+## E12 — indexing document titles: an obvious improvement that is a regression
+
+`c001` ("the annual rent on the **Al Noor Tower** unit") fails because document
+titles are not indexed: "Al Noor Tower" appears in the front matter, not in any
+chunk body, so coverage is low and the evidence gate refuses. Indexing titles
+looks like a free win. Measured:
+
+| metric | without titles | with titles | delta |
+|---|---|---|---|
+| fact accuracy | 0.227 | 0.255 | **+2.7pp** |
+| conflict items passed | 5/6 | **6/6** | +1 |
+| correct refusal | 0.707 | 0.576 | −13.1pp |
+| **hallucination rate** | 0.293 | **0.424** | **+13.1pp** |
+
+Under the project's stated objective (`grounded_accuracy − 3 × hallucination`)
+that is **−0.366**: a clear loss.
+
+The mechanism is worth understanding, because it generalises. Adding the title
+to every chunk's searchable text means *every* chunk of a document inherits the
+document's name. A question that names the document then scores high coverage
+against chunks that do not contain the answer, and the evidence gate — which
+exists precisely to ask "does anything here actually cover this?" — waves them
+through. The fix broke the gate it was supposed to help.
+
+**Rejected.** `c001` stays failing, and that failure is now the honest record of
+a real limitation rather than a number improved by weakening the safety
+property.
+
+---
+
 ## Still open, in priority order
 
-1. **E7 — attach a real local model.** `ollama pull qwen3.6:27b`, then
-   `amin bench --provider ollama`. Everything above measures the pipeline with
-   no language model; the ablation's *shape* should hold but every absolute
-   number will change. **The evidence floor must be re-swept** (`make sweep`) —
-   0.45 is tuned for an extractor that cannot abstain, and a real model abstains
-   on its own, so the floor should come down. Expectation to test: Amin's fact
-   accuracy > 0.80 and hallucination < 0.10; naive RAG's hallucination stays
-   high. If naive's hallucination collapses too, the verifier is not earning its
-   latency and should be cut.
-2. **E8 — grow the unanswerable slice to 97+ items.** The headline metric
-   currently has a ±15pp interval. Nothing else on this list matters as much.
-3. **E9 — LLM verifier vs lexical** (`AMIN_VERIFIER=llm`). Should catch
-   paraphrase and negation failures. Measure latency, not just accuracy: it is
-   one small-model call per sentence.
-4. **E10 — chunk size sweep** (`chunk_chars` 600 / 900 / 1400). Chunk
-   boundaries decide whether a citation points at the right clause.
-5. **E11 — the near-miss hole.** Items tagged `near-miss` (FR-550 vs FR-440,
+1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is
+   serving. Everything above measures the pipeline with no language model; the
+   ablation's *shape* should hold but every absolute number will change.
+   **The evidence floor must be re-swept** (`make sweep`) — 0.45 is tuned for an
+   extractor that cannot abstain, and a real model abstains on its own, so the
+   floor should come down. Expectation to test: Amin's fact accuracy > 0.80 and
+   hallucination < 0.10; naive RAG's hallucination stays high. If naive's
+   hallucination collapses too, the verifier is not earning its latency and
+   should be cut.
+2. **E17 — typed quantities in conflict detection.** The E11 limitation: compare
+   `AED 3,900` with `AED 4,100` as currencies, and refuse to compare a currency
+   with a duration. Removes the false-positive class that the coverage band is
+   currently suppressing by brute force.
+3. **E18 — the near-miss hole.** Items tagged `near-miss` (FR-550 vs FR-440,
    V16 vs V14, Freedom 300 vs 150) are where lexical coverage cannot help: the
    distinctive terms *are* present, only the model number differs. Candidate
    fixes: an entity-agreement check on the retrieved chunk, or trusting the
-   model's own abstention more. This is the known design hole.
-6. **E12 — the conflict path.** The two handbook versions disagree on coursework
-   weighting and no eval item tests it. Write the items, then measure.
-7. **E13 — a frontier row.** `amin/hosted.py` is ready; needs an API key. Note
-   the corpus is synthetic, so no hosted model has it memorised — which makes
-   this a fair test of grounding rather than of recall, and the right comparison
-   is against `naive` with the same retriever, not against the bare API.
+   model's own abstention more. This is the known design hole, and the
+   `near-miss` tag makes its cost visible in every run.
+4. **E19 — LLM verifier vs lexical** (`AMIN_VERIFIER=llm`). Should catch
+   paraphrase and negation failures. Measure latency, not just accuracy: it is
+   one small-model call per sentence.
+5. **E20 — chunk size sweep** (`chunk_chars` 600 / 900 / 1400). Chunk
+   boundaries decide whether a citation points at the right clause.
+6. **E21 — grow the conflict slice.** Six items is a capability check, not a
+   rate. 30+ would make conflict handling a measurable metric; it needs more
+   genuinely-disagreeing document pairs in the corpus.
+7. **E22 — a frontier row.** `amin/hosted.py` is ready; needs an API key. The
+   corpus is synthetic, so no hosted model has it memorised — which makes this a
+   fair test of grounding rather than of recall, and the right comparison is
+   against `naive` with the same retriever, not against the bare API.

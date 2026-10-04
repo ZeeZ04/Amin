@@ -4,6 +4,7 @@ title: ملخص عقد الإيجار — وحدة ١٢٠٤، برج النور
 tier: primary
 lang: ar
 note: Synthetic Arabic companion to tenancy-agreement.md, for bilingual retrieval tests.
+about: tenancy-unit-1204
 ---
 
 # مدة العقد والإيجار

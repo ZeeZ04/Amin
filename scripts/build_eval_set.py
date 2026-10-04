@@ -38,13 +38,10 @@ ANSWERABLE: list[tuple[str, list[str], str, str]] = [
     # -- tenancy-agreement ---------------------------------------------------
     ("When does the Al Noor Tower tenancy begin?", ["1 March 2026"], "tenancy-agreement", "dates"),
     ("When does the tenancy contract expire?", ["28 February 2027"], "tenancy-agreement", "dates"),
-    ("What is the annual rent on the Al Noor Tower unit?", ["AED 78,000", "78,000"], "tenancy-agreement", "money"),
     ("How much is each rent cheque for the flat?", ["AED 19,500", "19,500"], "tenancy-agreement", "money"),
-    ("How much notice must I give before the tenancy expires if I don't want to renew?", ["90 days"], "tenancy-agreement", "notice"),
     ("What happens if neither party serves notice before the tenancy expires?", ["renews automatically", "further 12 months"], "tenancy-agreement", "notice"),
     ("Who is responsible for the central air conditioning under the tenancy?", ["landlord"], "tenancy-agreement", "maintenance"),
     ("Up to what amount is the tenant responsible for minor maintenance?", ["AED 500", "500 per incident"], "tenancy-agreement", "maintenance"),
-    ("What is the security deposit on the flat?", ["AED 3,900", "3,900"], "tenancy-agreement", "money"),
     ("What percentage of the annual rent is the security deposit?", ["5 percent"], "tenancy-agreement", "money"),
     ("How soon after handover is the security deposit refunded?", ["30 days"], "tenancy-agreement", "money"),
     # -- ufp-handbook-2026 ---------------------------------------------------
@@ -217,6 +214,103 @@ OUT_OF_SCOPE: list[tuple[str, str]] = [
 ]
 
 
+
+# E8 - the headline metric lives on this slice, so it is the one that has to be
+# big. Every item names why it cannot be answered; see tests/test_eval.py.
+UNANSWERABLE += [
+    # near-miss entities: the distinctive terms are all present, one token differs
+    ("What is the excess on an ArcticLine FR-441?", "FR-441 is not the documented model; the manual covers the FR-440.", "near-miss"),
+    ("How much is the Freedom 150 Plus plan?", "No 'Plus' variant exists in the plan terms.", "near-miss"),
+    ("What is the Vertex V14 Pro battery coverage?", "Only the plain V14 is documented.", "near-miss"),
+    ("What is the pass mark for PHY-103?", "Only PHY-104 appears in the handbooks.", "near-miss"),
+    ("What does the ALF-90 filter cost?", "The documented part is ALF-9; ALF-90 does not appear.", "near-miss"),
+    ("What is the deposit for Unit 1024 at Al Noor Tower?", "The contract is for Unit 1204, not 1024.", "near-miss"),
+    ("What is the tariff for the first 2,500 kWh?", "The slab boundaries are 2,000 and 4,000 kWh; 2,500 is not a boundary.", "near-miss"),
+    ("What is the library loan period for a 7-day item?", "Loans are 14-day standard or 3-day short-loan; no 7-day category.", "near-miss"),
+    ("How much is the UFP application fee for international students?", "Only one application fee is documented, with no student-type split.", "near-miss"),
+    ("What is the HomeGuard buildings insurance sum insured?", "The schedule covers contents, not buildings.", "near-miss"),
+    # false premises: the question asserts something the corpus contradicts
+    ("Why is the fridge warranty only 12 months?", "False premise: the fridge warranty is 24 months.", "false-premise"),
+    ("Why does the tenancy require 30 days notice?", "False premise: the contract requires 90 days.", "false-premise"),
+    ("Why is the PHY-104 exam three hours long?", "False premise: the 2026/27 handbook says 2 hours.", "false-premise"),
+    ("Which three slabs above 5,000 kWh does the tariff define?", "False premise: the top slab is above 4,000 kWh and there is only one.", "false-premise"),
+    ("How do I claim the library's lost-item insurance?", "False premise: no such scheme is described.", "false-premise"),
+    ("What is the fourth UFP tuition instalment?", "False premise: tuition is paid in two instalments.", "false-premise"),
+    ("How much data does the roaming pass give after the first 48 hours?", "False premise: the pass is valid for 24 hours.", "false-premise"),
+    ("What is the second excess tier for escape of water claims?", "False premise: a single escape-of-water excess is specified.", "false-premise"),
+    ("When was the tenancy contract amended?", "False premise: no amendment is recorded.", "false-premise"),
+    ("Which Vertex models are excluded from the 36-month extension?", "False premise: no model exclusions are listed.", "false-premise"),
+    # silent: a reasonable question the corpus simply does not cover
+    ("Can I pay the electricity bill by direct debit?", "Payment methods are not described.", "silent"),
+    ("Is there a discount for paying UFP tuition in full up front?", "No early-payment discount is documented.", "silent"),
+    ("Can I transfer my phone plan to another person?", "Transfers are not covered by the plan terms.", "silent"),
+    ("Does the library have printing facilities?", "Not covered by the regulations.", "silent"),
+    ("Can I freeze my phone contract while travelling?", "Suspension is not addressed.", "silent"),
+    ("What happens to the electricity deposit if I move to another apartment?", "Transfers between premises are not covered.", "silent"),
+    ("Does the contents policy cover accidental damage to a laptop at home?", "Accidental damage is not listed among covered perils.", "silent"),
+    ("How do I appeal a PHY-104 grade?", "No appeals process appears in the handbook.", "silent"),
+    ("Can a Vertex laptop be repaired at a third-party centre under warranty?", "Third-party repair is not addressed.", "silent"),
+    ("What identification do I need to open an electricity account?", "Account-opening documents are not listed.", "silent"),
+    ("Is the fridge suitable for installation in a garage?", "Installation environment is not covered.", "silent"),
+    ("How many guests can a tenant have overnight?", "The contract says nothing about guests.", "silent"),
+    ("Does the tenancy include a service charge?", "No service charge appears in the contract.", "silent"),
+    ("Can I renew a short-loan library item in person?", "Short-loan items cannot be renewed; in-person renewal is not described.", "silent"),
+    ("What is the UFP minimum attendance for lectures?", "Only laboratory attendance is specified.", "silent"),
+    ("Does the phone plan include visual voicemail?", "Features beyond data, voice and SMS are not listed.", "silent"),
+    ("Who pays for repainting at the end of the tenancy?", "Redecoration is not addressed.", "silent"),
+    ("What is the warranty on the fridge water filter itself?", "Only the appliance warranty is documented.", "silent"),
+    ("Can insurance claims be submitted online?", "The claims channel is not described.", "silent"),
+    ("How long does a PHY-104 resit take to be marked?", "Marking timelines are not given.", "silent"),
+    ("Is there a penalty for exceeding the library borrowing limit?", "Only overdue fines are specified.", "silent"),
+    ("Does the electricity tariff change in summer?", "No seasonal variation is described.", "silent"),
+    ("What happens if the landlord sells the property mid-tenancy?", "Not covered by the contract excerpt.", "silent"),
+    ("How do I cancel the Vertex extended warranty?", "Cancellation is not addressed.", "silent"),
+    ("Can two students share one group study room booking slot?", "Shared bookings are not described.", "silent"),
+    ("What is the grace period for a late UFP registration?", "No grace period is documented.", "silent"),
+    ("Does the insurance cover items in a car parked at home?", "Vehicle contents are not addressed.", "silent"),
+    ("What voltage does the FR-440 require?", "Electrical specifications are not in the excerpt.", "silent"),
+    ("Is the agency commission refundable if the tenancy falls through?", "The summary sheet says it is non-refundable on signature but not what happens if the let fails.", "silent"),
+    # prior leaks: true facts the model knows and the corpus does not contain
+    ("What is the speed of light in metres per second?", "Model knows it; the corpus does not contain it.", "prior-leak"),
+    ("Who wrote the Principia Mathematica?", "True fact, no source in the corpus.", "prior-leak"),
+    ("What is the chemical symbol for tungsten?", "True fact, no source in the corpus.", "prior-leak"),
+    ("How many millimetres are in an inch?", "A unit conversion the model knows and no document states.", "prior-leak"),
+    ("What is the largest country in Africa by area?", "True fact, no source in the corpus.", "prior-leak"),
+    ("In what year did the Berlin Wall fall?", "True fact, no source in the corpus.", "prior-leak"),
+    ("What is the acceleration due to gravity at sea level?", "Physics the model knows; not in any document here.", "prior-leak"),
+    ("What is the currency of Japan?", "True fact, no source in the corpus.", "prior-leak"),
+    # Arabic
+    ("كم رسوم الطباعة في المكتبة؟", "Arabic. Printing is not covered anywhere in the corpus.", "silent"),
+    ("ما هي مدة ضمان الكمبيوتر المحمول في المستند العربي؟", "Arabic. The Arabic summaries cover the fridge, tenancy and fees, not the laptop.", "silent"),
+    ("ما هو الرقم السري لحساب الكهرباء؟", "Arabic. No account credentials exist in the corpus.", "silent"),
+    ("كم عدد سكان الإمارات؟", "Arabic prior-leak probe: a true fact with no source here.", "prior-leak"),
+]
+
+# Conflict items. Deliberately few: with n well under 30 this is a capability
+# check - does the path work at all - not a rate. Reported as passed/total.
+# (question, expect_docs, expect_outcome, note)
+CONFLICT: list[tuple[str, list[str], str, str]] = [
+    ("What is the annual rent on the Al Noor Tower unit?",
+     ["tenancy-agreement", "tenancy-summary-sheet"], "conflict",
+     "Contract says AED 78,000; the agency summary says AED 82,000. Both live."),
+    ("How much notice must I give before the tenancy expires if I don't want to renew?",
+     ["tenancy-agreement", "tenancy-summary-sheet"], "conflict",
+     "Contract says 90 days; the agency summary says 60 days. Both live."),
+    ("What is the security deposit on the flat?",
+     ["tenancy-agreement", "tenancy-summary-sheet"], "conflict",
+     "Contract says AED 3,900; the agency summary says AED 4,100. Both live."),
+    ("What is the coursework weighting for PHY-104?",
+     ["ufp-handbook-2026", "ufp-handbook-2025"], "version_skew",
+     "2026/27 says 30 percent, superseded 2025/26 says 40. Answer from current, surface the old."),
+    ("How long does the PHY-104 final examination last?",
+     ["ufp-handbook-2026", "ufp-handbook-2025"], "version_skew",
+     "2026/27 says 2 hours, superseded 2025/26 says 90 minutes."),
+    ("What is the examination weighting for PHY-104?",
+     ["ufp-handbook-2026", "ufp-handbook-2025"], "version_skew",
+     "2026/27 says 70 percent, superseded 2025/26 says 60 percent."),
+]
+
+
 def is_arabic(text: str) -> bool:
     return any("؀" <= ch <= "ۿ" for ch in text)
 
@@ -260,6 +354,19 @@ def build() -> list[dict]:
                 "tags": [tag],
             }
         )
+    for i, (q, docs, outcome, note) in enumerate(CONFLICT, start=1):
+        items.append(
+            {
+                "id": f"c{i:03d}",
+                "kind": "conflict",
+                "question": q,
+                "expect_docs": docs,
+                "expect_outcome": outcome,
+                "note": note,
+                "lang": "ar" if is_arabic(q) else "en",
+                "tags": [outcome],
+            }
+        )
     for i, (q, route) in enumerate(OUT_OF_SCOPE, start=1):
         items.append(
             {
@@ -293,6 +400,14 @@ def validate(items: list[dict]) -> list[str]:
             problems.append(f"{item['id']} must explain why it is unanswerable")
         if item["kind"] == "out_of_scope" and not item.get("expect_route"):
             problems.append(f"{item['id']} has no expected route")
+        if item["kind"] == "conflict":
+            if len(item.get("expect_docs", [])) < 2:
+                problems.append(f"{item['id']} must name at least two disagreeing documents")
+            if item.get("expect_outcome") not in {"conflict", "version_skew"}:
+                problems.append(f"{item['id']} needs expect_outcome conflict|version_skew")
+            for doc in item.get("expect_docs", []):
+                if doc not in present:
+                    problems.append(f"{item['id']} names missing doc {doc}")
     return problems
 
 
@@ -321,8 +436,10 @@ def main() -> int:
     sys.path.insert(0, str(REPO))
     from amin.stats import required_n, wilson
 
-    for kind in ("answerable", "unanswerable", "out_of_scope"):
+    for kind in ("answerable", "unanswerable", "out_of_scope", "conflict"):
         n = kinds[kind]
+        if not n:
+            continue
         hw = wilson(n // 2, n).half_width
         print(f"  {kind:14s} n={n:3d} -> worst-case 95% CI half-width ±{hw:.1%}")
     print(f"  (±10pp needs {required_n(0.10)} items per slice, ±5pp needs {required_n(0.05)})")

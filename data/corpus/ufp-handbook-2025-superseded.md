@@ -8,6 +8,7 @@ status: superseded
 note: >-
   Kept in the corpus on purpose. It disagrees with the 2026/27 handbook on
   coursework weighting, which is what the conflict-detection eval items test.
+about: phy-104-module
 ---
 
 # Assessment weighting

@@ -36,6 +36,11 @@ class Item:
     expect_any: list[str] = field(default_factory=list)
     expect_doc: str = ""
     expect_route: str = ""
+    # conflict items: every document that must appear in the answer's sources
+    expect_docs: list[str] = field(default_factory=list)
+    # conflict items: "conflict" (two live sources, must not pick) or
+    # "version_skew" (current source answers, superseded one is surfaced)
+    expect_outcome: str = ""
     note: str = ""
     lang: str = "en"
     tags: list[str] = field(default_factory=list)
@@ -49,6 +54,8 @@ class Item:
             expect_any=obj.get("expect_any", []),
             expect_doc=obj.get("expect_doc", ""),
             expect_route=obj.get("expect_route", ""),
+            expect_docs=obj.get("expect_docs", []),
+            expect_outcome=obj.get("expect_outcome", ""),
             note=obj.get("note", ""),
             lang=obj.get("lang", "en"),
             tags=obj.get("tags", []),
@@ -153,6 +160,29 @@ def grade(item: Item, answer: Answer, cites: bool = True) -> Result:
             why = f"routed to {answer.routed_to}"
         fact_ok = grounded_ok = passed
 
+    elif item.kind == "conflict":
+        cited = {s["doc_id"] for s in answer.sources()}
+        missing = [d for d in item.expect_docs if d not in cited]
+        if item.expect_outcome == "version_skew":
+            # The current source must answer, and the superseded one must be
+            # visible rather than silently dropped. Refusing here is a failure:
+            # an outdated document is not a reason to withhold a current answer.
+            if answer.refused:
+                passed, why = False, "refused instead of answering from the current source"
+            elif missing:
+                passed, why = False, f"did not surface {missing}"
+            else:
+                passed, why = True, "answered from current source, superseded one surfaced"
+        else:
+            if answer.outcome is not Outcome.CONFLICT:
+                passed = False
+                why = f"resolved a disagreement silently ({answer.outcome.value})"
+            elif missing:
+                passed, why = False, f"flagged conflict but did not cite {missing}"
+            else:
+                passed, why = True, "surfaced both positions"
+        fact_ok = grounded_ok = passed
+
     else:
         passed = False
         why = f"unknown item kind {item.kind!r}"
@@ -185,6 +215,7 @@ def metrics(results: list[Result]) -> dict:
     answerable = [r for r in results if r.item.kind == "answerable"]
     unanswerable = [r for r in results if r.item.kind == "unanswerable"]
     oos = [r for r in results if r.item.kind == "out_of_scope"]
+    conflicts = [r for r in results if r.item.kind == "conflict"]
     arabic = [r for r in results if r.item.lang == "ar"]
 
     precisions = [
@@ -203,6 +234,7 @@ def metrics(results: list[Result]) -> dict:
     n_refusal = sum(r.passed for r in unanswerable)
     n_halluc = sum(r.answer.asserted for r in unanswerable)
     n_route = sum(r.passed for r in oos)
+    n_conflict = sum(r.passed for r in conflicts)
 
     return {
         "n": len(results),
@@ -212,6 +244,11 @@ def metrics(results: list[Result]) -> dict:
         "hallucination_rate": _rate(n_halluc, len(unanswerable)),
         "citation_precision": _rate(sum(precisions), len(precisions)) if precisions else 0.0,
         "routing_accuracy": _rate(n_route, len(oos)),
+        # Reported as passed/total, not as a rate to optimise: with fewer than
+        # ~30 items this is a capability check - does the path work at all -
+        # and quoting it as a percentage would imply a precision it lacks.
+        "conflict_handling": _rate(n_conflict, len(conflicts)),
+        "conflict_passed": n_conflict,
         "overall_pass": _rate(sum(r.passed for r in results), len(results)),
         "arabic_pass": _rate(sum(r.passed for r in arabic), len(arabic)),
         "p50_latency_ms": latencies[len(latencies) // 2] if latencies else 0,
@@ -227,6 +264,7 @@ def metrics(results: list[Result]) -> dict:
             "answerable": len(answerable),
             "unanswerable": len(unanswerable),
             "out_of_scope": len(oos),
+            "conflict": len(conflicts),
             "arabic": len(arabic),
         },
     }

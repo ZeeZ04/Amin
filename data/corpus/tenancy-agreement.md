@@ -4,6 +4,7 @@ title: Residential Tenancy Contract — Unit 1204, Al Noor Tower
 tier: primary
 lang: en
 note: Synthetic document. Clause numbers and figures exist only in this repository.
+about: tenancy-unit-1204
 ---
 
 # Term and rent

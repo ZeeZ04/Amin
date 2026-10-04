@@ -26,6 +26,14 @@ from .config import settings
 from .providers import content_tokens
 from .schema import Chunk, Document, Retrieved, Tier
 
+# Bump when the table definitions below change. `CREATE TABLE IF NOT EXISTS`
+# cannot add a column to an existing database, so without a version check an
+# upgraded Amin meets an old index and fails with "table has no column named
+# ...", which looks like a bug in the query rather than a stale file. The index
+# is a derived artefact - it can always be rebuilt from the corpus - so the
+# correct response to a version mismatch is to drop it and say so.
+SCHEMA_VERSION = 3
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
@@ -33,6 +41,8 @@ CREATE TABLE IF NOT EXISTS documents (
     path   TEXT NOT NULL,
     tier   INTEGER NOT NULL,
     lang   TEXT NOT NULL,
+    subject TEXT NOT NULL DEFAULT '',
+    superseded INTEGER NOT NULL DEFAULT 0,
     meta   TEXT NOT NULL DEFAULT '{}'
 );
 
@@ -43,6 +53,8 @@ CREATE TABLE IF NOT EXISTS chunks (
     heading  TEXT NOT NULL DEFAULT '',
     text     TEXT NOT NULL,
     tier     INTEGER NOT NULL,
+    subject  TEXT NOT NULL DEFAULT '',
+    superseded INTEGER NOT NULL DEFAULT 0,
     vector   BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
@@ -69,12 +81,41 @@ class Store:
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
-        self.db.executescript(SCHEMA)
         self._idf_cache: dict[str, float] | None = None
+        self._subject_cache: dict[str, str] | None = None
+        self._doc_token_cache: dict[str, set[str]] | None = None
         self._n_chunks: int = 0
+        # Set by _migrate when an older index was discarded, so the CLI can tell
+        # the user to re-ingest instead of silently reporting an empty index.
+        self.stale_rebuild: bool = False
+        self._migrate()
+        self.db.executescript(SCHEMA)
+
+    def _migrate(self) -> None:
+        """Drop a stale index rather than half-upgrading it."""
+        current = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if current == SCHEMA_VERSION:
+            return
+        existing = {
+            r[0]
+            for r in self.db.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table','view')"
+            )
+        }
+        if existing & {"documents", "chunks", "chunks_fts"}:
+            self.stale_rebuild = True
+            self.db.executescript(
+                "DROP TABLE IF EXISTS chunks_fts;"
+                "DROP TABLE IF EXISTS chunks;"
+                "DROP TABLE IF EXISTS documents;"
+            )
+        self.db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        self.db.commit()
 
     def _invalidate(self) -> None:
         self._idf_cache = None
+        self._subject_cache = None
+        self._doc_token_cache = None
 
     # -- writing -------------------------------------------------------------
 
@@ -90,10 +131,19 @@ class Store:
             raise ValueError(f"{len(chunks)} chunks but {len(vectors)} vectors")
         with self.db:
             self.db.executemany(
-                "INSERT OR REPLACE INTO documents(doc_id,title,path,tier,lang,meta)"
-                " VALUES(?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO documents(doc_id,title,path,tier,lang,subject,superseded,meta)"
+                " VALUES(?,?,?,?,?,?,?,?)",
                 [
-                    (d.doc_id, d.title, d.path, int(d.tier), d.lang, json.dumps(d.meta))
+                    (
+                        d.doc_id,
+                        d.title,
+                        d.path,
+                        int(d.tier),
+                        d.lang,
+                        d.subject,
+                        int(d.superseded),
+                        json.dumps(d.meta),
+                    )
                     for d in docs
                 ],
             )
@@ -103,8 +153,8 @@ class Store:
                 "DELETE FROM chunks_fts WHERE chunk_id LIKE ? || '#%'", [(i,) for i in doc_ids]
             )
             self.db.executemany(
-                "INSERT INTO chunks(chunk_id,doc_id,ordinal,heading,text,tier,vector)"
-                " VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO chunks(chunk_id,doc_id,ordinal,heading,text,tier,subject,superseded,vector)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
                 [
                     (
                         c.chunk_id,
@@ -113,6 +163,8 @@ class Store:
                         c.heading,
                         c.text,
                         int(c.tier),
+                        c.subject,
+                        int(c.superseded),
                         np.asarray(v, dtype=np.float32).tobytes(),
                     )
                     for c, v in zip(chunks, vectors, strict=True)
@@ -144,6 +196,8 @@ class Store:
             heading=row["heading"],
             text=row["text"],
             tier=Tier(row["tier"]),
+            subject=row["subject"],
+            superseded=bool(row["superseded"]),
         )
 
     def get_chunk(self, chunk_id: str) -> Chunk | None:
@@ -240,7 +294,9 @@ class Store:
 
     # -- fusion --------------------------------------------------------------
 
-    def search(self, question: str, query_vec: np.ndarray | None = None) -> list[Retrieved]:
+    def search(
+        self, question: str, query_vec: np.ndarray | None = None, limit: int | None = None
+    ) -> list[Retrieved]:
         dense_ids = self.dense(query_vec, settings.top_k_dense) if query_vec is not None else []
         lex_ids = self.lexical(question, settings.top_k_lexical)
 
@@ -265,6 +321,13 @@ class Store:
             # is nearly flat. Tier is a small, deliberately weak nudge: a
             # primary source wins ties, never relevance outright.
             adjusted = score * (1.0 + 1.5 * cov) * (1.0 + (4 - int(chunk.tier)) * 0.04)
+            # A superseded document stays searchable - "what did last year's
+            # handbook say" is a real question - but must never outrank the
+            # current version at comparable relevance. Without this, a question
+            # explicitly about the 2026/27 handbook was answered from the 2025
+            # one, which is a wrong answer with a correct-looking citation.
+            if chunk.superseded:
+                adjusted *= settings.superseded_penalty
             results.append(
                 Retrieved(
                     chunk=chunk,
@@ -275,7 +338,55 @@ class Store:
                 )
             )
         results.sort(key=lambda r: (-r.score, -r.coverage))
-        return results[: settings.top_k_final]
+        return results[: limit or settings.top_k_final]
+
+    # -- document relatedness ------------------------------------------------
+
+    def are_related(self, doc_a: str, doc_b: str, overlap_floor: float = 0.15) -> bool:
+        """Are two documents about the same thing?
+
+        Only comparable documents can contradict each other. A tenancy contract
+        and an electricity tariff both have a section headed "Security deposit"
+        with different figures, and that is not a disagreement - they are about
+        different deposits.
+
+        Declared `about:` subjects are authoritative. The vocabulary-overlap
+        fallback is a heuristic with a known failure mode: it was measured at
+        0.19 and 0.24 for the two genuinely related pairs in this corpus and at
+        most 0.12 for every unrelated pair, so 0.15 separates them here. That
+        margin is a property of this corpus, not a law. Declare `about:` on
+        documents that matter rather than relying on it.
+        """
+        if doc_a == doc_b:
+            return True
+        subjects = self._subjects()
+        sa, sb = subjects.get(doc_a, ""), subjects.get(doc_b, "")
+        if sa and sb:
+            return sa == sb
+        return self._doc_overlap(doc_a, doc_b) >= overlap_floor
+
+    def _subjects(self) -> dict[str, str]:
+        if self._subject_cache is None:
+            self._subject_cache = {
+                r["doc_id"]: r["subject"]
+                for r in self.db.execute("SELECT doc_id, subject FROM documents")
+            }
+        return self._subject_cache
+
+    def _doc_tokens(self) -> dict[str, set[str]]:
+        if self._doc_token_cache is None:
+            acc: dict[str, set[str]] = {}
+            for row in self.db.execute("SELECT doc_id, text FROM chunks"):
+                acc.setdefault(row["doc_id"], set()).update(content_tokens(row["text"]))
+            self._doc_token_cache = acc
+        return self._doc_token_cache
+
+    def _doc_overlap(self, doc_a: str, doc_b: str) -> float:
+        tokens = self._doc_tokens()
+        ta, tb = tokens.get(doc_a, set()), tokens.get(doc_b, set())
+        if not ta or not tb:
+            return 0.0
+        return len(ta & tb) / len(ta | tb)
 
     def close(self) -> None:
         self.db.close()

@@ -5,6 +5,7 @@ tier: primary
 lang: en
 version: "2026/27"
 note: Synthetic document created for this repository.
+about: phy-104-module
 ---
 
 # Assessment weighting

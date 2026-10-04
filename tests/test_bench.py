@@ -207,8 +207,8 @@ def test_stratified_sample_keeps_every_kind():
     assert len({i.kind for i in naive_head}) == 1, "precondition: the set is ordered by kind"
 
     sample = stratified_sample(items, 30)
-    assert {i.kind for i in sample} == {"answerable", "unanswerable", "out_of_scope"}
-    assert 25 <= len(sample) <= 40
+    assert {"answerable", "unanswerable", "out_of_scope"} <= {i.kind for i in sample}
+    assert 25 <= len(sample) <= 45
 
 
 def test_stratified_sample_is_a_noop_when_n_exceeds_the_set():

@@ -33,6 +33,15 @@ class Document(BaseModel):
     path: str
     tier: Tier = Tier.UNVERIFIED
     lang: str = "en"
+    # What the document is ABOUT, declared in front matter as `about:`. Two
+    # documents sharing a subject are comparable, so a disagreement between
+    # them is a real contradiction rather than a coincidence of vocabulary.
+    subject: str = ""
+    # A document explicitly marked `status: superseded` in its front matter.
+    # Kept in the corpus on purpose - an old contract or handbook is still the
+    # right answer to "what did it say last year" - but it must never win a
+    # disagreement with the current version silently.
+    superseded: bool = False
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -43,6 +52,8 @@ class Chunk(BaseModel):
     text: str
     heading: str = ""
     tier: Tier = Tier.UNVERIFIED
+    subject: str = ""
+    superseded: bool = False
 
     def label(self) -> str:
         """Short human-facing citation label, e.g. 'fridge-manual §Warranty'."""

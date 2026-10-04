@@ -113,3 +113,45 @@ slice is below the ±10pp threshold.
 Current set: 113 answerable (±9.1pp), 38 unanswerable (±15.2pp), 22 out-of-scope
 (±19.3pp). The unanswerable slice carries the headline metric and is the weakest
 — growing it is the top open task.
+
+
+---
+
+## Conflict items (added 2026-10-04)
+
+A fourth kind. Two sub-shapes, distinguished by `expect_outcome`:
+
+| expect_outcome | passes when |
+|---|---|
+| `conflict` | outcome is CONFLICT **and** every document in `expect_docs` is cited |
+| `version_skew` | answered (not refused) from the current source **and** the superseded one is surfaced |
+
+```json
+{"id": "c003", "kind": "conflict",
+ "question": "What is the security deposit on the flat?",
+ "expect_docs": ["tenancy-agreement", "tenancy-summary-sheet"],
+ "expect_outcome": "conflict",
+ "note": "Contract says AED 3,900; the agency summary says AED 4,100. Both live."}
+```
+
+There are six. **That is a capability check, not a rate** — does the path work
+at all — and it is reported as `passed/total` rather than a percentage, because
+quoting 83.3% from six items implies a precision it does not have. Growing this
+slice past 30 is tracked as E21; it needs more genuinely-disagreeing document
+pairs in the corpus, which is corpus work rather than code.
+
+Version skew and genuine conflict are graded differently on purpose. Refusing
+because a superseded document disagrees would make Amin useless every time a
+contract was renewed, so for `version_skew` a refusal is a **failure**.
+
+## Corpus conventions these rely on
+
+| front matter | meaning |
+|---|---|
+| `tier:` | primary / reference / secondary / unverified — a small ranking nudge |
+| `status: superseded` | still searchable, demoted in ranking, never wins a disagreement silently |
+| `about: <subject>` | two documents sharing a subject are comparable, so a disagreement between them is real |
+
+`about:` is declared rather than inferred because inference was measured and
+found not to work: chunk-level vocabulary overlap scored a false pair (0.172)
+*higher* than the real one (0.167). See EXPERIMENTS E10.

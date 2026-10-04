@@ -5,6 +5,7 @@ tier: primary
 lang: en
 publisher: ArcticLine Appliances
 note: Synthetic document. Written for this repository so that eval ground truth is exact.
+about: arcticline-fr440
 ---
 
 # Warranty

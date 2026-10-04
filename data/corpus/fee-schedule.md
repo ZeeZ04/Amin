@@ -4,6 +4,7 @@ title: University Foundation Programme — Fee Schedule and Refund Policy 2026/2
 tier: primary
 lang: en
 note: Synthetic document created for this repository.
+about: ufp-fees
 ---
 
 # Tuition

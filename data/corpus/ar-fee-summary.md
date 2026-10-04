@@ -4,6 +4,7 @@ title: ملخص رسوم البرنامج التأسيسي الجامعي ٢٠٢
 tier: primary
 lang: ar
 note: Synthetic Arabic companion to fee-schedule.md.
+about: ufp-fees
 ---
 
 # الرسوم الدراسية

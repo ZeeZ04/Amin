@@ -125,3 +125,60 @@ reported but never optimised, and no paired test may run across slices.
 **Consequence:** more columns, more p-values, and a report that cannot be
 summarised in one number — which is the point. The cost asymmetry is made
 explicit in `trust_score` instead, with its weight stated as a judgement.
+
+
+## ADR-009 — Conflicts are detected in code, not delegated to the model
+**Status:** accepted · **Date:** 2026-10-04
+
+The original implementation trusted the model to begin its draft with the word
+`CONFLICT`. That is unverifiable, untestable without a model, and fails
+silently. Measured: asked for the PHY-104 coursework weighting with two
+handbooks giving 30% and 40%, Amin retrieved both at coverage 1.00 and answered
+"30 percent" with a clean citation.
+
+**Decision:** detect disagreement in `amin/conflict.py`, before generation, from
+the retrieved passages. Version skew (one live source vs a superseded one)
+answers from the current source and surfaces the old one; a genuine conflict
+between live sources shows both and picks neither.
+
+**Consequence:** conflict detection is testable without a model and cannot be
+silently lost by a prompt change. It also needs its own machinery — number
+tokenisation, answer-position scoping, document relatedness — each of which is
+an experiment in its own right (E9–E11).
+
+## ADR-010 — Document relatedness is declared, not inferred
+**Status:** accepted · **Date:** 2026-10-04
+
+Only comparable documents can contradict each other. A tenancy contract and an
+electricity tariff both have a section headed "Security deposit" with different
+figures; they are about different deposits. Chunk-level vocabulary overlap was
+measured as a discriminator and **failed**: the false pair scored 0.172 against
+the real pair's 0.167.
+
+**Decision:** documents declare `about: <subject>` in front matter, and only
+documents sharing a subject can conflict. Document-level vocabulary overlap at
+0.15 is the fallback for undeclared documents.
+
+**Consequence:** curation work — someone must say what a document is about. That
+is the same kind of work the project already requires for `tier:`, and it is
+reliable in a way the inferred version demonstrably is not. The fallback's
+threshold is a property of this 14-document corpus, and that is written down
+where the threshold lives.
+
+## ADR-011 — A change that improves accuracy and worsens refusal is a regression
+**Status:** accepted · **Date:** 2026-10-04
+
+Indexing document titles raises fact accuracy by 2.7pp and fixes a failing
+conflict item. It also raises hallucination by 13.1pp, because every chunk
+inherits its document's name, so a question naming a document scores high
+coverage against chunks that do not contain the answer — and the evidence gate,
+whose entire job is to ask "does anything here actually cover this?", waves them
+through.
+
+**Decision:** rejected. Changes are judged on `trust_score`
+(`grounded_accuracy − 3 × hallucination_rate`), which makes this −0.366.
+
+**Consequence:** `c001` remains a failing eval item, and that failure is the
+honest record of a real limitation rather than a number bought by weakening the
+safety property. Any future change that moves accuracy and hallucination in the
+same direction gets this treatment.

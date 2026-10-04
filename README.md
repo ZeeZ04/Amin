@@ -16,46 +16,45 @@ Everything runs on one laptop. No API keys, no services, nothing leaves the mach
 
 ## Measured behaviour
 
-The project's claim is not that a 27B local model beats a frontier model. It is
-that **a small model inside this pipeline refuses when it should, and a
-conventional RAG pipeline does not** — measured, with intervals, on identical
-items.
+The claim is not that a 27B local model beats a frontier model. It is that
+**a small model inside this pipeline refuses when it should, and a conventional
+RAG pipeline does not** — measured, with intervals, on identical items.
 
-Three systems, same retriever, same model, same 173-item eval set, same grader:
+Three systems, same retriever, same model, same 237-item eval set, same grader:
 
 | metric | bare | naive RAG | **Amin** | direction |
 |---|---|---|---|---|
-| fact accuracy | 0.0% ±2% | **31.0% ±8%** | 23.0% ±8% | higher |
-| grounded accuracy | — | — | **23.0% ±8%** | higher |
-| correct refusal | 100.0% ±5% | 0.0% ±5% | 73.7% ±14% | higher |
-| **hallucination rate** | 0.0% ±5% | **100.0% ±5%** | **26.3% ±14%** | **lower** |
+| fact accuracy | 0.0% ±2% | **30.0% ±8%** | 22.7% ±8% | higher |
+| grounded accuracy | — | — | **22.7% ±8%** | higher |
+| correct refusal | 100.0% ±2% | 1.0% ±3% | 70.7% ±9% | higher |
+| **hallucination rate** | 0.0% ±2% | **99.0% ±3%** | **29.3% ±9%** | **lower** |
 | citation precision | — | — | **100.0%** | higher |
 | routing accuracy | — | — | **95.5% ±10%** | higher |
+| conflict handling | 0/6 | 0/6 | **5/6** | higher |
 
 Paired McNemar tests on the same items, sliced by question kind:
 
 | comparison | metric | delta (95% CI) | p |
 |---|---|---|---|
-| Amin vs naive | fact accuracy | **−8.0%** [−13.3%, −3.5%] | 0.004 |
-| Amin vs naive | correct refusal | **+73.7%** [+60.5%, +86.8%] | <0.0001 |
+| Amin vs naive | fact accuracy | **−7.3%** [−12.7%, −2.7%] | 0.008 |
+| Amin vs naive | correct refusal | **+69.7%** [+60.6%, +78.8%] | <0.0001 |
 
-**Amin trades 8 points of fact accuracy for 74 points of correct refusal.** Both
+**Amin trades 7 points of fact accuracy for 70 points of correct refusal.** Both
 significant, neither interval crossing zero. That trade is the thesis, stated as
-two numbers.
+two numbers — not dominance, which the data does not support.
 
 > **Read the caveats, they are not decoration.**
 >
 > 1. These are `echo`-provider numbers — a deterministic lexical extractor with
 >    **no language model at all**, so the pipeline is testable offline in CI.
 >    They measure plumbing, not quality. 23% fact accuracy is bad.
->    `docs/EXPERIMENTS.md` E7 is where real-model numbers go.
+>    `docs/EXPERIMENTS.md` E16 is where real-model numbers go.
 > 2. `bare` scoring 0% hallucination is not a win — with no passages it abstains
 >    on everything. A system that always says "I don't know" has a perfect
 >    refusal rate and no use. That is why refusal is never reported without
 >    accuracy beside it.
-> 3. The unanswerable slice is 38 items, so hallucination rate carries a ±15pp
->    interval. Enough to separate 100% from 26%; nowhere near enough to call an
->    8-point improvement. Fixing that is the top open task.
+> 3. Conflict handling is 6 items: a capability check, not a rate. It is
+>    reported as passed/total for exactly that reason.
 
 Reproduce all of it with no model and no network:
 
@@ -135,6 +134,14 @@ absolute, and it is what makes "what is the capital of Burkina Faso?" a refusal
 instead of a confident answer sourced from a refrigerator manual. This bug was
 real, it shipped, and the eval harness caught it; see `docs/EXPERIMENTS.md` E2.
 
+**Disagreement is detected in code, before generation.** Retrieve two sources
+that contradict each other, hand both to a model, and it will pick one and cite
+it — a silently resolved contradiction wearing a citation. Relying on the model
+to announce the conflict is unverifiable and fails quietly, so `conflict.py`
+compares the numbers each source puts next to the question's own terms, and only
+between documents declared to be about the same subject. `docs/EXPERIMENTS.md`
+E7–E11 is how that was built and why the obvious version of it does not work.
+
 **A sentence that cites a passage which does not support it is deleted, not
 flagged.** A fabrication with a correct-looking footnote is the worst output this
 system can produce — worse than no answer, because the footnote is what buys the
@@ -151,6 +158,7 @@ reader can always tell the two apart.
 | `amin ask "…" [--debug] [--retrieved]` | one grounded answer with sources |
 | `amin eval [--failures] [--system amin\|naive\|bare]` | run the eval set, print metrics with CIs |
 | `amin bench [--systems bare,naive,amin]` | the ablation: compare systems with paired tests |
+| `make build-eval` | regenerate and validate the eval set |
 | `amin stats` | what is in the index |
 | `amin doctor` | is the model server up, are the models pulled |
 | `make serve` | FastAPI on :8000 — `/ask`, `/chunks/{id}`, `/metrics` |
@@ -169,12 +177,13 @@ amin/
   evaluate.py    the eval harness and its metrics
   api.py         FastAPI
   cli.py         typer
+  conflict.py    structural disagreement detection, before generation
   stats.py       Wilson intervals, McNemar paired tests, paired bootstrap
   systems.py     the three comparable systems: bare, naive RAG, amin
   benchmark.py   multi-system runner, significance tests, markdown report
   hosted.py      OpenAI-compatible + Anthropic adapters with cost accounting
-data/corpus/     13 synthetic source documents, exact ground truth
-data/eval/       173-item eval set: 113 answerable, 38 unanswerable, 22 out-of-scope
+data/corpus/     14 synthetic source documents, exact ground truth
+data/eval/       237 items: 110 answerable, 99 unanswerable, 22 out-of-scope, 6 conflict
 docs/            ARCHITECTURE · EVAL · EXPERIMENTS · DECISIONS
 private/         gitignored. Real documents go here and never into a commit.
 ```
@@ -219,6 +228,13 @@ and the generator at once would change two variables and measure neither.
   appliance from "FR-440": the distinctive terms are all present and only the
   model number differs. Items tagged `near-miss` are in the set precisely so the
   number reflects this, and it is the known design hole (EXPERIMENTS E11).
+- Conflict detection compares numbers in answer position, not *typed*
+  quantities, so two sections of one subject discussing different quantities can
+  look contradictory. Currently suppressed by a tuned coverage band rather than
+  solved (EXPERIMENTS E11).
+- Document titles are deliberately not indexed. Indexing them raises fact
+  accuracy by 2.7pp and hallucination by 13.1pp, because every chunk inherits
+  the document's name and the evidence gate stops working (EXPERIMENTS E12).
 - No real-model numbers exist yet. Every figure above is from the no-model
   provider. The ablation's *shape* should survive attaching a model; the
   absolute numbers will not.
