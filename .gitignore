@@ -1,0 +1,16 @@
+# The data wall. Real documents live in private/ and never enter a commit.
+private/*
+!private/.gitkeep
+
+data/index/
+reports/*.json
+*.db
+*.sqlite3
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+.DS_Store

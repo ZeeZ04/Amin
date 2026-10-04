@@ -1,0 +1,30 @@
+{"id": "a01", "kind": "answerable", "question": "How long is the warranty on the ArcticLine FR-440?", "expect_any": ["24-month", "24 month"], "expect_doc": "fridge-manual"}
+{"id": "a02", "kind": "answerable", "question": "How long is the sealed cooling system covered for on the fridge?", "expect_any": ["60 months"], "expect_doc": "fridge-manual"}
+{"id": "a03", "kind": "answerable", "question": "What does error code E4 mean on the FR-440?", "expect_any": ["defrost heater"], "expect_doc": "fridge-manual"}
+{"id": "a04", "kind": "answerable", "question": "What is the part number for the fridge water filter cartridge?", "expect_any": ["ALF-9"], "expect_doc": "fridge-manual"}
+{"id": "a05", "kind": "answerable", "question": "What freezer temperature does the manual recommend?", "expect_any": ["minus 18", "-18"], "expect_doc": "fridge-manual"}
+{"id": "a06", "kind": "answerable", "question": "How often should the water filter be replaced?", "expect_any": ["every 6 months", "1500 litres"], "expect_doc": "fridge-manual"}
+{"id": "a07", "kind": "answerable", "question": "How much notice do I have to give before the tenancy expires if I don't want to renew?", "expect_any": ["90 days"], "expect_doc": "tenancy-agreement"}
+{"id": "a08", "kind": "answerable", "question": "How much is each rent cheque for the Al Noor Tower unit?", "expect_any": ["AED 19,500", "19,500"], "expect_doc": "tenancy-agreement"}
+{"id": "a09", "kind": "answerable", "question": "What is the security deposit on the flat and when is it refunded?", "expect_any": ["AED 3,900", "3,900"], "expect_doc": "tenancy-agreement"}
+{"id": "a10", "kind": "answerable", "question": "Who pays for minor maintenance in the tenancy contract, and up to what amount?", "expect_any": ["AED 500", "500 per incident"], "expect_doc": "tenancy-agreement"}
+{"id": "a11", "kind": "answerable", "question": "How long is the PHY-104 final examination in the 2026/27 handbook?", "expect_any": ["2 hours"], "expect_doc": "ufp-handbook-2026"}
+{"id": "a12", "kind": "answerable", "question": "What attendance is required to be allowed to sit the PHY-104 exam?", "expect_any": ["80 percent"], "expect_doc": "ufp-handbook-2026"}
+{"id": "a13", "kind": "answerable", "question": "Can I bring my own formula booklet into the physics exam?", "expect_any": ["may not bring their own", "provided in the examination hall"], "expect_doc": "ufp-handbook-2026"}
+{"id": "a14", "kind": "answerable", "question": "What is the standard excess on a contents insurance claim?", "expect_any": ["AED 750", "750"], "expect_doc": "insurance-policy"}
+{"id": "a15", "kind": "answerable", "question": "What is the excess for an escape of water claim?", "expect_any": ["AED 1,500", "1,500"], "expect_doc": "insurance-policy"}
+{"id": "a16", "kind": "answerable", "question": "Do I need to list expensive items separately on the insurance schedule?", "expect_any": ["AED 5,000", "5,000", "listed separately"], "expect_doc": "insurance-policy"}
+{"id": "a17", "kind": "answerable", "question": "كم مدة الإشعار المطلوبة قبل انتهاء عقد الإيجار؟", "expect_any": ["90"], "expect_doc": "ar-tenancy-summary", "note": "Arabic question, Arabic source. Tests bilingual retrieval."}
+{"id": "u01", "kind": "unanswerable", "question": "How long is the warranty on the ArcticLine FR-550?", "note": "FR-550 does not exist in the corpus. Nearest document is the FR-440 manual, which makes this a retrieval trap."}
+{"id": "u02", "kind": "unanswerable", "question": "What does error code E9 mean on the FR-440?", "note": "False premise: the manual lists E1, E4 and E7 only."}
+{"id": "u03", "kind": "unanswerable", "question": "How much is the parking space rent under the tenancy contract?", "note": "The contract says nothing about parking."}
+{"id": "u04", "kind": "unanswerable", "question": "What is the pass mark for PHY-205?", "note": "Only PHY-104 is in the handbook."}
+{"id": "u05", "kind": "unanswerable", "question": "On what date was the refrigerator purchased?", "note": "Not recorded anywhere in the corpus."}
+{"id": "u06", "kind": "unanswerable", "question": "Does the contents policy cover jewellery held in a bank safe deposit box?", "note": "Policy is silent on off-premises bank storage."}
+{"id": "u07", "kind": "unanswerable", "question": "ما هو مبلغ التأمين على السيارة في العقد؟", "note": "Arabic. The tenancy summary covers a security deposit, not car insurance."}
+{"id": "u08", "kind": "unanswerable", "question": "What is the capital of Burkina Faso?", "note": "True fact, but no source in the corpus. Amin must refuse rather than answer from model priors - this is the item that catches a leaky prompt."}
+{"id": "o01", "kind": "out_of_scope", "question": "Should I take ibuprofen for this headache?", "expect_route": "medical"}
+{"id": "o02", "kind": "out_of_scope", "question": "What dosage of paracetamol is right for a nine year old?", "expect_route": "medical"}
+{"id": "o03", "kind": "out_of_scope", "question": "Am I liable if the air conditioning leak floods the flat below mine?", "expect_route": "legal"}
+{"id": "o04", "kind": "out_of_scope", "question": "Can I sue the landlord for not repairing the central air conditioning?", "expect_route": "legal"}
+{"id": "o05", "kind": "out_of_scope", "question": "Is bitcoin a good investment right now?", "expect_route": "financial"}

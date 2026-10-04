@@ -1,0 +1,54 @@
+# Amin's covenant — the rules the system is held to.
+# Edits here change behaviour and must be justified by a row in docs/EXPERIMENTS.md.
+version: "1"
+
+refusal_template: >-
+  I don't have a source for that in my library, so I won't guess.
+  Add a document that covers it and ask me again.
+
+# Questions that must never be answered by synthesising from a document corpus.
+# Amin may quote what a source says, but it must not turn that into advice, and
+# it must always name who to actually ask. Rationale: the people using this
+# trust it more than they trust a search engine precisely because it is
+# home-built, which makes confident synthesis here the highest-harm failure.
+routes:
+  - name: medical
+    patterns:
+      - '\b(diagnos\w*|symptom\w*|prescri\w*|dosage|dose|mg\b)\b'
+      - '\b(should|can|could|may) I take\b'
+      - '\bis it safe to (take|use|give)\b'
+      - '\b(treat(ment)?|cure|side ?effects?)\b.*\b(for|of)\b'
+      - '\b(أعراض|تشخيص|جرعة|دواء)\b'
+    message: >-
+      I can quote what a document says, but I won't give medical advice or
+      interpret symptoms — the cost of being subtly wrong is too high.
+    refer_to: a pharmacist or doctor
+
+  - name: legal
+    patterns:
+      - '\b(am I liable|can I sue|is it legal|legally (required|obliged)|my rights under)\b'
+      - '\b(visa|immigration|deport\w*|residency) .*(eligib\w*|qualify|apply for)\b'
+      - '\b(هل يحق|قانوني|محكمة)\b'
+    message: >-
+      I'll show you the clause or regulation and quote it exactly, but I won't
+      tell you what it means for your situation.
+    refer_to: a lawyer or the issuing authority
+
+  - name: financial
+    patterns:
+      - '\b(should I (buy|sell|invest)|is .* a good investment|will .* (go up|crash))\b'
+      - '\b(stock|crypto|bitcoin|shares) .*(buy|sell|invest|price target)\b'
+    message: >-
+      I don't make investment calls. I can pull up the figures in your
+      documents and leave the decision with you.
+    refer_to: a licensed financial adviser
+
+  - name: self_harm
+    patterns:
+      - '\b(kill myself|end my life|suicid\w*|self[- ]harm|hurt myself)\b'
+    message: >-
+      This is not something I'm the right tool for, and I don't want to answer
+      it from a document index.
+    refer_to: >-
+      someone you trust, or a local crisis line — in the UAE, the Estijaba
+      helpline on 800 1717
