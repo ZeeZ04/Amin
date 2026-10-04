@@ -29,6 +29,13 @@ serve:
 doctor:
 	uv run amin doctor
 
+eval-bench:
+	uv run amin ingest --reset --provider echo
+	uv run amin bench --provider echo --verifier lexical
+
+build-eval:
+	uv run python scripts/build_eval_set.py
+
 sweep:
 	uv run python scripts/sweep_floor.py
 

@@ -68,3 +68,48 @@ The committed set is a seed. The build plan calls for 100 items, written by
 asking the actual users what they would ask — which is research, not typing, and
 it will change the design. Keep the proportions roughly 60/25/15 and never let
 the unanswerable slice fall below a quarter.
+
+---
+
+## The three systems (added 2026-10-04)
+
+`amin bench` runs the same eval set through three architectures to answer
+whether the pipeline earns its complexity:
+
+| system | retrieval | scope routing | evidence gate | citations | verification |
+|---|---|---|---|---|---|
+| `bare` | no | no | no | no | no |
+| `naive` | yes | no | no | no | no |
+| `amin` | yes | yes | yes | yes | yes |
+
+They share the retriever, the model, the items, the grader and the
+verbal-refusal detector. The only variable is the machinery under test.
+
+## Two accuracy metrics, and why
+
+`fact_accuracy` asks only whether the expected fact appeared.
+`grounded_accuracy` additionally requires the expected source document to be
+cited.
+
+A system that cannot cite is graded on `fact_accuracy`; scoring it on
+`grounded_accuracy` would guarantee zero and prove nothing about its behaviour.
+Cross-system claims are therefore made on `fact_accuracy` and
+`hallucination_rate` only. `grounded_accuracy`, `citation_precision` and
+`routing_accuracy` are reported as capabilities Amin has and the baselines do
+not — a dash, not a defeat.
+
+## Statistics
+
+Every proportion carries a Wilson 95% interval. Every system-vs-system claim
+carries a McNemar paired test (exact binomial when disagreements ≤ 25) and a
+paired bootstrap CI on the difference, computed **per item kind** — never across
+kinds, because `fact_ok` means different things on answerable and unanswerable
+items and averaging them cancels real effects.
+
+Sample size, worst case at p=0.5: **97 items** for ±10pp, **385** for ±5pp.
+`amin.stats.required_n()` computes it; `amin bench` prints a warning when a
+slice is below the ±10pp threshold.
+
+Current set: 113 answerable (±9.1pp), 38 unanswerable (±15.2pp), 22 out-of-scope
+(±19.3pp). The unanswerable slice carries the headline metric and is the weakest
+— growing it is the top open task.

@@ -16,4 +16,4 @@ jobs:
       - name: eval (no model required)
         run: |
           uv run amin ingest --reset --provider echo
-          uv run amin eval --provider echo --no-save
+          uv run amin bench --provider echo --verifier lexical --no-save

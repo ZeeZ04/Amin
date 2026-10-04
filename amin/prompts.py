@@ -31,6 +31,22 @@ YES only if the passage states the claim, including every number, name and date 
 If the passage is merely about the same topic, answer NO."""
 
 
+# -- baseline system prompts, for the ablation study ------------------------
+#
+# These exist to be beaten. They are written as a competent engineer would
+# write them for each baseline, not weakened to make Amin look good - a
+# strawman baseline is worse than no baseline, because it produces a number
+# that cannot be defended.
+
+PLAIN_SYSTEM = """You are a helpful assistant. Answer the question concisely.
+If you do not know the answer, say so."""
+
+
+NAIVE_RAG_SYSTEM = """You are a helpful assistant. Use the context passages below
+to answer the question. Be concise. If the context does not contain the answer,
+say you don't know."""
+
+
 def format_passages(retrieved: list[Retrieved]) -> tuple[str, dict[str, str]]:
     """Render passages as [S1]..[Sn] and return the tag -> chunk_id mapping."""
     lines, mapping = [], {}

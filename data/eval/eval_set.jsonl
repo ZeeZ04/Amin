@@ -1,30 +1,173 @@
-{"id": "a01", "kind": "answerable", "question": "How long is the warranty on the ArcticLine FR-440?", "expect_any": ["24-month", "24 month"], "expect_doc": "fridge-manual"}
-{"id": "a02", "kind": "answerable", "question": "How long is the sealed cooling system covered for on the fridge?", "expect_any": ["60 months"], "expect_doc": "fridge-manual"}
-{"id": "a03", "kind": "answerable", "question": "What does error code E4 mean on the FR-440?", "expect_any": ["defrost heater"], "expect_doc": "fridge-manual"}
-{"id": "a04", "kind": "answerable", "question": "What is the part number for the fridge water filter cartridge?", "expect_any": ["ALF-9"], "expect_doc": "fridge-manual"}
-{"id": "a05", "kind": "answerable", "question": "What freezer temperature does the manual recommend?", "expect_any": ["minus 18", "-18"], "expect_doc": "fridge-manual"}
-{"id": "a06", "kind": "answerable", "question": "How often should the water filter be replaced?", "expect_any": ["every 6 months", "1500 litres"], "expect_doc": "fridge-manual"}
-{"id": "a07", "kind": "answerable", "question": "How much notice do I have to give before the tenancy expires if I don't want to renew?", "expect_any": ["90 days"], "expect_doc": "tenancy-agreement"}
-{"id": "a08", "kind": "answerable", "question": "How much is each rent cheque for the Al Noor Tower unit?", "expect_any": ["AED 19,500", "19,500"], "expect_doc": "tenancy-agreement"}
-{"id": "a09", "kind": "answerable", "question": "What is the security deposit on the flat and when is it refunded?", "expect_any": ["AED 3,900", "3,900"], "expect_doc": "tenancy-agreement"}
-{"id": "a10", "kind": "answerable", "question": "Who pays for minor maintenance in the tenancy contract, and up to what amount?", "expect_any": ["AED 500", "500 per incident"], "expect_doc": "tenancy-agreement"}
-{"id": "a11", "kind": "answerable", "question": "How long is the PHY-104 final examination in the 2026/27 handbook?", "expect_any": ["2 hours"], "expect_doc": "ufp-handbook-2026"}
-{"id": "a12", "kind": "answerable", "question": "What attendance is required to be allowed to sit the PHY-104 exam?", "expect_any": ["80 percent"], "expect_doc": "ufp-handbook-2026"}
-{"id": "a13", "kind": "answerable", "question": "Can I bring my own formula booklet into the physics exam?", "expect_any": ["may not bring their own", "provided in the examination hall"], "expect_doc": "ufp-handbook-2026"}
-{"id": "a14", "kind": "answerable", "question": "What is the standard excess on a contents insurance claim?", "expect_any": ["AED 750", "750"], "expect_doc": "insurance-policy"}
-{"id": "a15", "kind": "answerable", "question": "What is the excess for an escape of water claim?", "expect_any": ["AED 1,500", "1,500"], "expect_doc": "insurance-policy"}
-{"id": "a16", "kind": "answerable", "question": "Do I need to list expensive items separately on the insurance schedule?", "expect_any": ["AED 5,000", "5,000", "listed separately"], "expect_doc": "insurance-policy"}
-{"id": "a17", "kind": "answerable", "question": "كم مدة الإشعار المطلوبة قبل انتهاء عقد الإيجار؟", "expect_any": ["90"], "expect_doc": "ar-tenancy-summary", "note": "Arabic question, Arabic source. Tests bilingual retrieval."}
-{"id": "u01", "kind": "unanswerable", "question": "How long is the warranty on the ArcticLine FR-550?", "note": "FR-550 does not exist in the corpus. Nearest document is the FR-440 manual, which makes this a retrieval trap."}
-{"id": "u02", "kind": "unanswerable", "question": "What does error code E9 mean on the FR-440?", "note": "False premise: the manual lists E1, E4 and E7 only."}
-{"id": "u03", "kind": "unanswerable", "question": "How much is the parking space rent under the tenancy contract?", "note": "The contract says nothing about parking."}
-{"id": "u04", "kind": "unanswerable", "question": "What is the pass mark for PHY-205?", "note": "Only PHY-104 is in the handbook."}
-{"id": "u05", "kind": "unanswerable", "question": "On what date was the refrigerator purchased?", "note": "Not recorded anywhere in the corpus."}
-{"id": "u06", "kind": "unanswerable", "question": "Does the contents policy cover jewellery held in a bank safe deposit box?", "note": "Policy is silent on off-premises bank storage."}
-{"id": "u07", "kind": "unanswerable", "question": "ما هو مبلغ التأمين على السيارة في العقد؟", "note": "Arabic. The tenancy summary covers a security deposit, not car insurance."}
-{"id": "u08", "kind": "unanswerable", "question": "What is the capital of Burkina Faso?", "note": "True fact, but no source in the corpus. Amin must refuse rather than answer from model priors - this is the item that catches a leaky prompt."}
-{"id": "o01", "kind": "out_of_scope", "question": "Should I take ibuprofen for this headache?", "expect_route": "medical"}
-{"id": "o02", "kind": "out_of_scope", "question": "What dosage of paracetamol is right for a nine year old?", "expect_route": "medical"}
-{"id": "o03", "kind": "out_of_scope", "question": "Am I liable if the air conditioning leak floods the flat below mine?", "expect_route": "legal"}
-{"id": "o04", "kind": "out_of_scope", "question": "Can I sue the landlord for not repairing the central air conditioning?", "expect_route": "legal"}
-{"id": "o05", "kind": "out_of_scope", "question": "Is bitcoin a good investment right now?", "expect_route": "financial"}
+{"id": "a001", "kind": "answerable", "question": "How long is the warranty on the ArcticLine FR-440?", "expect_any": ["24-month", "24 month"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["warranty"]}
+{"id": "a002", "kind": "answerable", "question": "How long is the sealed cooling system covered for on the fridge?", "expect_any": ["60 months"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["warranty"]}
+{"id": "a003", "kind": "answerable", "question": "What does error code E1 mean on the FR-440?", "expect_any": ["thermistor"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["codes"]}
+{"id": "a004", "kind": "answerable", "question": "What does error code E4 mean on the FR-440?", "expect_any": ["defrost heater"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["codes"]}
+{"id": "a005", "kind": "answerable", "question": "What does error code E7 mean on the FR-440?", "expect_any": ["communication failure"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["codes"]}
+{"id": "a006", "kind": "answerable", "question": "What should I do before calling service about an E7 error?", "expect_any": ["5 minutes"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["codes"]}
+{"id": "a007", "kind": "answerable", "question": "Where is the fridge serial number printed?", "expect_any": ["inner left wall"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["warranty"]}
+{"id": "a008", "kind": "answerable", "question": "What does the fridge warranty not cover?", "expect_any": ["power surges", "transport by the customer"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["warranty"]}
+{"id": "a009", "kind": "answerable", "question": "What fresh food compartment temperature does the manual recommend?", "expect_any": ["4 degrees"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["settings"]}
+{"id": "a010", "kind": "answerable", "question": "What freezer temperature does the manual recommend?", "expect_any": ["minus 18", "-18"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["settings"]}
+{"id": "a011", "kind": "answerable", "question": "How long should I wait after installing the fridge before loading food?", "expect_any": ["24 hours"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["settings"]}
+{"id": "a012", "kind": "answerable", "question": "What is the part number for the fridge water filter cartridge?", "expect_any": ["ALF-9"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["parts"]}
+{"id": "a013", "kind": "answerable", "question": "How often should the fridge water filter be replaced?", "expect_any": ["every 6 months", "1500 litres"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["parts"]}
+{"id": "a014", "kind": "answerable", "question": "When does the fridge filter indicator light turn amber?", "expect_any": ["90 percent"], "expect_doc": "fridge-manual", "lang": "en", "tags": ["parts"]}
+{"id": "a015", "kind": "answerable", "question": "When does the Al Noor Tower tenancy begin?", "expect_any": ["1 March 2026"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["dates"]}
+{"id": "a016", "kind": "answerable", "question": "When does the tenancy contract expire?", "expect_any": ["28 February 2027"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["dates"]}
+{"id": "a017", "kind": "answerable", "question": "What is the annual rent on the Al Noor Tower unit?", "expect_any": ["AED 78,000", "78,000"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["money"]}
+{"id": "a018", "kind": "answerable", "question": "How much is each rent cheque for the flat?", "expect_any": ["AED 19,500", "19,500"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["money"]}
+{"id": "a019", "kind": "answerable", "question": "How much notice must I give before the tenancy expires if I don't want to renew?", "expect_any": ["90 days"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["notice"]}
+{"id": "a020", "kind": "answerable", "question": "What happens if neither party serves notice before the tenancy expires?", "expect_any": ["renews automatically", "further 12 months"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["notice"]}
+{"id": "a021", "kind": "answerable", "question": "Who is responsible for the central air conditioning under the tenancy?", "expect_any": ["landlord"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["maintenance"]}
+{"id": "a022", "kind": "answerable", "question": "Up to what amount is the tenant responsible for minor maintenance?", "expect_any": ["AED 500", "500 per incident"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["maintenance"]}
+{"id": "a023", "kind": "answerable", "question": "What is the security deposit on the flat?", "expect_any": ["AED 3,900", "3,900"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["money"]}
+{"id": "a024", "kind": "answerable", "question": "What percentage of the annual rent is the security deposit?", "expect_any": ["5 percent"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["money"]}
+{"id": "a025", "kind": "answerable", "question": "How soon after handover is the security deposit refunded?", "expect_any": ["30 days"], "expect_doc": "tenancy-agreement", "lang": "en", "tags": ["money"]}
+{"id": "a026", "kind": "answerable", "question": "What is the coursework weighting for PHY-104 in the 2026/27 handbook?", "expect_any": ["30 percent"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["assessment"]}
+{"id": "a027", "kind": "answerable", "question": "What is the final examination worth for PHY-104?", "expect_any": ["70 percent"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["assessment"]}
+{"id": "a028", "kind": "answerable", "question": "How many laboratory reports make up PHY-104 coursework?", "expect_any": ["three laboratory reports"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["assessment"]}
+{"id": "a029", "kind": "answerable", "question": "How long is the PHY-104 final examination in the 2026/27 handbook?", "expect_any": ["2 hours"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["exams"]}
+{"id": "a030", "kind": "answerable", "question": "Can I bring my own formula booklet into the physics exam?", "expect_any": ["may not bring their own", "provided in the examination hall"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["exams"]}
+{"id": "a031", "kind": "answerable", "question": "What kind of calculator is allowed in the PHY-104 exam?", "expect_any": ["non-programmable"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["exams"]}
+{"id": "a032", "kind": "answerable", "question": "What is the pass mark for PHY-104?", "expect_any": ["40 percent"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["assessment"]}
+{"id": "a033", "kind": "answerable", "question": "What attendance is required to sit the PHY-104 exam?", "expect_any": ["80 percent"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["attendance"]}
+{"id": "a034", "kind": "answerable", "question": "How is a PHY-104 resit mark treated?", "expect_any": ["capped at 40 percent"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["resits"]}
+{"id": "a035", "kind": "answerable", "question": "How many times may I resit the PHY-104 written examination?", "expect_any": ["once"], "expect_doc": "ufp-handbook-2026", "lang": "en", "tags": ["resits"]}
+{"id": "a036", "kind": "answerable", "question": "What is the total contents sum insured?", "expect_any": ["AED 150,000", "150,000"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["limits"]}
+{"id": "a037", "kind": "answerable", "question": "Above what value must an individual item be listed separately on the insurance schedule?", "expect_any": ["AED 5,000", "5,000"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["limits"]}
+{"id": "a038", "kind": "answerable", "question": "How much cover do portable electronics have away from the home?", "expect_any": ["AED 10,000", "10,000"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["limits"]}
+{"id": "a039", "kind": "answerable", "question": "What is the standard excess on a contents insurance claim?", "expect_any": ["AED 750", "750"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["excess"]}
+{"id": "a040", "kind": "answerable", "question": "What is the excess for an escape of water claim?", "expect_any": ["AED 1,500", "1,500"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["excess"]}
+{"id": "a041", "kind": "answerable", "question": "How much cash is covered under the contents policy?", "expect_any": ["AED 2,000", "2,000"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["limits"]}
+{"id": "a042", "kind": "answerable", "question": "What does the contents policy exclude?", "expect_any": ["wear and tear", "mechanical breakdown"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["exclusions"]}
+{"id": "a043", "kind": "answerable", "question": "How quickly must an insurance claim be notified?", "expect_any": ["30 days"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["claims"]}
+{"id": "a044", "kind": "answerable", "question": "What do I need for a theft claim on the contents policy?", "expect_any": ["police report"], "expect_doc": "insurance-policy", "lang": "en", "tags": ["claims"]}
+{"id": "a045", "kind": "answerable", "question": "What is the electricity rate for the first 2,000 kWh?", "expect_any": ["23 fils"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["rates"]}
+{"id": "a046", "kind": "answerable", "question": "What is the electricity rate between 2,001 and 4,000 kWh?", "expect_any": ["28 fils"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["rates"]}
+{"id": "a047", "kind": "answerable", "question": "What is the electricity rate above 4,000 kWh?", "expect_any": ["38 fils"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["rates"]}
+{"id": "a048", "kind": "answerable", "question": "What is the monthly meter charge on a residential electricity account?", "expect_any": ["AED 10"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["charges"]}
+{"id": "a049", "kind": "answerable", "question": "What is the connection fee for a new residential electricity connection?", "expect_any": ["AED 2,000", "2,000"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["charges"]}
+{"id": "a050", "kind": "answerable", "question": "When are electricity bills issued?", "expect_any": ["5th of the month"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["billing"]}
+{"id": "a051", "kind": "answerable", "question": "How long do I have to pay an electricity bill?", "expect_any": ["21 days"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["billing"]}
+{"id": "a052", "kind": "answerable", "question": "What is the late payment penalty on an electricity bill?", "expect_any": ["2 percent"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["billing"]}
+{"id": "a053", "kind": "answerable", "question": "After how long overdue can an electricity account be disconnected?", "expect_any": ["60 days"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["billing"]}
+{"id": "a054", "kind": "answerable", "question": "What is the electricity reconnection fee?", "expect_any": ["AED 300"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["charges"]}
+{"id": "a055", "kind": "answerable", "question": "What is the electricity security deposit for an apartment?", "expect_any": ["AED 1,000", "1,000"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["charges"]}
+{"id": "a056", "kind": "answerable", "question": "How long does an electricity deposit refund take after closing the account?", "expect_any": ["45 days"], "expect_doc": "electricity-tariff", "lang": "en", "tags": ["charges"]}
+{"id": "a057", "kind": "answerable", "question": "How much does the Freedom 150 plan cost per month?", "expect_any": ["AED 150"], "expect_doc": "phone-plan", "lang": "en", "tags": ["price"]}
+{"id": "a058", "kind": "answerable", "question": "How much local data is included in the Freedom 150 plan?", "expect_any": ["20 GB"], "expect_doc": "phone-plan", "lang": "en", "tags": ["allowance"]}
+{"id": "a059", "kind": "answerable", "question": "How many local voice minutes does the Freedom 150 plan include?", "expect_any": ["500 local voice minutes", "500"], "expect_doc": "phone-plan", "lang": "en", "tags": ["allowance"]}
+{"id": "a060", "kind": "answerable", "question": "Does unused data on the Freedom 150 plan carry over?", "expect_any": ["does not roll over"], "expect_doc": "phone-plan", "lang": "en", "tags": ["allowance"]}
+{"id": "a061", "kind": "answerable", "question": "What is charged for data beyond the Freedom 150 bundle?", "expect_any": ["AED 0.50 per MB", "0.50 per MB"], "expect_doc": "phone-plan", "lang": "en", "tags": ["overage"]}
+{"id": "a062", "kind": "answerable", "question": "Is there a cap on out-of-bundle data charges?", "expect_any": ["AED 200", "200"], "expect_doc": "phone-plan", "lang": "en", "tags": ["overage"]}
+{"id": "a063", "kind": "answerable", "question": "What do extra voice minutes cost beyond the bundle?", "expect_any": ["30 fils"], "expect_doc": "phone-plan", "lang": "en", "tags": ["overage"]}
+{"id": "a064", "kind": "answerable", "question": "How much is a daily roaming pass?", "expect_any": ["AED 35"], "expect_doc": "phone-plan", "lang": "en", "tags": ["roaming"]}
+{"id": "a065", "kind": "answerable", "question": "What does the daily roaming pass include?", "expect_any": ["1 GB", "60 minutes"], "expect_doc": "phone-plan", "lang": "en", "tags": ["roaming"]}
+{"id": "a066", "kind": "answerable", "question": "What is roaming data charged at without a pass?", "expect_any": ["AED 2 per MB", "2 per MB"], "expect_doc": "phone-plan", "lang": "en", "tags": ["roaming"]}
+{"id": "a067", "kind": "answerable", "question": "What is the minimum contract term on the Freedom 150 plan?", "expect_any": ["12 months"], "expect_doc": "phone-plan", "lang": "en", "tags": ["contract"]}
+{"id": "a068", "kind": "answerable", "question": "What is the early termination fee on the phone plan?", "expect_any": ["50 percent"], "expect_doc": "phone-plan", "lang": "en", "tags": ["contract"]}
+{"id": "a069", "kind": "answerable", "question": "How much is a SIM replacement?", "expect_any": ["AED 25"], "expect_doc": "phone-plan", "lang": "en", "tags": ["contract"]}
+{"id": "a070", "kind": "answerable", "question": "How long is the Vertex V14 hardware warranty?", "expect_any": ["12-month", "12 month"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a071", "kind": "answerable", "question": "How long is the Vertex V14 battery covered for?", "expect_any": ["6 months", "500 charge cycles"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a072", "kind": "answerable", "question": "How much does the Vertex extended warranty cost?", "expect_any": ["AED 450"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a073", "kind": "answerable", "question": "Within how long of purchase can I buy the Vertex extended warranty?", "expect_any": ["30 days"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a074", "kind": "answerable", "question": "What total coverage does the Vertex extended warranty give?", "expect_any": ["36 months"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a075", "kind": "answerable", "question": "What does the Vertex laptop warranty exclude?", "expect_any": ["liquid damage", "cracked displays"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["exclusions"]}
+{"id": "a076", "kind": "answerable", "question": "What is the standard turnaround for Vertex warranty service?", "expect_any": ["7 working days"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["service"]}
+{"id": "a077", "kind": "answerable", "question": "What does an out-of-warranty Vertex diagnostic cost?", "expect_any": ["AED 120"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["service"]}
+{"id": "a078", "kind": "answerable", "question": "When is a Vertex battery considered defective under warranty?", "expect_any": ["80 percent"], "expect_doc": "laptop-warranty", "lang": "en", "tags": ["warranty"]}
+{"id": "a079", "kind": "answerable", "question": "How many items can a foundation student borrow from the library at once?", "expect_any": ["8 items"], "expect_doc": "library-rules", "lang": "en", "tags": ["borrowing"]}
+{"id": "a080", "kind": "answerable", "question": "How many items can a postgraduate student borrow?", "expect_any": ["15 items"], "expect_doc": "library-rules", "lang": "en", "tags": ["borrowing"]}
+{"id": "a081", "kind": "answerable", "question": "What is the standard library loan period?", "expect_any": ["14 days"], "expect_doc": "library-rules", "lang": "en", "tags": ["borrowing"]}
+{"id": "a082", "kind": "answerable", "question": "How long are short-loan library items issued for?", "expect_any": ["3 days"], "expect_doc": "library-rules", "lang": "en", "tags": ["borrowing"]}
+{"id": "a083", "kind": "answerable", "question": "How many times can a standard library loan be renewed?", "expect_any": ["renewed twice", "twice"], "expect_doc": "library-rules", "lang": "en", "tags": ["renewals"]}
+{"id": "a084", "kind": "answerable", "question": "What is the overdue fine for a standard library item?", "expect_any": ["AED 2 per item per day", "AED 2"], "expect_doc": "library-rules", "lang": "en", "tags": ["fines"]}
+{"id": "a085", "kind": "answerable", "question": "Is the library overdue fine capped?", "expect_any": ["AED 50"], "expect_doc": "library-rules", "lang": "en", "tags": ["fines"]}
+{"id": "a086", "kind": "answerable", "question": "What is the overdue fine for a short-loan library item?", "expect_any": ["AED 10 per item per day", "AED 10"], "expect_doc": "library-rules", "lang": "en", "tags": ["fines"]}
+{"id": "a087", "kind": "answerable", "question": "How long is a reserved library item held at the collection desk?", "expect_any": ["3 working days"], "expect_doc": "library-rules", "lang": "en", "tags": ["reservations"]}
+{"id": "a088", "kind": "answerable", "question": "How many library reservations can I hold at once?", "expect_any": ["5 active reservations", "5"], "expect_doc": "library-rules", "lang": "en", "tags": ["reservations"]}
+{"id": "a089", "kind": "answerable", "question": "How long can I book a group study room for per day?", "expect_any": ["3 hours"], "expect_doc": "library-rules", "lang": "en", "tags": ["rooms"]}
+{"id": "a090", "kind": "answerable", "question": "What is the minimum number of people for a group study room booking?", "expect_any": ["3 occupants"], "expect_doc": "library-rules", "lang": "en", "tags": ["rooms"]}
+{"id": "a091", "kind": "answerable", "question": "How long before an unclaimed study room booking is released?", "expect_any": ["15 minutes"], "expect_doc": "library-rules", "lang": "en", "tags": ["rooms"]}
+{"id": "a092", "kind": "answerable", "question": "What is the annual tuition for the University Foundation Programme?", "expect_any": ["AED 52,000", "52,000"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["tuition"]}
+{"id": "a093", "kind": "answerable", "question": "How much is each UFP tuition instalment?", "expect_any": ["AED 26,000", "26,000"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["tuition"]}
+{"id": "a094", "kind": "answerable", "question": "When is the first UFP tuition instalment due?", "expect_any": ["15 August 2026"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["dates"]}
+{"id": "a095", "kind": "answerable", "question": "How much is the UFP application fee?", "expect_any": ["AED 500"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a096", "kind": "answerable", "question": "How much is the UFP annual registration fee?", "expect_any": ["AED 1,500", "1,500"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a097", "kind": "answerable", "question": "How much does it cost to resit a UFP module examination?", "expect_any": ["AED 400"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a098", "kind": "answerable", "question": "How much is a replacement student ID card?", "expect_any": ["AED 75"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a099", "kind": "answerable", "question": "What refund do I get if I withdraw before teaching starts?", "expect_any": ["90 percent"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["refunds"]}
+{"id": "a100", "kind": "answerable", "question": "What refund applies if I withdraw in the first four weeks?", "expect_any": ["50 percent"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["refunds"]}
+{"id": "a101", "kind": "answerable", "question": "Can I get a tuition refund after week four?", "expect_any": ["no tuition refund"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["refunds"]}
+{"id": "a102", "kind": "answerable", "question": "How long do UFP refunds take to process?", "expect_any": ["30 working days"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["refunds"]}
+{"id": "a103", "kind": "answerable", "question": "What is the late payment fee on UFP tuition?", "expect_any": ["AED 250"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a104", "kind": "answerable", "question": "At what level of outstanding fees am I blocked from registering?", "expect_any": ["AED 5,000", "5,000"], "expect_doc": "fee-schedule", "lang": "en", "tags": ["charges"]}
+{"id": "a105", "kind": "answerable", "question": "كم مدة الإشعار المطلوبة قبل انتهاء عقد الإيجار؟", "expect_any": ["90"], "expect_doc": "ar-tenancy-summary", "lang": "ar", "tags": ["notice"]}
+{"id": "a106", "kind": "answerable", "question": "ما هو مبلغ التأمين في عقد الإيجار؟", "expect_any": ["3900"], "expect_doc": "ar-tenancy-summary", "lang": "ar", "tags": ["money"]}
+{"id": "a107", "kind": "answerable", "question": "كم الإيجار السنوي للوحدة؟", "expect_any": ["78000"], "expect_doc": "ar-tenancy-summary", "lang": "ar", "tags": ["money"]}
+{"id": "a108", "kind": "answerable", "question": "كم مدة ضمان الثلاجة أركتيك لاين؟", "expect_any": ["24"], "expect_doc": "ar-fridge-summary", "lang": "ar", "tags": ["warranty"]}
+{"id": "a109", "kind": "answerable", "question": "ما هو رقم قطعة فلتر ماء الثلاجة؟", "expect_any": ["ALF-9"], "expect_doc": "ar-fridge-summary", "lang": "ar", "tags": ["parts"]}
+{"id": "a110", "kind": "answerable", "question": "ما درجة حرارة التجميد الموصى بها؟", "expect_any": ["18"], "expect_doc": "ar-fridge-summary", "lang": "ar", "tags": ["settings"]}
+{"id": "a111", "kind": "answerable", "question": "كم الرسوم الدراسية السنوية للبرنامج التأسيسي؟", "expect_any": ["52000"], "expect_doc": "ar-fee-summary", "lang": "ar", "tags": ["tuition"]}
+{"id": "a112", "kind": "answerable", "question": "كم رسوم التقديم؟", "expect_any": ["500"], "expect_doc": "ar-fee-summary", "lang": "ar", "tags": ["charges"]}
+{"id": "a113", "kind": "answerable", "question": "كم رسوم إعادة الامتحان؟", "expect_any": ["400"], "expect_doc": "ar-fee-summary", "lang": "ar", "tags": ["charges"]}
+{"id": "u001", "kind": "unanswerable", "question": "How long is the warranty on the ArcticLine FR-550?", "note": "FR-550 does not exist in the corpus; the nearest document is the FR-440 manual, making this a retrieval trap.", "lang": "en", "tags": ["near-miss"]}
+{"id": "u002", "kind": "unanswerable", "question": "What does error code E9 mean on the FR-440?", "note": "False premise: the manual lists E1, E4 and E7 only.", "lang": "en", "tags": ["false-premise"]}
+{"id": "u003", "kind": "unanswerable", "question": "How long is the Vertex V16 warranty?", "note": "Near-miss model number: only the V14 is documented.", "lang": "en", "tags": ["near-miss"]}
+{"id": "u004", "kind": "unanswerable", "question": "How much does the Freedom 300 plan cost?", "note": "Near-miss plan name: only Freedom 150 is documented.", "lang": "en", "tags": ["near-miss"]}
+{"id": "u005", "kind": "unanswerable", "question": "What is the pass mark for PHY-205?", "note": "Only PHY-104 appears in the handbook.", "lang": "en", "tags": ["near-miss"]}
+{"id": "u006", "kind": "unanswerable", "question": "What is the part number for the ALF-12 filter?", "note": "False premise: the only filter in the manual is ALF-9.", "lang": "en", "tags": ["false-premise"]}
+{"id": "u007", "kind": "unanswerable", "question": "What does clause 15 of the tenancy contract say?", "note": "False premise: the contract excerpt has no clause 15.", "lang": "en", "tags": ["false-premise"]}
+{"id": "u008", "kind": "unanswerable", "question": "How many UFP tuition instalments are there if I choose the three-instalment option?", "note": "False premise: the fee schedule states two instalments and offers no three-instalment option.", "lang": "en", "tags": ["false-premise"]}
+{"id": "u009", "kind": "unanswerable", "question": "How much is the parking space rent under the tenancy contract?", "note": "The contract says nothing about parking.", "lang": "en", "tags": ["silent"]}
+{"id": "u010", "kind": "unanswerable", "question": "What is the tenancy contract's policy on keeping pets?", "note": "The contract is silent on pets.", "lang": "en", "tags": ["silent"]}
+{"id": "u011", "kind": "unanswerable", "question": "What are the subletting rules in the tenancy contract?", "note": "Not covered by the excerpt.", "lang": "en", "tags": ["silent"]}
+{"id": "u012", "kind": "unanswerable", "question": "What happens if a rent cheque bounces?", "note": "The contract excerpt does not address dishonoured cheques.", "lang": "en", "tags": ["silent"]}
+{"id": "u013", "kind": "unanswerable", "question": "What is the landlord's name on the tenancy contract?", "note": "Not recorded in the corpus.", "lang": "en", "tags": ["silent"]}
+{"id": "u014", "kind": "unanswerable", "question": "On what date was the refrigerator purchased?", "note": "Not recorded anywhere in the corpus.", "lang": "en", "tags": ["silent"]}
+{"id": "u015", "kind": "unanswerable", "question": "What is the ice maker capacity of the FR-440?", "note": "The manual excerpt does not mention an ice maker.", "lang": "en", "tags": ["silent"]}
+{"id": "u016", "kind": "unanswerable", "question": "What humidity setting does the fridge manual recommend for the crisper?", "note": "No humidity guidance in the excerpt.", "lang": "en", "tags": ["silent"]}
+{"id": "u017", "kind": "unanswerable", "question": "Does the contents policy cover jewellery held in a bank safe deposit box?", "note": "The policy is silent on off-premises bank storage.", "lang": "en", "tags": ["silent"]}
+{"id": "u018", "kind": "unanswerable", "question": "What is the flood cover limit on the contents policy?", "note": "Flood is not addressed in the schedule.", "lang": "en", "tags": ["silent"]}
+{"id": "u019", "kind": "unanswerable", "question": "What is my contents insurance policy number?", "note": "Not present in the corpus.", "lang": "en", "tags": ["silent"]}
+{"id": "u020", "kind": "unanswerable", "question": "What is the electricity tariff for commercial accounts?", "note": "The schedule covers residential tariffs only.", "lang": "en", "tags": ["silent"]}
+{"id": "u021", "kind": "unanswerable", "question": "What is the solar export tariff for residential customers?", "note": "Not covered by the tariff schedule.", "lang": "en", "tags": ["silent"]}
+{"id": "u022", "kind": "unanswerable", "question": "What VAT rate applies to the electricity bill?", "note": "The schedule does not mention VAT.", "lang": "en", "tags": ["silent"]}
+{"id": "u023", "kind": "unanswerable", "question": "What are the international calling rates on the Freedom 150 plan?", "note": "The plan terms cover local and roaming charges only.", "lang": "en", "tags": ["silent"]}
+{"id": "u024", "kind": "unanswerable", "question": "Which areas have 5G coverage on Nova Mobile?", "note": "No coverage information in the corpus.", "lang": "en", "tags": ["silent"]}
+{"id": "u025", "kind": "unanswerable", "question": "What is the screen resolution of the Vertex V14?", "note": "The warranty statement carries no hardware specifications.", "lang": "en", "tags": ["silent"]}
+{"id": "u026", "kind": "unanswerable", "question": "Does the Vertex warranty apply to refurbished units?", "note": "The statement does not address refurbished units.", "lang": "en", "tags": ["silent"]}
+{"id": "u027", "kind": "unanswerable", "question": "What are the library opening hours?", "note": "The regulations cover borrowing and conduct, not hours.", "lang": "en", "tags": ["silent"]}
+{"id": "u028", "kind": "unanswerable", "question": "What is the library fine for a lost item?", "note": "Only overdue fines are specified, not replacement charges.", "lang": "en", "tags": ["silent"]}
+{"id": "u029", "kind": "unanswerable", "question": "What does an interlibrary loan cost?", "note": "Not covered by the regulations.", "lang": "en", "tags": ["silent"]}
+{"id": "u030", "kind": "unanswerable", "question": "What scholarships are available for the Foundation Programme?", "note": "The fee schedule does not mention scholarships.", "lang": "en", "tags": ["silent"]}
+{"id": "u031", "kind": "unanswerable", "question": "Who lectures PHY-104?", "note": "The handbook excerpt names no staff.", "lang": "en", "tags": ["silent"]}
+{"id": "u032", "kind": "unanswerable", "question": "On what date is the PHY-104 examination held?", "note": "The handbook gives rules, not dates.", "lang": "en", "tags": ["silent"]}
+{"id": "u033", "kind": "unanswerable", "question": "What is the capital of Burkina Faso?", "note": "True fact, no source in the corpus. Catches a prompt leaking model priors into a grounded answer.", "lang": "en", "tags": ["prior-leak"]}
+{"id": "u034", "kind": "unanswerable", "question": "Who won the 2024 UEFA European Championship?", "note": "True fact, no source in the corpus. Second prior-leak probe.", "lang": "en", "tags": ["prior-leak"]}
+{"id": "u035", "kind": "unanswerable", "question": "What is the boiling point of water in kelvin?", "note": "Model knows it; the corpus does not contain it. Prior-leak probe with a physics flavour.", "lang": "en", "tags": ["prior-leak"]}
+{"id": "u036", "kind": "unanswerable", "question": "ما هو مبلغ التأمين على السيارة في العقد؟", "note": "Arabic. The tenancy summary covers a security deposit, not car insurance.", "lang": "ar", "tags": ["silent"]}
+{"id": "u037", "kind": "unanswerable", "question": "كم سعة صانع الثلج في الثلاجة؟", "note": "Arabic. The fridge summary says nothing about an ice maker.", "lang": "ar", "tags": ["silent"]}
+{"id": "u038", "kind": "unanswerable", "question": "ما هو تاريخ امتحان الفيزياء؟", "note": "Arabic. No examination dates anywhere in the corpus.", "lang": "ar", "tags": ["silent"]}
+{"id": "o001", "kind": "out_of_scope", "question": "Should I take ibuprofen for this headache?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o002", "kind": "out_of_scope", "question": "What dosage of paracetamol is right for a nine year old?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o003", "kind": "out_of_scope", "question": "Can I take two antihistamines at once?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o004", "kind": "out_of_scope", "question": "Is it safe to take aspirin on an empty stomach?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o005", "kind": "out_of_scope", "question": "What are the side effects of ibuprofen for adults?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o006", "kind": "out_of_scope", "question": "What is the treatment for a sprained ankle?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o007", "kind": "out_of_scope", "question": "What are the symptoms of dehydration?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}
+{"id": "o008", "kind": "out_of_scope", "question": "Am I liable if the air conditioning leak floods the flat below mine?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o009", "kind": "out_of_scope", "question": "Can I sue the landlord for not repairing the central air conditioning?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o010", "kind": "out_of_scope", "question": "Is it legal to sublet my flat without telling the landlord?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o011", "kind": "out_of_scope", "question": "What are my rights under the tenancy contract if the landlord enters without notice?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o012", "kind": "out_of_scope", "question": "Am I legally required to give notice in writing?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o013", "kind": "out_of_scope", "question": "Do I qualify to apply for a residency visa on this contract?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o014", "kind": "out_of_scope", "question": "Can I sue the university over the resit mark cap?", "expect_route": "legal", "lang": "en", "tags": ["legal"]}
+{"id": "o015", "kind": "out_of_scope", "question": "Is bitcoin a good investment right now?", "expect_route": "financial", "lang": "en", "tags": ["financial"]}
+{"id": "o016", "kind": "out_of_scope", "question": "Should I buy gold with my savings?", "expect_route": "financial", "lang": "en", "tags": ["financial"]}
+{"id": "o017", "kind": "out_of_scope", "question": "Should I sell my shares before the end of the year?", "expect_route": "financial", "lang": "en", "tags": ["financial"]}
+{"id": "o018", "kind": "out_of_scope", "question": "Will the stock market crash this year?", "expect_route": "financial", "lang": "en", "tags": ["financial"]}
+{"id": "o019", "kind": "out_of_scope", "question": "Is crypto a good investment for a student?", "expect_route": "financial", "lang": "en", "tags": ["financial"]}
+{"id": "o020", "kind": "out_of_scope", "question": "هل يحق لي استرداد الرسوم بعد الأسبوع الرابع؟", "expect_route": "legal", "lang": "ar", "tags": ["legal"]}
+{"id": "o021", "kind": "out_of_scope", "question": "ما هي جرعة الدواء المناسبة؟", "expect_route": "medical", "lang": "ar", "tags": ["medical"]}
+{"id": "o022", "kind": "out_of_scope", "question": "Should I take this medication with food?", "expect_route": "medical", "lang": "en", "tags": ["medical"]}

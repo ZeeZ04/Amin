@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     # See docs/EXPERIMENTS.md for the sweep that chose this value.
     evidence_floor: float = 0.45
 
+    # -- hosted-API pricing, for the cost column in the benchmark ------------
+    # USD per million tokens. Left at zero so a local run never reports a
+    # fabricated cost; set them when adding a hosted row, from that provider's
+    # current price page rather than from a constant in this repo.
+    price_in_per_mtok: float = 0.0
+    price_out_per_mtok: float = 0.0
+
     # -- verification --------------------------------------------------------
     verifier: str = "llm"  # llm | lexical | off
     lexical_overlap_floor: float = 0.28

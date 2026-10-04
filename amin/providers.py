@@ -298,4 +298,10 @@ def get_provider(kind: str | None = None) -> Provider:
         return MLXProvider()
     if kind == "ollama":
         return OllamaProvider()
-    raise ValueError(f"unknown provider {kind!r} (expected ollama | mlx | echo)")
+    if kind in ("openai", "anthropic"):
+        from .hosted import HOSTED
+
+        return HOSTED[kind]()
+    raise ValueError(
+        f"unknown provider {kind!r} (expected ollama | mlx | echo | openai | anthropic)"
+    )
