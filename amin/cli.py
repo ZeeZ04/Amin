@@ -359,6 +359,11 @@ def bench_cmd(
     else:
         console.print(to_markdown(bench))
 
+    # A partial run must not look like a finished one: setup_mac.sh printed
+    # "done" after the amin row died, inviting a 2-of-3 result into E16.
+    if any(r.error for r in bench.runs):
+        raise typer.Exit(1)
+
 
 
 @app.command()

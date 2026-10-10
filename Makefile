@@ -37,7 +37,9 @@ build-eval:
 	uv run python scripts/build_eval_set.py
 
 sweep:
-	uv run python scripts/sweep_floor.py
+	# The default provider is echo; sweeping the stub re-tunes the floor to the
+	# stub, which is the bug E16 exposed. Real model unless overridden.
+	uv run python scripts/sweep_floor.py --provider $${PROVIDER:-ollama}
 
 clean:
 	rm -rf data/index .pytest_cache **/__pycache__

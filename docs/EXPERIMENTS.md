@@ -262,6 +262,89 @@ property.
 
 ---
 
+## E16 — first real-model run (qwen3.6:27b via Ollama)
+
+**Run 1 (discarded).** Full set, thinking on. bare and naive completed (6.1 h and
+4.2 h); amin died on a 180 s `ReadTimeout`. The 27B at ~9 tok/s spent its
+budget reasoning before answering. Fix: `think: false` for all calls
+(`AMIN_THINK=1` to re-enable), timeout 600 s, and `amin bench` now exits
+non-zero on a partial run (setup_mac.sh had printed "done" over it).
+Discarded rather than reported: its bare/naive rows used thinking, so they are
+not comparable with any amin row run without it.
+
+**Run 2 — smoke, 31 items, thinking off.** 10 min total.
+
+| | bare | naive | amin |
+|---|---|---|---|
+| fact accuracy | 28.6% | 100% | 71.4% |
+| correct refusal | 23.1% | 100% | 100% |
+| hallucination | 76.9% | 0% | 0% |
+
+All four items amin missed and naive got were refused in ~12 ms by the
+evidence floor (0.45) before any model call. The floor was tuned on the echo
+stub. Naive's 0% hallucination is the first evidence for the kill criterion;
+the sample is too small to decide it (no naive-vs-amin delta is significant).
+
+**Floor sweep, full set (237), real model, weight 3.**
+
+| floor | grounded | refusal | halluc | trust |
+|---|---|---|---|---|
+| 0.15 | 0.936 | 0.929 | 0.071 | 0.724 |
+| 0.25 | 0.891 | 0.929 | 0.071 | 0.679 |
+| 0.34 | 0.782 | 0.949 | 0.051 | 0.630 |
+| 0.38 | 0.782 | 0.960 | 0.040 | 0.661 |
+| 0.45 | 0.755 | 0.980 | 0.020 | 0.694 |
+
+Reading it honestly:
+- 0.25 and 0.34 are dominated (by 0.15 and 0.38). The real choice is 0.15 vs 0.45.
+- 0.15 buys +18 pts grounded accuracy for +5 pts hallucination (2% → 7%).
+- The winner is decided by the weight, not the data: 0.15 wins at weight 3
+  (0.724 vs 0.694), 0.45 wins above weight ≈ 3.6. A 0.03 trust gap is inside
+  the noise of a 237-item set.
+- 0.15 is the edge of the grid; the optimum may be lower and is untested.
+- Tuned on the same set it will be reported on — a mild optimistic bias.
+
+**Why the floor cannot fix this (model-free diagnosis).** Max coverage per
+item, lexical arm only:
+
+| slice | p10 | p25 | median | p75 | p90 |
+|---|---|---|---|---|---|
+| answerable (110) | 0.27 | 0.47 | 0.58 | 0.76 | 1.00 |
+| unanswerable (99) | 0.00 | 0.18 | 0.30 | 0.46 | 0.63 |
+
+The distributions overlap across the whole useful range. At 0.15, 82/99
+unanswerables pass the gate, yet hallucination is only 7%: **the model, not
+the floor, is doing most of the refusing.** At 0.45 the floor blocks 23
+answerables to stop a handful of unanswerables the model would mostly have
+refused anyway. 12 of 14 near-miss items sit above 0.34 — no floor catches them.
+
+**Fix: an identifier gate (Gate 2b).** If the question names an identifier
+(FR-550, PHY-205, Freedom 300) that no chunk in the retrieval pool contains,
+refuse. Offline on the full set: flags 13/99 unanswerables (9 of 14 near-miss)
+and **0/110 answerables**. Caveat: the pattern was written while looking at
+this eval set; the zero false positives need confirming on new questions.
+Next: re-sweep the floor with the gate on — it should let the floor drop.
+
+**Re-sweep with the identifier gate on.**
+
+| floor | grounded | refusal | halluc | trust |
+|---|---|---|---|---|
+| 0.05 | 0.936 | 0.939 | 0.061 | 0.755 |
+| 0.15 | 0.927 | 0.939 | 0.061 | 0.745 |
+| 0.25 | 0.891 | 0.939 | 0.061 | 0.709 |
+| 0.45 | 0.755 | 0.980 | 0.020 | 0.694 |
+
+The gate moved hallucination at 0.15 from 7.1% to 6.1% — **one item**, not the
+13 it flags offline. The model was already refusing nearly all of those; the
+gate makes those refusals deterministic and instant but buys little accuracy.
+Grounded at 0.15 fell 0.936 → 0.927 (one item): either the gate's first false
+positive or run-to-run noise. Below 0.15 the floor no longer matters.
+
+**Decision:** floor → 0.15. The remaining ~6 hallucinations at 0.15 are not
+near-misses and are unexplained; the sweep does not save per-item results.
+Next: a full three-system bench at 0.15, which both settles the naive-vs-amin
+kill criterion and names the six items.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is

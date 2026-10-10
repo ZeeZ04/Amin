@@ -222,3 +222,35 @@ def test_settings_evidence_floor_is_the_single_refusal_dial(amin, monkeypatch):
     assert amin.ask(q).outcome is Outcome.ANSWERED
     monkeypatch.setattr(settings, "evidence_floor", 10.0)
     assert amin.ask(q).refused
+
+
+# -- identifier gate (E16 / E18 near-miss hole) -------------------------------
+
+
+@pytest.mark.parametrize(
+    "question, expected",
+    [
+        ("How long is the warranty on the ArcticLine FR-550?", {"fr-550"}),
+        ("How much does the Freedom 300 plan cost?", {"freedom 300"}),
+        ("What is the pass mark for PHY-205?", {"phy-205"}),
+        ("How much notice must I give before the tenancy expires?", set()),
+    ],
+)
+def test_question_identifiers(question, expected):
+    from amin.covenant import question_identifiers
+
+    assert question_identifiers(question) == expected
+
+
+def test_sibling_model_number_is_refused_not_answered(amin):
+    """A question about a product the corpus does not cover must not be
+    answered from the manual of its neighbour, however well the rest matches."""
+    answer = amin.ask("What is the recommended freezer temperature on the ZX-9999?")
+    assert answer.refused
+    assert "zx-9999" in answer.refusal_reason.lower()
+
+
+def test_identifier_gate_can_be_turned_off(amin, monkeypatch):
+    monkeypatch.setattr(settings, "identifier_gate", False)
+    answer = amin.ask("What is the recommended freezer temperature on the ZX-9999?")
+    assert "zx-9999" not in (answer.refusal_reason or "").lower()

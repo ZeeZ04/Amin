@@ -16,8 +16,8 @@ server_up() { curl -fsS --max-time 3 "$OLLAMA_HOST_URL/api/tags" >/dev/null 2>&1
 command -v uv >/dev/null || { say "installing uv"; curl -LsSf https://astral.sh/uv/install.sh | sh; }
 
 say "python env"
-uv venv
-uv pip install -e ".[dev]"
+uv venv --allow-existing
+uv sync --extra dev   # install from uv.lock, not a fresh resolve
 
 say "offline checks (no model needed)"
 uv run pytest -q

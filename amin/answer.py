@@ -98,6 +98,22 @@ class Amin:
                 )
             )
 
+        # Gate 2b — identity. Evidence about a sibling product is not evidence.
+        if settings.identifier_gate and (
+            missing := self.covenant.missing_identifiers(question, pool)
+        ):
+            return finish(
+                Answer(
+                    question=question,
+                    outcome=Outcome.REFUSED_NO_EVIDENCE,
+                    refusal_reason=(
+                        self.covenant.refusal_template.strip()
+                        + f" (No document mentions {', '.join(missing)}.)"
+                    ),
+                    retrieved=retrieved,
+                )
+            )
+
         # Gate 3 — disagreement, detected in code before the model ever sees the
         # passages. Left to the model, a contradiction between two sources gets
         # silently resolved and then confidently cited, which is the worst thing

@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     embed_model: str = "nomic-embed-text"
     temperature: float = 0.1
     num_ctx: int = 8192
+    # Qwen3 "thinks" before answering unless told not to. At ~9 tok/s on the
+    # 27B that reasoning alone can exceed the request timeout, and the eval
+    # measures grounding, not long reasoning. Off by default; AMIN_THINK=1 to
+    # measure what it buys. (E16: the amin row died on a 180s ReadTimeout.)
+    think: bool = False
+    request_timeout: float = 600.0
 
     # -- storage -------------------------------------------------------------
     index_path: Path = REPO_ROOT / "data" / "index" / "amin.db"
@@ -53,7 +59,12 @@ class Settings(BaseSettings):
     # number is the main dial between "refuses too often" and "answers from
     # nothing", and it is tuned by the eval harness, not by vibes.
     # See docs/EXPERIMENTS.md for the sweep that chose this value.
-    evidence_floor: float = 0.45
+    # 0.45 was tuned on the echo stub. Re-swept on qwen3.6:27b in E16: 0.15.
+    evidence_floor: float = 0.15
+    # Refuse when the question names an identifier (FR-550, PHY-205) that no
+    # retrieved chunk contains. E16: catches 13/99 unanswerables, 0/110
+    # answerables blocked, model-free. See covenant.missing_identifiers.
+    identifier_gate: bool = True
     # Multiplier applied to a chunk from a document marked `status: superseded`.
     # Strong enough to lose a tie, too weak to hide a clearly better match.
     superseded_penalty: float = 0.7

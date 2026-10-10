@@ -40,9 +40,9 @@ class Provider(Protocol):
 class OllamaProvider:
     name = "ollama"
 
-    def __init__(self, host: str | None = None, timeout: float = 180.0):
+    def __init__(self, host: str | None = None, timeout: float | None = None):
         self.host = (host or settings.ollama_host).rstrip("/")
-        self._client = httpx.Client(base_url=self.host, timeout=timeout)
+        self._client = httpx.Client(base_url=self.host, timeout=timeout or settings.request_timeout)
 
     def _payload(self, prompt: str, model: str | None, system: str, stream: bool) -> dict:
         return {
@@ -50,6 +50,7 @@ class OllamaProvider:
             "prompt": prompt,
             "system": system,
             "stream": stream,
+            "think": settings.think,
             "options": {"temperature": settings.temperature, "num_ctx": settings.num_ctx},
         }
 

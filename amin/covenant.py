@@ -22,6 +22,18 @@ from .config import settings
 from .schema import Retrieved
 
 
+# A token with both a letter and a digit (FR-550, PHY-205, V16, 5G), or a
+# capitalised word followed by a number (Freedom 300, Unit 1024).
+_ID = re.compile(r"\b(?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\b")
+_NAME_NUM = re.compile(r"\b([A-Z][a-z]+)\s+(\d{2,})\b")
+
+
+def question_identifiers(question: str) -> set[str]:
+    out = {m.group(0).lower() for m in _ID.finditer(question)}
+    out |= {f"{a} {b}".lower() for a, b in _NAME_NUM.findall(question)}
+    return out
+
+
 @dataclass(frozen=True)
 class Route:
     name: str
@@ -80,6 +92,24 @@ class Covenant:
         if not retrieved:
             return False
         return max(r.coverage for r in retrieved) >= settings.evidence_floor
+
+    def missing_identifiers(self, question: str, retrieved: list[Retrieved]) -> list[str]:
+        """Identifiers the question names that no retrieved chunk contains.
+
+        The near-miss hole (E18): "warranty on the FR-550" retrieves the FR-440
+        manual at high coverage, because every distinctive word matches except
+        the one that matters. Coverage cannot see that; an exact check on the
+        model number can. Non-empty means the corpus is about a sibling of the
+        thing asked, so answering would cite the wrong product correctly.
+        """
+        wanted = question_identifiers(question)
+        if not wanted:
+            return []
+        seen = " ".join(
+            f"{r.chunk.heading} {r.chunk.text}".lower() for r in retrieved
+        )
+        seen = re.sub(r"\s+", " ", seen)
+        return sorted(w for w in wanted if w not in seen)
 
     def evidence_note(self, retrieved: list[Retrieved]) -> str:
         if not retrieved:
