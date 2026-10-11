@@ -47,7 +47,7 @@
 
   <section class="card" id="auth">
     <p class="muted" id="authNote">Your private documents stay on this computer and are visible only to you.</p>
-    <input id="name" placeholder="Name" autocomplete="username" autocapitalize="none">
+    <input id="name" placeholder="Name, e.g. abdul (lowercase, no spaces)" autocomplete="username" autocapitalize="none">
     <div style="height:8px"></div>
     <input id="pass" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
     <div style="height:8px"></div>
@@ -104,7 +104,14 @@ const $ = id => document.getElementById(id);
 async function call(path, opts = {}) {
   const res = await fetch(path, { credentials: "same-origin", ...opts });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "check your input") : res.statusText);
+  if (!res.ok) {
+    const d = data.detail;
+    // FastAPI validation errors arrive as a list; show what was actually wrong.
+    const msg = typeof d === "string" ? d
+      : Array.isArray(d) ? d.map(e => `${e.loc?.at(-1) ?? "input"}: ${e.msg}`).join("; ")
+      : res.statusText;
+    throw new Error(msg);
+  }
   return data;
 }
 const post = (path, body) => call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
