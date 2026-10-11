@@ -4,6 +4,7 @@ private/*
 
 data/index/
 data/users/
+data/certs/
 reports/*.json
 *.db
 *.sqlite3

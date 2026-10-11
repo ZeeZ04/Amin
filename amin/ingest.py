@@ -16,6 +16,7 @@ from pathlib import Path
 import yaml
 
 from .config import settings
+from .ocr import IMAGE_SUFFIXES, ocr_image, ocr_pdf
 from .schema import Chunk, Document, Tier
 
 # ---------------------------------------------------------------------------
@@ -40,7 +41,12 @@ def load_text(path: Path) -> str:
             from pypdf import PdfReader
         except ImportError as exc:  # pragma: no cover - optional extra
             raise RuntimeError("PDF support needs the 'pdf' extra: uv sync --extra pdf") from exc
-        return "\n\n".join((p.extract_text() or "") for p in PdfReader(str(path)).pages)
+        text = "\n\n".join((p.extract_text() or "") for p in PdfReader(str(path)).pages)
+        if len(text.strip()) < 40:  # no text layer: a scan or a photo saved as PDF
+            text = ocr_pdf(path)
+        return text
+    if suffix in IMAGE_SUFFIXES:
+        return ocr_image(path)
     raise ValueError(f"unsupported file type: {path.suffix}")
 
 
@@ -185,7 +191,7 @@ def chunk_document(doc: Document, body: str) -> list[Chunk]:
 # pipeline
 # ---------------------------------------------------------------------------
 
-SUPPORTED = TEXT_SUFFIXES | HTML_SUFFIXES | {".pdf"}
+SUPPORTED = TEXT_SUFFIXES | HTML_SUFFIXES | IMAGE_SUFFIXES | {".pdf"}
 
 
 def discover(root: Path) -> list[Path]:

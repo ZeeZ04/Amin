@@ -1,4 +1,4 @@
-.PHONY: install ingest eval ask test lint serve doctor clean sweep
+.PHONY: install ingest eval ask test lint serve doctor clean sweep certs
 
 install:
 	uv venv && uv pip install -e ".[dev]"
@@ -24,8 +24,17 @@ lint:
 	uv run ruff check amin tests
 
 serve:
-	# 0.0.0.0 = reachable from phones on the home Wi-Fi: http://<mac-name>.local:8000
-	uv run uvicorn amin.api:api --host 0.0.0.0 --port 8000
+	# Reachable from phones on the home Wi-Fi. HTTPS once `make certs` has run.
+	@if [ -f data/certs/amin.pem ]; then \
+	  uv run uvicorn amin.api:api --host 0.0.0.0 --port 8443 \
+	    --ssl-certfile data/certs/amin.pem --ssl-keyfile data/certs/amin-key.pem; \
+	else \
+	  echo "no certificate yet - serving plain HTTP. Run 'make certs' for HTTPS."; \
+	  uv run uvicorn amin.api:api --host 0.0.0.0 --port 8000; \
+	fi
+
+certs:
+	./scripts/make_cert.sh
 
 doctor:
 	uv run amin doctor

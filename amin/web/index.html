@@ -5,32 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Amin</title>
 <style>
-  :root { --bg:#f6f4ef; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e0d8; --accent:#0f6b5c; --warn:#9a5b00; }
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e0d8; --accent:#0f6b5c; --warn:#9a5b00; --danger:#a3332b; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#141413; --card:#1f1f1d; --ink:#ecebe6; --muted:#9c9a92; --line:#33322f; --accent:#4fb39f; --warn:#e0a24a; }
+    :root { --bg:#141413; --card:#1f1f1d; --ink:#ecebe6; --muted:#9c9a92; --line:#33322f; --accent:#4fb39f; --warn:#e0a24a; --danger:#e07a70; }
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
   main { max-width:680px; margin:0 auto; padding:16px; }
-  header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 16px; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 16px; gap:8px; }
   h1 { font-size:22px; margin:0; letter-spacing:.5px; }
   h1 small { color:var(--muted); font-weight:400; font-size:14px; margin-left:6px; }
+  h2 { font-size:15px; margin:0 0 6px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
-  input, textarea, button { font:inherit; color:inherit; }
-  input, textarea { width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+  input, textarea, button, select { font:inherit; color:inherit; }
+  input, textarea, select { width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
   textarea { resize:vertical; min-height:56px; }
-  button { padding:10px 16px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; }
+  button { padding:10px 16px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; min-height:44px; }
   button.ghost { background:none; color:var(--muted); border:1px solid var(--line); }
   button:disabled { opacity:.5; }
-  .row { display:flex; gap:8px; margin-top:8px; }
+  .row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .row > * { flex:1; }
   .muted { color:var(--muted); font-size:14px; }
-  .err { color:var(--warn); font-size:14px; min-height:20px; }
+  .err { color:var(--warn); font-size:14px; min-height:20px; margin-top:6px; }
   .q { font-weight:600; margin-bottom:6px; }
   .refusal { color:var(--warn); }
   sup a { color:var(--accent); text-decoration:none; font-weight:600; padding:0 2px; }
   .src { border-left:3px solid var(--accent); padding:8px 12px; margin-top:8px; font-size:14px; background:var(--bg); border-radius:0 8px 8px 0; white-space:pre-wrap; }
-  .docs { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .chip { font-size:13px; padding:4px 10px; border:1px solid var(--line); border-radius:99px; }
+  ul.docs { list-style:none; padding:0; margin:0 0 12px; }
+  ul.docs li { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  ul.docs button { min-height:32px; padding:4px 10px; font-size:13px; background:none; color:var(--danger); border:1px solid var(--line); }
+  .code { font:600 20px ui-monospace,monospace; letter-spacing:2px; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -42,10 +46,12 @@
   </header>
 
   <section class="card" id="auth">
-    <p class="muted">Your documents stay on this computer and are visible only to you.</p>
+    <p class="muted" id="authNote">Your private documents stay on this computer and are visible only to you.</p>
     <input id="name" placeholder="Name" autocomplete="username" autocapitalize="none">
     <div style="height:8px"></div>
     <input id="pass" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+    <div style="height:8px"></div>
+    <input id="invite" placeholder="Invite code (new accounts only)" autocapitalize="none">
     <div class="row">
       <button id="login">Sign in</button>
       <button class="ghost" id="signup">Create account</button>
@@ -56,22 +62,39 @@
   <div id="app" hidden>
     <section class="card">
       <div class="muted" id="hello"></div>
-      <div class="docs" id="docs"></div>
+      <div style="height:10px"></div>
+      <h2>My private documents</h2>
+      <ul class="docs" id="privateDocs"></ul>
+      <h2>Household documents <span class="muted">(everyone can ask about these)</span></h2>
+      <ul class="docs" id="householdDocs"></ul>
       <div class="row">
-        <label class="ghost" style="flex:1">
-          <input type="file" id="file" accept=".pdf,.md,.txt,.html" style="display:none">
-          <button class="ghost" id="pick" style="width:100%">+ Add a document (PDF or text)</button>
-        </label>
+        <select id="library">
+          <option value="private">Add to: my private documents</option>
+          <option value="household">Add to: household documents</option>
+        </select>
+      </div>
+      <div class="row">
+        <input type="file" id="file" accept=".pdf,.md,.txt,.html,image/*" hidden>
+        <button class="ghost" id="pick">+ Add a document or photo</button>
       </div>
       <div class="err" id="upErr"></div>
     </section>
 
     <section class="card">
       <textarea id="question" dir="auto" placeholder="Ask about your documents… / اسأل عن مستنداتك"></textarea>
-      <div class="row"><button id="ask" style="flex:1">Ask</button></div>
+      <div class="row"><button id="ask">Ask</button></div>
     </section>
 
     <div id="answers"></div>
+
+    <section class="card">
+      <h2>Account</h2>
+      <div class="row">
+        <button class="ghost" id="logoutAll">Sign out on all devices</button>
+        <button class="ghost" id="newInvite" hidden>Create invite code</button>
+      </div>
+      <div id="inviteOut" class="err"></div>
+    </section>
   </div>
 </main>
 
@@ -81,45 +104,76 @@ const $ = id => document.getElementById(id);
 async function call(path, opts = {}) {
   const res = await fetch(path, { credentials: "same-origin", ...opts });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || res.statusText);
+  if (!res.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : "check your input") : res.statusText);
   return data;
 }
-
+const post = (path, body) => call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+let ME = null;
+
+function docList(el, files, library) {
+  const canDelete = library === "private" || ME.admin;
+  el.innerHTML = files.length
+    ? files.map(f => `<li><span dir="auto">${esc(f)}</span>${canDelete ? `<button data-f="${esc(f)}" data-l="${library}">Delete</button>` : ""}</li>`).join("")
+    : '<li class="muted">None yet.</li>';
+  el.querySelectorAll("button").forEach(b => b.onclick = async () => {
+    if (!confirm(`Delete ${b.dataset.f}? Amin will no longer answer from it on any device.`)) return;
+    try {
+      await call(`/documents?filename=${encodeURIComponent(b.dataset.f)}&library=${b.dataset.l}`, { method: "DELETE" });
+      refresh();
+    } catch (e) { $("upErr").textContent = e.message; }
+  });
+}
 
 async function refresh() {
   try {
-    const me = await call("/me");
+    ME = await call("/me");
     $("auth").hidden = true; $("app").hidden = false; $("logout").hidden = false;
-    $("hello").textContent = `Signed in as ${me.name} · ${me.documents.length} document(s)`;
-    $("docs").innerHTML = me.documents.map(d => `<span class="chip">${esc(d)}</span>`).join("")
-      || '<span class="muted">No documents yet. Add your first one above.</span>';
+    $("hello").textContent = `Signed in as ${ME.name}${ME.admin ? " (admin)" : ""}`;
+    $("newInvite").hidden = !ME.admin;
+    docList($("privateDocs"), ME.private, "private");
+    docList($("householdDocs"), ME.household, "household");
   } catch {
+    ME = null;
     $("auth").hidden = false; $("app").hidden = true; $("logout").hidden = true;
+    const s = await call("/setup").catch(() => ({}));
+    $("invite").hidden = !!s.first_account;
+    if (s.first_account) $("authNote").textContent = "Welcome. The first account you create becomes the admin, who can invite the rest of the household.";
   }
 }
 
 async function auth(kind) {
   $("authErr").textContent = "";
   try {
-    await call(`/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: $("name").value.trim(), password: $("pass").value }) });
-    $("pass").value = ""; refresh();
+    await post(`/${kind}`, { name: $("name").value.trim(), password: $("pass").value, invite: $("invite").value.trim() || null });
+    $("pass").value = ""; $("invite").value = ""; refresh();
   } catch (e) { $("authErr").textContent = e.message; }
 }
 
 $("login").onclick = () => auth("login");
 $("signup").onclick = () => auth("signup");
 $("pass").onkeydown = e => { if (e.key === "Enter") auth("login"); };
-$("logout").onclick = async () => { await call("/logout", { method: "POST" }); $("answers").innerHTML = ""; refresh(); };
+$("logout").onclick = async () => { await post("/logout"); $("answers").innerHTML = ""; refresh(); };
+$("logoutAll").onclick = async () => {
+  if (!confirm("Sign out on every phone and computer, including this one?")) return;
+  await post("/logout-all"); $("answers").innerHTML = ""; refresh();
+};
+$("newInvite").onclick = async () => {
+  try {
+    const r = await post("/invites");
+    $("inviteOut").innerHTML = `Share this code (one use, valid ${r.valid_days} days):<div class="code">${esc(r.code)}</div>`;
+  } catch (e) { $("inviteOut").textContent = e.message; }
+};
 
-$("pick").onclick = e => { e.preventDefault(); $("file").click(); };
+$("pick").onclick = () => $("file").click();
 $("file").onchange = async () => {
   const f = $("file").files[0]; if (!f) return;
-  $("upErr").textContent = `Reading ${f.name}…`;
+  const lib = $("library").value;
+  $("upErr").textContent = `Reading ${f.name}… (photos and scans take longer)`;
   try {
-    const r = await call(`/upload?filename=${encodeURIComponent(f.name)}`, { method: "POST", body: f });
-    $("upErr").textContent = `Added ${r.document} (${r.chunks} sections).`;
+    const r = await call(`/upload?filename=${encodeURIComponent(f.name)}&library=${lib}`, { method: "POST", body: f });
+    $("upErr").textContent = `Added ${r.document} to ${r.library} documents (${r.chunks} sections).`;
     refresh();
   } catch (e) { $("upErr").textContent = e.message; }
   $("file").value = "";
@@ -132,8 +186,7 @@ async function ask() {
   card.innerHTML = `<div class="q" dir="auto">${esc(q)}</div><div class="muted">…</div>`;
   $("answers").prepend(card);
   try {
-    const a = await call("/ask", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q }) });
+    const a = await post("/ask", { question: q });
     card.innerHTML = `<div class="q" dir="auto">${esc(q)}</div>` + render(a);
     card.querySelectorAll("sup a").forEach(link => link.onclick = ev => { ev.preventDefault(); showSource(link, card); });
     $("question").value = "";
@@ -154,6 +207,12 @@ function render(a) {
   return `${banner}<div dir="auto">${body}</div><div class="muted" style="margin-top:8px">Tap a number to see the source · ${(a.latency_ms/1000).toFixed(1)}s</div>`;
 }
 
+function sourceName(docId) {
+  if (docId.startsWith("h.")) return "Household · " + docId.slice(2);
+  if (docId.startsWith("p.")) return "Private · " + docId.slice(2);
+  return docId;
+}
+
 async function showSource(link, card) {
   const id = link.dataset.id;
   const old = card.querySelector(`.src[data-id="${CSS.escape(id)}"]`);
@@ -161,9 +220,9 @@ async function showSource(link, card) {
   try {
     const c = await call(`/chunks/${encodeURIComponent(id)}`);
     const div = document.createElement("div"); div.className = "src"; div.dataset.id = id; div.dir = "auto";
-    div.innerHTML = `<strong>${esc(c.doc_id)}${c.heading ? " · " + esc(c.heading) : ""}</strong>\n${esc(c.text)}`;
+    div.innerHTML = `<strong>${esc(sourceName(c.doc_id))}${c.heading ? " · " + esc(c.heading) : ""}</strong>\n${esc(c.text)}`;
     card.appendChild(div);
-  } catch (e) { alert(e.message); }
+  } catch (e) { $("upErr").textContent = e.message; }
 }
 
 $("ask").onclick = ask;

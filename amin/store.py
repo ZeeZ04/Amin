@@ -180,6 +180,16 @@ class Store:
 
     # -- reading -------------------------------------------------------------
 
+    def delete_doc(self, doc_id: str) -> None:
+        with self.db:
+            self.db.execute("DELETE FROM chunks_fts WHERE chunk_id LIKE ? || '#%'", (doc_id,))
+            self.db.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+            self.db.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
+        self._invalidate()
+
+    def doc_ids(self) -> set[str]:
+        return {r[0] for r in self.db.execute("SELECT doc_id FROM documents")}
+
     def stats(self) -> dict:
         row = self.db.execute(
             "SELECT (SELECT COUNT(*) FROM documents) d, (SELECT COUNT(*) FROM chunks) c"

@@ -1,13 +1,17 @@
-"""Household accounts: each person gets their own documents and their own index.
+"""Household accounts.
 
-Isolation is by directory, not by row filter: a user's documents and index live
-under data/users/<name>/, and the engine for one user is built on that user's
-index alone. A query cannot reach another person's files because no code path
-opens them.
+Each person has a private folder (documents + index) under data/users/<name>/.
+Shared household documents live once in data/users/_household/docs and are
+indexed into every member's index, so one search covers both libraries while
+nobody's index ever contains another person's private files. "_household"
+cannot collide with a user name: names may not start with an underscore.
 
-Passwords are PBKDF2-hashed (stdlib). Sessions are HMAC-signed cookies with a
-per-install secret. shortcut: plain HTTP on the home network, so a password
-crosses the Wi-Fi in clear text; put it behind HTTPS before it leaves the house.
+Signup is invite-only: the first account becomes the admin; everyone after
+needs a one-time invite code from the admin.
+
+Passwords: PBKDF2 (stdlib). Sessions: HMAC-signed cookie carrying a per-user
+session version; "sign out everywhere" bumps the version, which invalidates
+every cookie issued before it.
 """
 
 from __future__ import annotations
@@ -17,11 +21,14 @@ import hmac
 import json
 import re
 import secrets
+import time
 from pathlib import Path
 
 from .config import settings
 
-NAME_RE = re.compile(r"^[a-z0-9_-]{2,32}$")
+NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,31}$")
+HOUSEHOLD = "_household"
+INVITE_TTL = 7 * 24 * 3600
 
 
 def root() -> Path:
@@ -31,8 +38,8 @@ def root() -> Path:
 
 
 def user_dir(name: str) -> Path:
-    if not NAME_RE.match(name):  # trust boundary: the name becomes a path
-        raise ValueError("invalid user name")
+    if name != HOUSEHOLD and not NAME_RE.match(name):  # trust boundary: becomes a path
+        raise ValueError("names: 2-32 characters, lowercase letters, digits, - or _")
     return root() / name
 
 
@@ -46,41 +53,79 @@ def index_path(name: str) -> Path:
     return user_dir(name) / "amin.db"
 
 
-def _registry() -> dict:
-    f = root() / "users.json"
+def _load(file: str) -> dict:
+    f = root() / file
     return json.loads(f.read_text()) if f.exists() else {}
 
 
-def _save(reg: dict) -> None:
-    f = root() / "users.json"
-    f.write_text(json.dumps(reg, indent=2))
-    f.chmod(0o600)
+def _save(file: str, data: dict) -> None:
+    f = root() / file
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    tmp.chmod(0o600)
+    tmp.replace(f)  # atomic: a crash mid-write cannot corrupt the account list
 
 
 def _hash(password: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 200_000).hex()
 
 
-def create(name: str, password: str) -> None:
+def names() -> list[str]:
+    return sorted(_load("users.json"))
+
+
+def is_admin(name: str) -> bool:
+    return bool(_load("users.json").get(name, {}).get("admin"))
+
+
+def create(name: str, password: str, invite: str | None = None) -> None:
     name = name.strip().lower()
-    user_dir(name)  # validates
+    if not NAME_RE.match(name):  # user_dir() allows HOUSEHOLD; an account must not
+        raise ValueError("names: 2-32 characters, lowercase letters, digits, - or _")
     if len(password) < 6:
         raise ValueError("password must be at least 6 characters")
-    reg = _registry()
+    reg = _load("users.json")
     if name in reg:
         raise ValueError("that name is taken")
+    first = not reg
+    if not first:
+        _use_invite(invite)
     salt = secrets.token_hex(16)
-    reg[name] = {"salt": salt, "hash": _hash(password, salt)}
-    _save(reg)
+    reg[name] = {"salt": salt, "hash": _hash(password, salt), "admin": first, "session": 0}
+    _save("users.json", reg)
     docs_dir(name)
 
 
 def verify(name: str, password: str) -> bool:
-    entry = _registry().get(name.strip().lower())
+    entry = _load("users.json").get(name.strip().lower())
     if not entry:
-        _hash(password, "00" * 16)  # same cost either way, so timing does not reveal names
+        _hash(password, "00" * 16)  # same cost either way: timing does not reveal names
         return False
     return hmac.compare_digest(entry["hash"], _hash(password, entry["salt"]))
+
+
+# -- invites -----------------------------------------------------------------
+
+
+def new_invite() -> str:
+    code = secrets.token_urlsafe(6)
+    inv = _load("invites.json")
+    now = time.time()
+    inv = {c: t for c, t in inv.items() if t > now}  # drop expired
+    inv[code] = now + INVITE_TTL
+    _save("invites.json", inv)
+    return code
+
+
+def _use_invite(code: str | None) -> None:
+    inv = _load("invites.json")
+    if not code or inv.get(code.strip(), 0) < time.time():
+        raise ValueError("a valid invite code is required — ask the admin for one")
+    del inv[code.strip()]
+    _save("invites.json", inv)
+
+
+# -- sessions ----------------------------------------------------------------
 
 
 def _secret() -> bytes:
@@ -91,16 +136,28 @@ def _secret() -> bytes:
     return f.read_text().encode()
 
 
+def _sign(payload: str) -> str:
+    return hmac.new(_secret(), payload.encode(), hashlib.sha256).hexdigest()
+
+
 def make_token(name: str) -> str:
-    sig = hmac.new(_secret(), name.encode(), hashlib.sha256).hexdigest()
-    return f"{name}.{sig}"
+    payload = f"{name}.{_load('users.json')[name]['session']}"
+    return f"{payload}.{_sign(payload)}"
 
 
 def read_token(token: str | None) -> str | None:
-    if not token or "." not in token:
+    if not token or token.count(".") != 2:
         return None
-    name, sig = token.rsplit(".", 1)
-    good = hmac.new(_secret(), name.encode(), hashlib.sha256).hexdigest()
-    if hmac.compare_digest(sig, good) and name in _registry():
-        return name
-    return None
+    name, version, sig = token.split(".")
+    if not hmac.compare_digest(sig, _sign(f"{name}.{version}")):
+        return None
+    entry = _load("users.json").get(name)
+    if not entry or str(entry["session"]) != version:
+        return None
+    return name
+
+
+def sign_out_everywhere(name: str) -> None:
+    reg = _load("users.json")
+    reg[name]["session"] += 1
+    _save("users.json", reg)
