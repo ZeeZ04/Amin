@@ -14,7 +14,7 @@ refusal_template: >-
 routes:
   - name: medical
     patterns:
-      - '\b(diagnos\w*|symptom\w*|prescri\w*|dosage|dose|mg\b)\b'
+      - '\b(diagnos(?:e|ed|es|is|ing)|symptom\w*|prescri\w*|dosage|dose|mg\b)\b'
       - '\b(should|can|could|may) I take\b'
       - '\bis it safe to (take|use|give)\b'
       - '\b(treat(ment)?|cure|side ?effects?)\b.*\b(for|of)\b'

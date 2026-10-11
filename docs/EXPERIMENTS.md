@@ -345,6 +345,67 @@ near-misses and are unexplained; the sweep does not save per-item results.
 Next: a full three-system bench at 0.15, which both settles the naive-vs-amin
 kill criterion and names the six items.
 
+**Run 3 — full set, floor 0.15, identifier gate on** (`bench-20261010T231911`).
+
+| | bare | naive | amin |
+|---|---|---|---|
+| fact accuracy | 14.5% | **99.1%** | 92.7% |
+| correct refusal | 25.3% | 92.9% | 93.9% |
+| hallucination | 74.7% | 7.1% | 6.1% |
+| citation precision | — | — | 100% |
+| routing | — | — | 95.5% |
+
+Paired: naive beats amin on fact accuracy, **+6.4 pts, p = 0.039, significant**.
+Hallucination: amin 6.1% vs naive 7.1%, 3 vs 4 discordant items, p = 1.0 —
+**no measurable safety gain.** By the criterion written before the run, the
+gates and verifier are not earning their cost as a safety mechanism.
+
+Where amin's 8 losses come from:
+- 3 × verifier rejected a correct draft ("could not verify") — a028, a029, a053
+- 2 × evidence/identifier gate — a015, a048
+- 1 × router false positive: "Vertex **diagnostic** cost" → medical (a074).
+  Fixed: pattern narrowed to diagnose/diagnosis forms.
+- 2 × partial answer — gave the AED 50 cap but not the AED 2/day rate (a081)
+
+Amin's 6 hallucinations: 4 silent, 1 near-miss (u045, not caught — no
+identifier in the question). u076 is a mis-graded abstention ("the passages do
+not contain…") emitted as an answer; u009 is a conflict raised on an
+unanswerable. Naive got 3 of the 6 right.
+
+What amin has that naive does not: 100% citation precision, routing, 100%
+Arabic pass (naive 88.9%). That is the case for the pipeline now — not safety.
+
+Next: E19 — the same run with `--verifier off`, to measure the verifier
+directly instead of inferring it.
+
+## E19 — the verifier, measured directly
+
+Same set, same model, floor 0.15, `--verifier off` (also includes the router
+fix). `bench-20261011T021943`.
+
+| | verifier on (E16 run 3) | verifier off |
+|---|---|---|
+| fact / grounded accuracy | 92.7% | **98.2%** |
+| hallucination | 6.1% | 7.1% |
+| citation precision | 100% | 100% |
+| p50 latency | 6448 ms | 5573 ms |
+
+Item level: 6 fixed, 1 broken. Fixed — a028, a029, a053 (verifier refused a
+correct draft), a075, a081 (verifier stripped claims, leaving a fragment that
+missed the fact), a074 (router fix, not the verifier). Broken — u083, one
+inference stated as fact. So the verifier traded **5 correct answers for 1
+prevented hallucination**. McNemar 6 vs 1, p ≈ 0.13: direction clear,
+not significant on its own.
+
+**Decision: verifier off by default**, as the E5 criterion said. Citation
+precision does not depend on it. Amin now matches naive RAG on accuracy
+(98.2% vs 99.1%) and hallucination (7.1% vs 7.1%) while citing every claim,
+routing out-of-scope questions, and passing all Arabic items.
+
+**What remains unsolved:** ~7% hallucination on unanswerable questions, in
+both pipelines. Nothing in the current design reduces it. That is the next
+real problem.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is

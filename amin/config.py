@@ -77,7 +77,10 @@ class Settings(BaseSettings):
     price_out_per_mtok: float = 0.0
 
     # -- verification --------------------------------------------------------
-    verifier: str = "llm"  # llm | lexical | off
+    # Off by default since E19: on qwen3.6:27b it rejected 5 correct answers
+    # (3 refusals, 2 answers stripped to a fragment) to stop 1 hallucination.
+    # Citations stay 100% precise without it. Re-test on a smaller model.
+    verifier: str = "off"  # llm | lexical | off
     lexical_overlap_floor: float = 0.28
     # Refuse rather than return an answer whose claims mostly failed the check.
     min_citation_precision: float = 0.5
