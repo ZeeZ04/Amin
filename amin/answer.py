@@ -23,7 +23,7 @@ from .config import settings
 from .conflict import Conflict
 from .conflict import detect as detect_conflict
 from .covenant import Covenant
-from .prompts import ANSWER_SYSTEM, answer_prompt
+from .prompts import ANSWER_SYSTEM, answer_prompt, looks_like_refusal
 from .providers import Provider, get_provider
 from .schema import Answer, Claim, Outcome, Retrieved, Verdict
 from .store import Store
@@ -140,7 +140,8 @@ class Amin:
         draft = self.provider.complete(prompt, system=ANSWER_SYSTEM).strip()
 
         # The model's own abstention signal.
-        if draft.upper().startswith("NO_EVIDENCE") or not draft:
+        # Also the paraphrased one ("the passages do not contain…"): E19, u076.
+        if draft.upper().startswith("NO_EVIDENCE") or not draft or looks_like_refusal(draft):
             return finish(
                 Answer(
                     question=question,

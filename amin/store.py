@@ -78,7 +78,9 @@ class Store:
     def __init__(self, path: Path | None = None):
         self.path = Path(path or settings.index_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path)
+        # The web app touches one store from several worker threads; api.py
+        # serialises access per user, so sharing the connection is safe.
+        self.db = sqlite3.connect(self.path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self._idf_cache: dict[str, float] | None = None

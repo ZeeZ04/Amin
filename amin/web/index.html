@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amin</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e0d8; --accent:#0f6b5c; --warn:#9a5b00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141413; --card:#1f1f1d; --ink:#ecebe6; --muted:#9c9a92; --line:#33322f; --accent:#4fb39f; --warn:#e0a24a; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:680px; margin:0 auto; padding:16px; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 16px; }
+  h1 { font-size:22px; margin:0; letter-spacing:.5px; }
+  h1 small { color:var(--muted); font-weight:400; font-size:14px; margin-left:6px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
+  input, textarea, button { font:inherit; color:inherit; }
+  input, textarea { width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+  textarea { resize:vertical; min-height:56px; }
+  button { padding:10px 16px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:none; color:var(--muted); border:1px solid var(--line); }
+  button:disabled { opacity:.5; }
+  .row { display:flex; gap:8px; margin-top:8px; }
+  .muted { color:var(--muted); font-size:14px; }
+  .err { color:var(--warn); font-size:14px; min-height:20px; }
+  .q { font-weight:600; margin-bottom:6px; }
+  .refusal { color:var(--warn); }
+  sup a { color:var(--accent); text-decoration:none; font-weight:600; padding:0 2px; }
+  .src { border-left:3px solid var(--accent); padding:8px 12px; margin-top:8px; font-size:14px; background:var(--bg); border-radius:0 8px 8px 0; white-space:pre-wrap; }
+  .docs { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { font-size:13px; padding:4px 10px; border:1px solid var(--line); border-radius:99px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Amin <small>أمين</small></h1>
+    <button class="ghost" id="logout" hidden>Sign out</button>
+  </header>
+
+  <section class="card" id="auth">
+    <p class="muted">Your documents stay on this computer and are visible only to you.</p>
+    <input id="name" placeholder="Name" autocomplete="username" autocapitalize="none">
+    <div style="height:8px"></div>
+    <input id="pass" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+    <div class="row">
+      <button id="login">Sign in</button>
+      <button class="ghost" id="signup">Create account</button>
+    </div>
+    <div class="err" id="authErr"></div>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card">
+      <div class="muted" id="hello"></div>
+      <div class="docs" id="docs"></div>
+      <div class="row">
+        <label class="ghost" style="flex:1">
+          <input type="file" id="file" accept=".pdf,.md,.txt,.html" style="display:none">
+          <button class="ghost" id="pick" style="width:100%">+ Add a document (PDF or text)</button>
+        </label>
+      </div>
+      <div class="err" id="upErr"></div>
+    </section>
+
+    <section class="card">
+      <textarea id="question" dir="auto" placeholder="Ask about your documents… / اسأل عن مستنداتك"></textarea>
+      <div class="row"><button id="ask" style="flex:1">Ask</button></div>
+    </section>
+
+    <div id="answers"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function call(path, opts = {}) {
+  const res = await fetch(path, { credentials: "same-origin", ...opts });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || res.statusText);
+  return data;
+}
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+async function refresh() {
+  try {
+    const me = await call("/me");
+    $("auth").hidden = true; $("app").hidden = false; $("logout").hidden = false;
+    $("hello").textContent = `Signed in as ${me.name} · ${me.documents.length} document(s)`;
+    $("docs").innerHTML = me.documents.map(d => `<span class="chip">${esc(d)}</span>`).join("")
+      || '<span class="muted">No documents yet. Add your first one above.</span>';
+  } catch {
+    $("auth").hidden = false; $("app").hidden = true; $("logout").hidden = true;
+  }
+}
+
+async function auth(kind) {
+  $("authErr").textContent = "";
+  try {
+    await call(`/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: $("name").value.trim(), password: $("pass").value }) });
+    $("pass").value = ""; refresh();
+  } catch (e) { $("authErr").textContent = e.message; }
+}
+
+$("login").onclick = () => auth("login");
+$("signup").onclick = () => auth("signup");
+$("pass").onkeydown = e => { if (e.key === "Enter") auth("login"); };
+$("logout").onclick = async () => { await call("/logout", { method: "POST" }); $("answers").innerHTML = ""; refresh(); };
+
+$("pick").onclick = e => { e.preventDefault(); $("file").click(); };
+$("file").onchange = async () => {
+  const f = $("file").files[0]; if (!f) return;
+  $("upErr").textContent = `Reading ${f.name}…`;
+  try {
+    const r = await call(`/upload?filename=${encodeURIComponent(f.name)}`, { method: "POST", body: f });
+    $("upErr").textContent = `Added ${r.document} (${r.chunks} sections).`;
+    refresh();
+  } catch (e) { $("upErr").textContent = e.message; }
+  $("file").value = "";
+};
+
+async function ask() {
+  const q = $("question").value.trim(); if (!q) return;
+  $("ask").disabled = true; $("ask").textContent = "Thinking…";
+  const card = document.createElement("section"); card.className = "card";
+  card.innerHTML = `<div class="q" dir="auto">${esc(q)}</div><div class="muted">…</div>`;
+  $("answers").prepend(card);
+  try {
+    const a = await call("/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q }) });
+    card.innerHTML = `<div class="q" dir="auto">${esc(q)}</div>` + render(a);
+    card.querySelectorAll("sup a").forEach(link => link.onclick = ev => { ev.preventDefault(); showSource(link, card); });
+    $("question").value = "";
+  } catch (e) {
+    card.innerHTML = `<div class="q">${esc(q)}</div><div class="refusal">${esc(e.message)}</div>`;
+  }
+  $("ask").disabled = false; $("ask").textContent = "Ask";
+}
+
+function render(a) {
+  if (!a.claims.length) return `<div class="refusal" dir="auto">${esc(a.refusal_reason || "No answer.")}</div>`;
+  const num = {}; let n = 0;
+  const body = a.claims.map(c => {
+    const marks = c.citations.map(id => { num[id] ??= ++n; return `<sup><a href="#" data-id="${esc(id)}">${num[id]}</a></sup>`; }).join("");
+    return `${esc(c.text)}${marks}`;
+  }).join(" ");
+  const banner = a.outcome === "conflict" ? `<div class="refusal">Your documents disagree on this:</div>` : "";
+  return `${banner}<div dir="auto">${body}</div><div class="muted" style="margin-top:8px">Tap a number to see the source · ${(a.latency_ms/1000).toFixed(1)}s</div>`;
+}
+
+async function showSource(link, card) {
+  const id = link.dataset.id;
+  const old = card.querySelector(`.src[data-id="${CSS.escape(id)}"]`);
+  if (old) { old.remove(); return; }
+  try {
+    const c = await call(`/chunks/${encodeURIComponent(id)}`);
+    const div = document.createElement("div"); div.className = "src"; div.dataset.id = id; div.dir = "auto";
+    div.innerHTML = `<strong>${esc(c.doc_id)}${c.heading ? " · " + esc(c.heading) : ""}</strong>\n${esc(c.text)}`;
+    card.appendChild(div);
+  } catch (e) { alert(e.message); }
+}
+
+$("ask").onclick = ask;
+$("question").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } };
+refresh();
+</script>
+</body>
+</html>

@@ -84,3 +84,43 @@ def rewrite_prompt(question: str) -> str:
         "Output only the query, no explanation.\n\n"
         f"<question>{question}</question>"
     )
+
+
+# -- abstention detection, shared by every system ------------------------
+
+REFUSAL_MARKERS = (
+    "no_evidence",
+    "i don't know",
+    "i do not know",
+    "i don't have",
+    "i do not have",
+    "cannot answer",
+    "can't answer",
+    "not able to answer",
+    "no information",
+    "not mentioned",
+    "not specified",
+    "not provided",
+    "not provide",
+    "not specify",
+    "not contain",
+    "doesn't say",
+    "does not say",
+    "unable to determine",
+    "لا أعرف",
+    "لا توجد معلومات",
+    "غير مذكور",
+)
+
+
+def looks_like_refusal(text: str) -> bool:
+    """Did the model verbally abstain?
+
+    Crediting a baseline with a refusal it did not make would flatter it; missing
+    one it did make would flatter Amin. Both are the same error, so this list is
+    applied identically to every system, including Amin's own draft stage.
+    """
+    low = text.lower().strip()
+    if not low:
+        return False
+    return any(marker in low for marker in REFUSAL_MARKERS)

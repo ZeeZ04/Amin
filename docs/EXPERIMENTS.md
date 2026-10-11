@@ -406,6 +406,30 @@ routing out-of-scope questions, and passing all Arabic items.
 both pipelines. Nothing in the current design reduces it. That is the next
 real problem.
 
+## E20 — what the 7% hallucination actually is
+
+The 7 unanswerables amin "hallucinated" on in E19, read against the corpus:
+
+| id | what happened | verdict |
+|---|---|---|
+| u045 | computed 2,000 kWh @ 23 + 500 kWh @ 28 from the slab table | correct inference — answer key wrong? |
+| u072 | "short-loan items cannot be renewed" — corpus says exactly that | correct — answer key wrong? |
+| u083 | "no, rooms need a minimum of 3 occupants" — corpus says exactly that | correct inference — answer key wrong? |
+| u087 | commission "non-refundable" applied to a failed let | arguable over-reach |
+| u065 | reasoned about accidental damage; corpus never mentions it | **real hallucination** |
+| u076 | "the passages do not contain…" — an abstention, scored as an answer | **pipeline bug, fixed** |
+| u009 | conflict path fired on an unanswerable question | **real bug, open** |
+
+Fixed: amin's draft stage now uses the same abstention detector as the
+baselines (`prompts.looks_like_refusal`). Its docstring already claimed this;
+the code did not do it — the E7 pattern again. Added "not provide" / "not
+specify" markers (naive u047, u064 were the same miss). Zero answerable items
+match the new markers in either saved run.
+
+Not changed: the eval labels. u045/u072/u083 look mislabelled, but relabelling
+after seeing results is exactly how a benchmark gets tuned to its system.
+Decide on the labels on their own merits, then re-run.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is

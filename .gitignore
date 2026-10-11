@@ -3,6 +3,7 @@ private/*
 !private/.gitkeep
 
 data/index/
+data/users/
 reports/*.json
 *.db
 *.sqlite3

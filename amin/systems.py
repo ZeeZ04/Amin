@@ -27,7 +27,7 @@ from typing import Protocol
 from .answer import Amin
 from .config import settings
 from .covenant import Covenant
-from .prompts import NAIVE_RAG_SYSTEM, PLAIN_SYSTEM, format_passages
+from .prompts import NAIVE_RAG_SYSTEM, PLAIN_SYSTEM, format_passages, looks_like_refusal
 from .providers import Provider, get_provider
 from .schema import Answer, Claim, Outcome, Verdict
 from .store import Store
@@ -70,7 +70,7 @@ class BareSystem:
         # A bare model has no notion of "no source", so the only refusal it can
         # express is a verbal one. Detect the common phrasings rather than
         # crediting it with a refusal it did not make.
-        refused = _looks_like_refusal(text)
+        refused = looks_like_refusal(text)
         return Answer(
             question=question,
             outcome=Outcome.REFUSED_NO_EVIDENCE if refused or not text else Outcome.ANSWERED,
@@ -109,7 +109,7 @@ class NaiveRagSystem:
         else:
             note = ""
 
-        refused = _looks_like_refusal(text)
+        refused = looks_like_refusal(text)
         claims = [
             Claim(text=s, verdict=Verdict.UNCITED, verifier_note="no verification in this system")
             for s in split_sentences(text)
@@ -151,42 +151,6 @@ class AminSystem:
 
 
 # ---------------------------------------------------------------------------
-
-REFUSAL_MARKERS = (
-    "no_evidence",
-    "i don't know",
-    "i do not know",
-    "i don't have",
-    "i do not have",
-    "cannot answer",
-    "can't answer",
-    "not able to answer",
-    "no information",
-    "not mentioned",
-    "not specified",
-    "not provided",
-    "not contain",
-    "doesn't say",
-    "does not say",
-    "unable to determine",
-    "لا أعرف",
-    "لا توجد معلومات",
-    "غير مذكور",
-)
-
-
-def _looks_like_refusal(text: str) -> bool:
-    """Did the model verbally abstain?
-
-    Crediting a baseline with a refusal it did not make would flatter it; missing
-    one it did make would flatter Amin. Both are the same error, so this list is
-    applied identically to every system, including Amin's own draft stage.
-    """
-    low = text.lower().strip()
-    if not low:
-        return False
-    return any(marker in low for marker in REFUSAL_MARKERS)
-
 
 SYSTEMS = {"bare": BareSystem, "naive": NaiveRagSystem, "amin": AminSystem}
 

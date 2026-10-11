@@ -17,7 +17,8 @@ from amin.ingest import ingest
 from amin.providers import EchoProvider, HashEmbedder
 from amin.stats import bootstrap_delta, mcnemar, required_n, wilson
 from amin.store import Store
-from amin.systems import BareSystem, NaiveRagSystem, _looks_like_refusal, build_system
+from amin.prompts import looks_like_refusal as _looks_like_refusal
+from amin.systems import BareSystem, NaiveRagSystem, build_system
 
 REPO = Path(__file__).resolve().parent.parent
 CORPUS = REPO / "data" / "corpus"
@@ -277,3 +278,11 @@ def test_comparisons_are_skipped_for_runs_of_unequal_length(bench):
     short.results = truncated.results[:5]
     short.system = "short"
     assert all(c.a != "short" and c.b != "short" for c in compare_runs([*bench.runs, short]))
+
+
+def test_amin_treats_paraphrased_abstention_as_refusal():
+    """E19 u076: the model wrote 'the passages do not contain…' instead of
+    NO_EVIDENCE, and it was scored and shown as an answer."""
+    assert _looks_like_refusal("The provided passages do not contain information on that.")
+    assert _looks_like_refusal("The context does not specify a fee for that.")
+    assert not _looks_like_refusal("The deposit is AED 5,000 [S1].")

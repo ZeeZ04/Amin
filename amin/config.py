@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     index_path: Path = REPO_ROOT / "data" / "index" / "amin.db"
     corpus_path: Path = REPO_ROOT / "data" / "corpus"
     private_path: Path = REPO_ROOT / "private"
+    # One folder per household account: documents + index. Never committed.
+    users_path: Path = REPO_ROOT / "data" / "users"
     eval_set: Path = REPO_ROOT / "data" / "eval" / "eval_set.jsonl"
     policy_path: Path = Path(__file__).parent / "policy.yaml"
 

@@ -24,7 +24,8 @@ lint:
 	uv run ruff check amin tests
 
 serve:
-	uv run uvicorn amin.api:api --reload --port 8000
+	# 0.0.0.0 = reachable from phones on the home Wi-Fi: http://<mac-name>.local:8000
+	uv run uvicorn amin.api:api --host 0.0.0.0 --port 8000
 
 doctor:
 	uv run amin doctor
