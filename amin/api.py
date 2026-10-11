@@ -17,6 +17,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__, users
@@ -29,6 +30,7 @@ api = FastAPI(title="Amin", version=__version__)
 COOKIE = "amin_session"
 MAX_UPLOAD = 25 * 1024 * 1024
 WEB = Path(__file__).parent / "web" / "index.html"
+api.mount("/static", StaticFiles(directory=WEB.parent), name="static")  # logo, icons, manifest
 PREFIX = {"private": "p.", "household": "h."}
 
 _engines: dict[str, Amin] = {}
