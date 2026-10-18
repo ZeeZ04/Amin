@@ -219,6 +219,16 @@ AMIN_PROVIDER=openai AMIN_ANSWER_MODEL=gpt-4o-mini OPENAI_API_KEY=... amin bench
 Embeddings deliberately stay local even on a hosted run: swapping the retriever
 and the generator at once would change two variables and measure neither.
 
+## Amin's own model
+
+Amin can run on its own post-trained model, Qwen3-8B distilled from the 27B
+teacher and then preference-tuned on its own graded failures. All of it runs
+on this Mac with MLX. Only behaviour goes into the weights (citing, refusing,
+Arabic register); your documents stay in the index. A trained model ships
+only if it passes the bench gate in ADR-012. The runbook, with timings, is in
+[`docs/TRAINING.md`](docs/TRAINING.md). No trained-model numbers are reported
+here until a run passes the gate.
+
 ## Limits, stated plainly
 
 - A 27B model is far from frontier on hard multi-step reasoning. It is close

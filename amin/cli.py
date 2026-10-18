@@ -409,6 +409,20 @@ def doctor():
                 f"[red]ollama not reachable at {prov.host}[/red]\n"
                 "start it with `ollama serve`, or run with --provider echo"
             )
+    if settings.provider == "mlx":
+        from .providers import MLXProvider
+
+        mlx = MLXProvider()
+        if mlx.available():
+            console.print(f"[green]ok[/green] mlx_lm.server reachable at {mlx.host} ({settings.mlx_model})")
+        else:
+            console.print(
+                f"[red]mlx_lm.server not reachable at {mlx.host}[/red]\n"
+                "start it with `make serve-student MODEL=data/models/amin-1`"
+            )
+        # Retrieval still embeds through Ollama, so it must be up too.
+        if not OllamaProvider().available():
+            console.print(f"[red]ollama not reachable at {settings.ollama_host}[/red] - needed for embeddings")
     console.print(f"index: {settings.index_path} "
                   f"({'present' if settings.index_path.exists() else 'not built'})")
 

@@ -1,4 +1,4 @@
-.PHONY: install ingest eval ask test lint serve doctor clean sweep certs
+.PHONY: install ingest eval ask test lint serve doctor clean sweep certs train-setup train-corpus distill train-sft serve-student preferences train-dpo bench-student
 
 install:
 	uv venv && uv pip install -e ".[dev]"
@@ -53,3 +53,46 @@ sweep:
 
 clean:
 	rm -rf data/index .pytest_cache **/__pycache__
+
+# ---------------------------------------------------------------------------
+# Amin's own model (ADR-012). Each step is resumable; see docs/TRAINING.md.
+# ---------------------------------------------------------------------------
+STUDENT ?= Qwen/Qwen3-8B
+NO_THINK = --chat-template-args '{"enable_thinking": false}'
+
+train-setup:
+	uv sync --extra dev --extra train
+	uv run python -c "from huggingface_hub import snapshot_download as d; d('$(STUDENT)', local_dir='data/models/Qwen3-8B')"
+
+train-corpus:
+	uv run python scripts/build_train_corpus.py
+	uv run python -m amin.train.distill index
+
+distill:
+	# Hours, not minutes: keep the Mac awake. Safe to stop and re-run.
+	caffeinate -i uv run python -m amin.train.distill run
+	uv run python -m amin.train.distill export
+
+train-sft:
+	uv run mlx_lm.lora -c amin/train/sft.yaml
+	uv run mlx_lm.fuse --model data/models/Qwen3-8B --adapter-path data/adapters/amin-1-sft \
+	  --save-path data/models/amin-1-sft
+
+serve-student:
+	uv run mlx_lm.server --model $${MODEL:-data/models/amin-1-sft} --port 8080 $(NO_THINK)
+
+preferences:
+	# Needs `make serve-student` running in another terminal.
+	caffeinate -i uv run python -m amin.train.preferences run
+	uv run python -m amin.train.preferences export
+
+train-dpo:
+	uv run mlx_lm_lora.train -c amin/train/dpo.yaml
+	uv run mlx_lm.fuse --model data/models/amin-1-sft --adapter-path data/adapters/amin-1-dpo \
+	  --save-path data/models/amin-1-bf16
+	uv run mlx_lm.convert --hf-path data/models/amin-1-bf16 --mlx-path data/models/amin-1 -q --q-bits 4
+
+bench-student:
+	# The ship gate: same 237 items, same retriever, student vs teacher.
+	uv run amin ingest --reset
+	AMIN_PROVIDER=mlx uv run amin bench --systems amin

@@ -94,24 +94,34 @@ class OllamaProvider:
 
 
 # ---------------------------------------------------------------------------
-# MLX — Apple-native path, used for fine-tuned adapters in phase 5
+# MLX — Apple-native path, serves Amin's own post-trained model (ADR-012)
 # ---------------------------------------------------------------------------
+
+_THINK_RE = re.compile(r"<think>.*?</think>\s*", re.S)
 
 
 class MLXProvider:
     """Thin wrapper over an `mlx_lm.server` running locally.
 
     mlx_lm exposes an OpenAI-compatible endpoint, so this is deliberately
-    boring. Start it with:
-        mlx_lm.server --model mlx-community/Qwen3.6-27B-4bit --port 8080
+    boring. Start it with (`make serve-student`):
+        mlx_lm.server --model data/models/amin-1 --port 8080 \
+          --chat-template-args '{"enable_thinking": false}'
     """
 
     name = "mlx"
+    # One server serves one model, whatever `model=` a caller asks for: the
+    # student replaces both answer_model and utility_model. Requests name the
+    # server's default so it never tries to load an Ollama tag as a path.
+    model_label = settings.mlx_model
 
-    def __init__(self, host: str = "http://127.0.0.1:8080", timeout: float = 180.0):
-        self.host = host.rstrip("/")
-        self._client = httpx.Client(base_url=self.host, timeout=timeout)
-        self._fallback_embed = HashEmbedder()
+    def __init__(
+        self, host: str | None = None, timeout: float | None = None, temperature: float | None = None
+    ):
+        self.host = (host or settings.mlx_host).rstrip("/")
+        self._client = httpx.Client(base_url=self.host, timeout=timeout or settings.request_timeout)
+        self.temperature = settings.temperature if temperature is None else temperature
+        self._embedder: Provider | None = None
 
     def _messages(self, prompt: str, system: str) -> list[dict]:
         msgs = [{"role": "system", "content": system}] if system else []
@@ -121,27 +131,32 @@ class MLXProvider:
         r = self._client.post(
             "/v1/chat/completions",
             json={
-                "model": model or settings.answer_model,
+                "model": "default_model",
                 "messages": self._messages(prompt, system),
-                "temperature": settings.temperature,
+                "temperature": self.temperature,
+                "max_tokens": 1024,
                 "stream": False,
             },
         )
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
+        # Thinking is off in the server's template and in training, but a
+        # stray empty block must never reach the citation parser.
+        return _THINK_RE.sub("", r.json()["choices"][0]["message"]["content"]).strip()
 
     def stream(self, prompt: str, *, model: str | None = None, system: str = "") -> Iterator[str]:
         with self._client.stream(
             "POST",
             "/v1/chat/completions",
             json={
-                "model": model or settings.answer_model,
+                "model": "default_model",
                 "messages": self._messages(prompt, system),
-                "temperature": settings.temperature,
+                "temperature": self.temperature,
+                "max_tokens": 1024,
                 "stream": True,
             },
         ) as r:
             r.raise_for_status()
+            pending = ""  # held back while it could still be an opening <think>
             for line in r.iter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -152,13 +167,35 @@ class MLXProvider:
                     delta = json.loads(body)["choices"][0]["delta"].get("content")
                 except (json.JSONDecodeError, KeyError, IndexError):
                     continue
-                if delta:
-                    yield delta
+                if not delta:
+                    continue
+                if pending is not None:
+                    pending += delta
+                    if "<think>".startswith(pending.lstrip()) and pending.strip():
+                        continue
+                    if pending.lstrip().startswith("<think>"):
+                        if "</think>" not in pending:
+                            continue
+                        pending = pending.split("</think>", 1)[1].lstrip()
+                    delta, pending = pending, None
+                    if not delta:
+                        continue
+                yield delta
 
     def embed(self, texts: list[str]) -> np.ndarray:
-        # mlx_lm.server does not serve embeddings; keep retrieval on Ollama or
-        # sentence-transformers and use MLX only for generation.
-        return self._fallback_embed(texts)
+        # mlx_lm.server does not serve embeddings. Retrieval stays on Ollama's
+        # embed model so an index built for the teacher serves the student
+        # unchanged - a bench against a hashed index would compare retrievers,
+        # not models.
+        if self._embedder is None:
+            self._embedder = OllamaProvider()
+        return self._embedder.embed(texts)
+
+    def available(self) -> bool:
+        try:
+            return self._client.get("/v1/models", timeout=3.0).status_code == 200
+        except Exception:
+            return False
 
 
 # ---------------------------------------------------------------------------

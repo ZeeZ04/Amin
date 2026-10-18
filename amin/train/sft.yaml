@@ -1,0 +1,28 @@
+# Stage 1 — supervised distillation. `mlx_lm.lora -c amin/train/sft.yaml`
+# Every run that changes a number here gets a row in docs/EXPERIMENTS.md.
+model: data/models/Qwen3-8B
+train: true
+data: data/train/sft
+fine_tune_type: lora
+adapter_path: data/adapters/amin-1-sft
+seed: 0
+
+# The loss is on Amin's reply only; the passages are context, not targets.
+mask_prompt: true
+# Six 900-character passages plus the question fit with room to spare.
+max_seq_length: 3072
+grad_checkpoint: true
+
+batch_size: 4
+iters: 1600            # ~2 epochs; `distill export` prints the figure for the real set
+learning_rate: 1.0e-4
+num_layers: -1         # adapt every layer
+lora_parameters:
+  rank: 16
+  scale: 20.0
+  dropout: 0.05
+
+steps_per_report: 20
+steps_per_eval: 200
+val_batches: 25
+save_every: 200

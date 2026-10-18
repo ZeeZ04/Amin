@@ -182,3 +182,40 @@ through.
 honest record of a real limitation rather than a number bought by weakening the
 safety property. Any future change that moves accuracy and hallucination in the
 same direction gets this treatment.
+
+## ADR-012 — Post-train a student once the eval can judge it
+**Status:** accepted · **Date:** 2026-10-18 · amends ADR-004
+
+ADR-004 said: no fine-tuning until the eval set says what is broken. It now
+does. E16–E20 put `qwen3.6:27b` at 98.2% fact accuracy and 7.1% hallucination,
+at a p50 of 5.6 s. The native-app plan names that latency as a risk for phone
+use, and the residual hallucination is something no pipeline change has moved.
+
+**Decision:** post-train a smaller Qwen (Qwen3-8B) into Amin's own model in
+two stages, on Apple silicon with MLX:
+
+1. *Distillation (SFT, LoRA).* The 27B runs the real pipeline over a synthetic
+   training corpus. Only exchanges `evaluate.grade()` passes become examples.
+2. *Preference tuning (DPO).* The student is sampled; its graded failures are
+   the `rejected` side of pairs whose `chosen` side is the teacher's reply to
+   the same prompt.
+
+Facts never go into the weights; only behaviour does. Every example is a
+passage-grounded `answer_prompt()`, the same one used at inference, so retrieval
+and citations stay and new documents need no retraining. Training a model on
+the household's own papers was considered and rejected: it loses citations,
+cannot take a new document, and puts private data inside a model file.
+
+**Guardrails:**
+- The training corpus (`amin/train/corpus.py`) shares no document, question,
+  8-gram of text or eval entity name with `data/corpus` or the eval set.
+  `tests/test_train.py` checks this on every commit.
+- **Ship gate.** On the 237-item bench, hallucination ≤ 7.1%, fact accuracy
+  not significantly below the teacher (paired McNemar, ADR-006), and p50
+  latency ≤ 2.5 s. An adapter that misses any of the three is discarded, as
+  ADR-004 always required.
+
+**Consequence:** the `mlx` provider becomes a first-class path. Its
+embeddings come from Ollama, not the hash embedder, so a student bench
+compares models rather than retrievers. Every training run is an experiment
+row (E23 onward). The workflow is in `docs/TRAINING.md`.

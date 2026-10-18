@@ -257,7 +257,8 @@ def chunk(chunk_id: str, name: str = Depends(current_user)) -> dict:
 
 @api.get("/health")
 def health() -> dict:
-    return {"version": __version__, "provider": settings.provider, "answer_model": settings.answer_model}
+    model = settings.mlx_model if settings.provider == "mlx" else settings.answer_model
+    return {"version": __version__, "provider": settings.provider, "answer_model": model}
 
 
 @api.get("/metrics")

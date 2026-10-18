@@ -64,7 +64,7 @@ class Amin:
 
         def finish(ans: Answer) -> Answer:
             ans.latency_ms = int((time.perf_counter() - started) * 1000)
-            ans.model = f"{self.provider.name}:{settings.answer_model}"
+            ans.model = f"{self.provider.name}:{getattr(self.provider, 'model_label', settings.answer_model)}"
             return ans
 
         # Gate 1 — scope. Checked before retrieval so an out-of-scope question

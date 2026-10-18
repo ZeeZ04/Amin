@@ -430,6 +430,48 @@ Not changed: the eval labels. u045/u072/u083 look mislabelled, but relabelling
 after seeing results is exactly how a benchmark gets tuned to its system.
 Decide on the labels on their own merits, then re-run.
 
+## E23 — distil qwen3.6:27b into Qwen3-8B (SFT) — *not yet run*
+
+Setup (ADR-012, `docs/TRAINING.md`): 401 synthetic training documents,
+3,955 graded items (2,868 answerable, 1,087 unanswerable, 545 Arabic). Split
+by document, 1 in 10 held out. Teacher = the full pipeline on `qwen3.6:27b`.
+Only grader-passed exchanges are kept, and gate refusals are capped at 35% of
+the set. LoRA rank 16 on every layer, lr 1e-4, about 2 epochs
+(`amin/train/sft.yaml`).
+
+Measure on the 237-item bench, same retriever: the stock 8B, amin-1-sft and the
+27B teacher. Report fact accuracy, hallucination and p50 latency, with paired
+tests against the teacher.
+
+**Smoke test, 2026-10-18 (teacher only, before any training).** The first
+corpus put all 401 documents in one index, and the teacher passed only 2 of
+21 answerable items. The cause was not the model. Sixty tenancy contracts in
+one index, and a contract's rent clause never repeats its unit number, so no
+retriever can tell sixty rent clauses apart. The corpus is now split into 90
+households, each with at most one document of a kind in one language, each
+indexed separately (`tests/test_train.py` enforces it). On every 80th item
+(50 items, every family) the teacher then passed 42/50 at 7.6 s/item, so
+the full teacher pass is about 8.4 h and should yield about 3,300 examples.
+Of the 8 failures, 6 are "tenancy start date" refusals, where the date clause
+and the unit number sit in different chunks. That is the E18 near-miss shape,
+and the grader keeps those exchanges out of the training set.
+
+Prediction, written before the run: the student matches the teacher within
+the interval on fact accuracy, roughly halves latency, and its hallucination is
+no better than the teacher's. SFT copies the teacher; it does not exceed it.
+
+## E24 — DPO on the student's own failures — *not yet run*
+
+The amin-1-sft student, sampled 4× at T=0.7 per training item. Graded failures
+are paired with the teacher's reply to the byte-identical prompt.
+Unanswerable and Arabic pairs are weighted ×2 each. β = 0.1, lr 5e-6
+(`amin/train/dpo.yaml`).
+
+Prediction: hallucination falls below the teacher's 7.1%. This is the only
+stage that trains against failure rather than copying success. Watch correct
+refusal on *answerable* items: a DPO run that buys lower hallucination with
+more refusals of answerable questions is the ADR-011 trade, and gets rejected.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is

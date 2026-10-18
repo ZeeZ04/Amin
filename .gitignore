@@ -5,6 +5,10 @@ private/*
 data/index/
 data/users/
 data/certs/
+# Generated training data, downloaded weights and adapters. All rebuildable.
+data/train/
+data/models/
+data/adapters/
 reports/*.json
 *.db
 *.sqlite3

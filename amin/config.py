@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     # measure what it buys. (E16: the amin row died on a 180s ReadTimeout.)
     think: bool = False
     request_timeout: float = 600.0
+    # mlx_lm.server, which serves Amin's own post-trained model (ADR-012).
+    mlx_host: str = "http://127.0.0.1:8080"
+    # Label only: shown in answers and /health. The server decides what it loads.
+    mlx_model: str = "amin-1"
+
+    # -- post-training (amin/train, ADR-012) ---------------------------------
+    # The teacher is whatever answer_model is; the student is what gets tuned.
+    student_model: str = "Qwen/Qwen3-8B"
+    train_path: Path = REPO_ROOT / "data" / "train"
 
     # -- storage -------------------------------------------------------------
     index_path: Path = REPO_ROOT / "data" / "index" / "amin.db"
