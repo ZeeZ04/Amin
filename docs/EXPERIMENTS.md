@@ -756,6 +756,36 @@ The 9-item gap to strict is the price of answering generally. It is reported,
 not rounded away. Note that items 1 and 2 above changed the instrument after
 seeing results, and are written down here for that reason.
 
+## E28 — slice k, the amin-2 checkpoint-selection slice
+
+`data/eval/eval_slice_k.jsonl`, 160 items, built by `scripts/build_eval_set.py`
+alongside the main set:
+
+| ids | n | kind |
+|---|---|---|
+| ku001–040 | 40 | adjacent-fact traps over `data/corpus`, unanswerable |
+| ks001–040 | 40 | the answerable sibling of each trap (pair n = ku n + ks n) |
+| ka001–040 | 40 | fresh answerables (4 Arabic) |
+| kg001–020 | 20 | general-knowledge unanswerables with `expect_general` facts |
+| kp001–020 | 20 | personal-detail unanswerables a general answer must decline |
+
+**What it is for.** Choosing amin-2's checkpoint in hybrid mode (TRAINING.md,
+Round 2, step 4), and nothing else. No benchmark is run on it and no number
+from it is reported as a result; slice j stays the final one-time test.
+
+**Written blind.** The items were written from the corpus documents alone,
+without looking at any model's output on any set. Facts the two tenancy
+documents or the two handbooks disagree on are kept out of the answerables.
+
+**Independent by test.** `tests/test_slice_k.py` fails if any slice k question
+repeats, or shares a 6-gram with, a training item (regenerated at seed 7, plus
+`data/train/items.jsonl` when present), the main set, or slice j (read from its
+branch until merged). Writing it found real collisions: six of the first
+general-knowledge questions repeated or shared a 6-gram with training items, so the general
+questions were replaced with ones the training set doesn't ask, even in other
+words. When step 2 adds general questions to SFT, the same test will catch any
+that land in slice k, as long as they go through `items.jsonl`.
+
 ## E29 — amin-2: accuracy fixed, the gate still fails on declining
 
 **Recipe.** The round-1 grounded SFT set now carries the round-3 trap items as
