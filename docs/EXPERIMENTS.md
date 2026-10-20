@@ -460,7 +460,129 @@ Prediction, written before the run: the student matches the teacher within
 the interval on fact accuracy, roughly halves latency, and its hallucination is
 no better than the teacher's. SFT copies the teacher; it does not exceed it.
 
-## E24 — DPO on the student's own failures — *not yet run*
+**Run 1, 2026-10-19 — failed the gate, and lost to the untrained 8B.**
+The teacher passed 3,871/3,955 items, giving 3,477 SFT examples (28% refusals).
+LoRA on bf16 Qwen3-8B at lr 1e-4 flat reached val loss 0.038 at step 200,
+diverged to 8.64 at step 600 and ended at 0.518. The step-200 checkpoint was
+fused and served at 8-bit. All three systems ran the full pipeline, with the
+same retriever, on the 237 items:
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1-sft (8-bit) | 93.6% ±5% | 18.2% ±8% | 81.8% ±8% | 1.3 s |
+| stock Qwen3-8B (8-bit) | 99.1% ±2% | 12.1% ±6% | 87.9% ±6% | 1.4 s |
+| teacher qwen3.6:27b | 98.2% ±3% | 6.1% ±5% | 93.9% ±5% | 6.7 s |
+
+Paired McNemar: SFT vs stock on answerable fact accuracy, 103 vs 109 of 110,
+p=0.031 (worse). SFT vs teacher on unanswerables, 81 vs 93 of 99, p=0.012
+(worse). Stock vs teacher shows no significant difference on either slice
+(p=1.0, p=0.11), so the untrained 8B was already the better student.
+
+Why, from the raw drafts. The student fabricates citations: "The Berlin Wall
+fell in 1989 [S1][S5]." It also cites [S7] when there are six passages. In
+the training targets 93% of answers cite [S1] or [S2], because the retriever
+ranks the answer first, so the student learned where tags go, not what they
+mean. And the training refusals held no general-knowledge or false-premise
+questions, which the eval has many of. Distillation copied the format and
+lost the 8B's own instinct to abstain.
+
+Fixes for run 2: shuffle the passages in each example and renumber its tags
+(`distill._shuffle_passages`), so a tag is only right if the passage says it.
+Add 421 refusal items: 76 general-knowledge, 140 document kinds the household
+lacks, 205 false premises, none reusing an eval question or fact. Use lr 2e-5
+with 50 warmup steps and cosine decay over one epoch.
+
+**Run 2, 2026-10-19 — matches the teacher, misses the gate on hallucination.**
+Same base, with shuffled passages, the 421 new refusal items (3,844 examples,
+35% refusals) and lr 2e-5 cosine over one epoch (961 steps, 5 h). Val loss
+fell 2.97 → 0.036 → 0.014 with no spike.
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1-sft-r2 (8-bit) | 98.2% ±3% | 10.1% ±6% | 89.9% ±6% | 1.7 s |
+
+Paired against the teacher: answerable 108 vs 108 (p=1.0), unanswerable
+89 vs 93 (p=0.22). Against run 1: p=0.13 and p=0.08, both improvements but
+neither significant alone. The student is no longer distinguishable from the
+27B and is 3.9× faster. The gate still fails, because 10.1% > 7.1%.
+
+Of its 10 unanswerable failures, 5 the teacher also fails (u009, u045, u072,
+u083, u087; E20 flagged three of these labels as doubtful). The other 5
+(u041, u056, u064, u073, u076) share one shape: an adjacent fact answered in
+place of a refusal, such as the fridge warranty when asked about the filter's.
+That shape is what E24 trains against.
+
+## E24 — DPO on the student's own failures
+
+**Sampling the run-2 student on its own training set found almost nothing.**
+3 samples per item at T=0.7 failed only 8/4,264 items: the student had learned
+the synthetic distribution. Its benchmark failures were a shape the corpus
+barely held, an adjacent fact answered in place of a refusal. So
+`corpus.round_three` adds 647 *adjacent-fact traps* to the training documents,
+each paired with an answerable sibling. Examples: insurance expiry where only
+the registration expiry is stated, renewal rent where only this year's rent
+is, an accessory's warranty where only the appliance's is.
+
+Caveat: this category was chosen *because* the benchmark exposed it. That is
+the eval's job (ADR-004), but it is also how a benchmark gets tuned to, so the
+traps use only training documents, and a fresh adjacent-fact eval slice is owed
+before any claim built on this result.
+
+Label fixes found by reading the teacher's failures: "4 rent cheques" was
+marked wrong against "4 cheque", which was my label bug. "Water rate per
+gallon" was a bad trap, because amount ÷ gallons derives it (cf. E20 u045), so
+it was replaced. The teacher itself fell for 43/60 "rent late fee" traps,
+quoting the *electricity bill's* late charge. Because the corpus is generated,
+such items are unanswerable by construction, so their chosen side is
+NO_EVIDENCE even where the teacher answered. This is the one place the
+student is taught something its teacher gets wrong.
+
+The student failed 176/1,288 trap items over 4 samples each. Those failures
+plus an equal number of balance pairs (a sibling answer chosen, a refusal
+rejected) gave 1,433 train / 152 valid pairs. DPO used β 0.1, lr 5e-6, two
+epochs (1,433 steps, 7 h), with the reference = the run-2 SFT model.
+
+**Final checkpoint — over-refuses.** Val pair accuracy hit 1.000 at step 200
+and the margin kept growing to 12.4 for the remaining 1,200 steps.
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1 (DPO, step 1433, 8-bit) | 90.0% ±6% | **1.0% ±3%** | 99.0% ±3% | 1.7 s |
+
+Paired vs the teacher: unanswerable 98 vs 93 (p=0.063), answerable **99 vs 108
+(p=0.012, worse)**. Conflict 5/6 and routing 21/22 are unchanged. 9 of its
+11 answerable misses are refusals. This is exactly the ADR-011 trade, so the
+checkpoint is rejected.
+
+**Checkpoint sweep, all 8-bit, same 237 items, paired against the teacher.**
+
+| DPO step | fact accuracy | hallucination | p50 | answerable vs teacher | unanswerable vs teacher | gate |
+|---|---|---|---|---|---|---|
+| **100** | 94.5% ±4% | **1.0% ±3%** | 1.3 s | 104 vs 108, p=0.22 | 98 vs 93, p=0.06 | **pass** |
+| 200 | 87.3% | 2.0% | 2.3 s | 96 vs 108, p<0.001 | 97 vs 93, p=0.22 | fail |
+| 1433 | 90.0% | 1.0% | 1.7 s | 99 vs 108, p=0.012 | 98 vs 93, p=0.063 | fail |
+
+Reports: `bench-20261020T001129` (step 100), `T003359` (step 200), `T000431`
+(step 1433). Their header says `qwen3.6:27b`; that was a labelling bug,
+since fixed (`settings.model_label`). They are MLX runs.
+
+**Step 100 is amin-1.** It passes every ADR-012 condition: hallucination
+1.0% ≤ 7.1%, fact accuracy not significantly below the teacher, and p50
+1.3 s ≤ 2.5 s. Trust score is +0.915, against the teacher's +0.800. Conflict
+(5/6) and routing (21/22) match the teacher.
+
+What this does not show:
+1. That amin-1 hallucinates *less* than the teacher. 98 vs 93 has p=0.06,
+   suggestive and not established.
+2. That it is as accurate. 104 vs 108 is not significant, but the point
+   estimate is 3.6 points lower, and 4 of its 6 misses are refusals.
+3. That the gain is general. The traps target the category the benchmark
+   exposed, so a fresh adjacent-fact eval slice, written without looking at
+   amin-1's outputs, is the next measurement owed.
+
+Lesson for the next DPO run: val pair accuracy saturated at step 200, and
+everything after it bought refusal with accuracy. Save every 25 steps and
+stop on saturation; 100 steps of a 1,433-step schedule was enough.
 
 The amin-1-sft student, sampled 4× at T=0.7 per training item. Graded failures
 are paired with the teacher's reply to the byte-identical prompt.

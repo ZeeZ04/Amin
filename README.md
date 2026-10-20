@@ -226,8 +226,19 @@ teacher and then preference-tuned on its own graded failures. All of it runs
 on this Mac with MLX. Only behaviour goes into the weights (citing, refusing,
 Arabic register); your documents stay in the index. A trained model ships
 only if it passes the bench gate in ADR-012. The runbook, with timings, is in
-[`docs/TRAINING.md`](docs/TRAINING.md). No trained-model numbers are reported
-here until a run passes the gate.
+[`docs/TRAINING.md`](docs/TRAINING.md).
+
+amin-1 (Qwen3-8B → SFT → DPO, 8-bit) passed the gate on 2026-10-20, on the same
+237 items, retriever and pipeline:
+
+| | fact accuracy | hallucination | p50 latency |
+|---|---|---|---|
+| qwen3.6:27b (teacher) | 98.2% ±3% | 6.1% ±5% | 6.7 s |
+| **amin-1** | 94.5% ±4% | **1.0% ±3%** | **1.3 s** |
+
+Neither difference is significant on its own (p=0.22 and p=0.06, paired). The
+hallucination gain comes from training aimed at a failure category this
+benchmark exposed, so it awaits a fresh eval slice; see EXPERIMENTS E24.
 
 ## Limits, stated plainly
 

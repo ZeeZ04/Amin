@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # -- post-training (amin/train, ADR-012) ---------------------------------
     # The teacher is whatever answer_model is; the student is what gets tuned.
-    student_model: str = "Qwen/Qwen3-8B"
+    student_model: str = "mlx-community/Qwen3-8B-bf16"
     train_path: Path = REPO_ROOT / "data" / "train"
 
     # -- storage -------------------------------------------------------------
@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     lexical_overlap_floor: float = 0.28
     # Refuse rather than return an answer whose claims mostly failed the check.
     min_citation_precision: float = 0.5
+
+    @property
+    def model_label(self) -> str:
+        """The model actually answering: the MLX server's, not the Ollama tag."""
+        return self.mlx_model if self.provider == "mlx" else self.answer_model
 
 
 settings = Settings()

@@ -1,6 +1,6 @@
 # Training Amin's own model
 
-Amin's own model is Qwen3-8B, post-trained on this Mac to do one job well:
+Amin's own model is Qwen3-8B (LoRA on bf16, shipped at 8-bit), post-trained on this Mac to do one job well:
 read the passages it is given, cite them, and say so when they don't hold the
 answer. The why is in ADR-012; this page is the runbook.
 
@@ -12,13 +12,13 @@ added and deleted.
 
 | step | command | what it does | time on an M3 Max, 64 GB |
 |---|---|---|---|
-| 1 | `make train-setup` | installs MLX, downloads Qwen3-8B (~16 GB) to `data/models/` | 10–30 min |
+| 1 | `make train-setup` | installs MLX, downloads Qwen3-8B bf16 (~16 GB) to `data/models/`; needs ~60 GB free in all | 10–30 min |
 | 2 | `make train-corpus` | writes 401 synthetic documents + 3,955 graded questions, indexes them separately from the eval index | ~5 min |
 | 3 | `make distill` | the 27B answers every question through the real pipeline; only grader-passed answers are kept | 6–10 h, resumable |
-| 4 | `make train-sft` | LoRA distillation into the 8B, then fuses it to `data/models/amin-1-sft` | 2–4 h |
+| 4 | `make train-sft` | LoRA distillation into the 8B, fused, then an 8-bit copy for serving | 2–4 h |
 | 5 | `make serve-student` + `make bench-student` | serves the student and runs the 237-item bench | ~30 min |
 | 6 | `make preferences` (student still serving) | samples the student, pairs its failures with the teacher's answers | 4–8 h, resumable |
-| 7 | `make train-dpo` | preference tuning, fuse, 4-bit quantize to `data/models/amin-1` | 1–3 h |
+| 7 | `make train-dpo` | preference tuning, fused, quantized to `data/models/amin-1` (8-bit; `Q_BITS=4` for speed) | 1–3 h |
 | 8 | `make serve-student MODEL=data/models/amin-1` + `make bench-student` | the ship gate | ~30 min |
 
 Times are estimates; record real ones in `docs/EXPERIMENTS.md` (E23, E24).

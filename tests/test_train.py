@@ -20,7 +20,7 @@ from amin.prompts import ANSWER_SYSTEM, answer_prompt
 from amin.providers import EchoProvider
 from amin.schema import Answer, Chunk, Outcome, Retrieved
 from amin.train import corpus
-from amin.train.distill import RecordingProvider, sft_examples
+from amin.train.distill import RecordingProvider, _shuffle_passages, sft_examples
 from amin.train.preferences import dpo_rows, teacher_replies
 
 REPO = Path(__file__).resolve().parent.parent
@@ -180,7 +180,7 @@ def test_sft_export_keeps_only_passed_and_uses_the_real_prompt():
     assert [m["role"] for m in msgs] == ["system", "user", "assistant"]
     assert msgs[0]["content"] == ANSWER_SYSTEM and msgs[1]["content"] == prompt
     assert "<question>What is the rent?</question>" in msgs[1]["content"]
-    assert msgs[2]["content"] == "The rent is AED 5,000 [S1]."
+    assert msgs[2]["content"] == "The rent is AED 5,000 [S1]."  # one passage: nothing to shuffle
 
 
 def test_gate_refusals_are_capped():
@@ -233,3 +233,46 @@ def test_written_files_round_trip(tmp_path):
     assert len(list((tmp_path / "corpus").glob("h*/*.md"))) == n_docs
     rows = [json.loads(x) for x in (tmp_path / "items.jsonl").read_text().splitlines()]
     assert len(rows) == n_items
+
+
+def test_shuffled_passages_keep_every_tag_pointing_at_the_same_text():
+    import random as _r
+
+    passages = [_passage(f"d{i}", f"Fact number {i} is {i * 11}.") for i in range(1, 7)]
+    prompt, _ = answer_prompt("What is fact 2 and fact 5?", passages)
+    ex = {"messages": [{"role": "system", "content": ANSWER_SYSTEM}, {"role": "user", "content": prompt},
+                       {"role": "assistant", "content": "Fact 2 is 22 [S2]. Fact 5 is 55 [S5]."}]}
+    moved = 0
+    for seed in range(20):
+        out = _shuffle_passages(ex, _r.Random(seed))
+        p, reply = out["messages"][1]["content"], out["messages"][2]["content"]
+        assert p.count("[S") == 6 and "<question>What is fact 2 and fact 5?</question>" in p
+        for sentence, n in re.findall(r"(Fact \d is \d+) \[S(\d)\]", reply):
+            block = re.search(rf"\[S{n}\] [^\n]*\n([^\n]*)", p).group(1)
+            assert block.split(" is ")[1].rstrip(".") == sentence.split(" is ")[1]
+        moved += reply != ex["messages"][2]["content"]
+    assert moved > 10
+
+
+def test_shuffle_leaves_refusals_and_bad_tags_alone():
+    import random as _r
+
+    prompt, _ = answer_prompt("q", [_passage("a", "x"), _passage("b", "y")])
+    bad = {"messages": [{"role": "system", "content": ANSWER_SYSTEM}, {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": "z [S7]."}]}
+    assert _shuffle_passages(bad, _r.Random(0)) == bad
+    ref = dict(bad, messages=bad["messages"][:2] + [{"role": "assistant", "content": "NO_EVIDENCE"}])
+    out = _shuffle_passages(ref, _r.Random(1))
+    assert out["messages"][2]["content"] == "NO_EVIDENCE"
+
+
+def test_dpo_balance_adds_one_answer_pair_per_refusal_pair():
+    student = [{"id": "u", "split": "train", "kind": "unanswerable", "lang": "en",
+                "pairs": [{"prompt": "G", "chosen": "NO_EVIDENCE", "rejected": "made up [S1]."}]}]
+    teacher = [_record(f"s{i}", "train", True, [{"prompt": f"P{i}", "response": f"fact {i} [S1].",
+                                                  "role": "answer", "system": ANSWER_SYSTEM}]) for i in range(5)]
+    rows = dpo_rows(student, balance=teacher)["train"]
+    refuse = [r for r in rows if r["chosen"] == "NO_EVIDENCE"]
+    answer = [r for r in rows if r["rejected"] == "NO_EVIDENCE"]
+    assert len(refuse) == 2 and len(answer) == 2  # unanswerable weighted x2, matched one for one
+    assert all(r["chosen"].endswith("[S1].") for r in answer)

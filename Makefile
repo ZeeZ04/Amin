@@ -57,12 +57,17 @@ clean:
 # ---------------------------------------------------------------------------
 # Amin's own model (ADR-012). Each step is resumable; see docs/TRAINING.md.
 # ---------------------------------------------------------------------------
-STUDENT ?= Qwen/Qwen3-8B
+# LoRA on the bf16 base, then quantize the finished model once. 8-bit is
+# near-lossless; Q_BITS=4 trades a little quality for speed if the latency
+# gate needs it. (Low on disk? STUDENT=mlx-community/Qwen3-8B-4bit is QLoRA.)
+STUDENT ?= mlx-community/Qwen3-8B-bf16
+BASE = data/models/$(notdir $(STUDENT))
+Q_BITS ?= 8
 NO_THINK = --chat-template-args '{"enable_thinking": false}'
 
 train-setup:
 	uv sync --extra dev --extra train
-	uv run python -c "from huggingface_hub import snapshot_download as d; d('$(STUDENT)', local_dir='data/models/Qwen3-8B')"
+	uv run python -c "from huggingface_hub import snapshot_download as d; d('$(STUDENT)', local_dir='$(BASE)')"
 
 train-corpus:
 	uv run python scripts/build_train_corpus.py
@@ -74,12 +79,14 @@ distill:
 	uv run python -m amin.train.distill export
 
 train-sft:
-	uv run mlx_lm.lora -c amin/train/sft.yaml
-	uv run mlx_lm.fuse --model data/models/Qwen3-8B --adapter-path data/adapters/amin-1-sft \
+	uv run mlx_lm.lora -c amin/train/sft.yaml --model $(BASE)
+	uv run mlx_lm.fuse --model $(BASE) --adapter-path data/adapters/amin-1-sft \
 	  --save-path data/models/amin-1-sft
+	uv run mlx_lm.convert --hf-path data/models/amin-1-sft --mlx-path data/models/amin-1-sft-q$(Q_BITS) \
+	  -q --q-bits $(Q_BITS)
 
 serve-student:
-	uv run mlx_lm.server --model $${MODEL:-data/models/amin-1-sft} --port 8080 $(NO_THINK)
+	uv run mlx_lm.server --model $${MODEL:-data/models/amin-1-sft-q$(Q_BITS)} --port 8080 $(NO_THINK)
 
 preferences:
 	# Needs `make serve-student` running in another terminal.
@@ -90,7 +97,7 @@ train-dpo:
 	uv run mlx_lm_lora.train -c amin/train/dpo.yaml
 	uv run mlx_lm.fuse --model data/models/amin-1-sft --adapter-path data/adapters/amin-1-dpo \
 	  --save-path data/models/amin-1-bf16
-	uv run mlx_lm.convert --hf-path data/models/amin-1-bf16 --mlx-path data/models/amin-1 -q --q-bits 4
+	uv run mlx_lm.convert --hf-path data/models/amin-1-bf16 --mlx-path data/models/amin-1 -q --q-bits $(Q_BITS)
 
 bench-student:
 	# The ship gate: same 237 items, same retriever, student vs teacher.

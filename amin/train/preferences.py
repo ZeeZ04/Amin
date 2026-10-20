@@ -54,6 +54,13 @@ def teacher_replies(records: list[dict]) -> dict[str, tuple[dict[str, str], str 
     out: dict[str, tuple[dict[str, str], str | None]] = {}
     for r in records:
         if not r["passed"]:
+            # The corpus is generated, so an unanswerable item is unanswerable
+            # by construction: NO_EVIDENCE is right even where the teacher
+            # answered. These are the pairs that can take the student past it.
+            if r["kind"] == "unanswerable":
+                replies = {c["prompt"]: GATE_REFUSAL for c in r["calls"] if c["role"] == "answer"}
+                if replies:
+                    out[r["id"]] = (replies, None)
             continue
         replies = {c["prompt"]: c["response"] for c in r["calls"] if c["role"] == "answer"}
         gate = r.get("gate_prompt")
@@ -70,12 +77,14 @@ def run(
     temperature: float = typer.Option(0.7, help="Sampling temperature for the student."),
     host: str = typer.Option(None, help="mlx_lm.server address (default: settings.mlx_host)."),
     limit: int = typer.Option(0, help="Stop after N items - for a smoke test."),
+    prefix: str = typer.Option("", help="Only item ids starting with this, e.g. t3- for the traps."),
 ):
     """Sample the student; keep every failure that has a teacher counterpart."""
     teacher = teacher_replies(read_jsonl(paths()["raw"]))
     out = pref_paths()["raw"]
     done = {r["id"] for r in read_jsonl(out)}
-    todo = [(i, r) for i, r in load_train_items() if i.id in teacher and i.id not in done]
+    todo = [(i, r) for i, r in load_train_items()
+            if i.id in teacher and i.id not in done and i.id.startswith(prefix)]
     if limit:
         todo = todo[:limit]
 
@@ -115,7 +124,14 @@ def run(
     console.print(f"[green]done[/green]: the student failed on {found}/{len(todo)} items")
 
 
-def dpo_rows(records: list[dict], seed: int = 0) -> dict[str, list[dict]]:
+def dpo_rows(records: list[dict], seed: int = 0, balance: list[dict] | None = None) -> dict[str, list[dict]]:
+    """Preference rows from the student's failures.
+
+    `balance` holds teacher records for answerable items. Each becomes a pair
+    whose rejected side is a refusal, as many as there are refusal-side pairs
+    in the split. Without them DPO can lower hallucination the cheap way, by
+    refusing more of everything - the ADR-011 trade.
+    """
     rng = random.Random(seed)
     out: dict[str, list[dict]] = {"train": [], "valid": []}
     for r in records:
@@ -129,15 +145,26 @@ def dpo_rows(records: list[dict], seed: int = 0) -> dict[str, list[dict]]:
                    "chosen": p["chosen"].strip(), "rejected": p["rejected"].strip()}
             weight = 1 + (r["kind"] == "unanswerable") + (r["lang"] == "ar")
             out[r["split"]].extend([row] * weight)
-    for rows in out.values():
+    for split, rows in out.items():
+        refusal_side = sum(r["chosen"] == GATE_REFUSAL for r in rows)
+        pool = [
+            {"system": ANSWER_SYSTEM, "prompt": c["prompt"], "chosen": c["response"].strip(), "rejected": GATE_REFUSAL}
+            for b in balance or [] if b["split"] == split and b["passed"] and b["kind"] == "answerable"
+            for c in b["calls"] if c["role"] == "answer"
+        ]
+        rng.shuffle(pool)
+        rows.extend(pool[:refusal_side])
         rng.shuffle(rows)
     return out
 
 
 @app.command()
-def export():
+def export(
+    balance_prefix: str = typer.Option("t3-", help="Answerable teacher items used to balance refusal pairs."),
+):
     """Write DPO data in the prompt/chosen/rejected format mlx_lm_lora reads."""
-    sets = dpo_rows(read_jsonl(pref_paths()["raw"]))
+    balance = [r for r in read_jsonl(paths()["raw"]) if r["id"].startswith(balance_prefix)] if balance_prefix else []
+    sets = dpo_rows(read_jsonl(pref_paths()["raw"]), balance=balance)
     d = pref_paths()["dpo"]
     d.mkdir(parents=True, exist_ok=True)
     for split, rows in sets.items():

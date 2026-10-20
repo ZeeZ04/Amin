@@ -64,6 +64,13 @@ class Doc:
     # Which household's library it belongs to. A household holds at most one
     # document of each family, as a real one does; each is indexed on its own.
     household: int = 0
+    # False-premise questions: they assert a figure the document contradicts.
+    premises: list[tuple[str, str]] = field(default_factory=list)
+    # Adjacent-fact traps: (question, why unanswerable, sibling question the
+    # document does answer, its expected facts). The nearest passage holds a
+    # related figure; the right reply is a refusal, and the sibling is there
+    # so a model cannot pass by refusing everything that looks like it.
+    traps: list[tuple[str, str, str, list[str]]] = field(default_factory=list)
 
     def markdown(self) -> str:
         meta = [
@@ -223,8 +230,20 @@ def tenancy_en(rng: random.Random, n: int) -> Doc:
     ]
     if not parking:
         absent.append((f"How many parking bays come with {where}?", "The contract allocates no parking."))
-    return Doc(f"tr-tenancy-{n:03d}", f"Tenancy Contract — Unit {unit}, {b}", "en",
-               f"tr-tenancy-{n:03d}", sections, facts, absent, key=where)
+    wrong = 30 if notice != 30 else 45
+    d = Doc(f"tr-tenancy-{n:03d}", f"Tenancy Contract — Unit {unit}, {b}", "en",
+            f"tr-tenancy-{n:03d}", sections, facts, absent, key=where)
+    d.premises = [(f"Why is the notice period for {where} only {wrong} days?",
+                   f"False premise: the contract requires {notice} days.")]
+    d.traps = [
+        (f"What will the rent be for {where} after the contract renews?",
+         "Only the current year's rent is stated; renewal rent is not.",
+         f"What is the annual rent for {where} this term?", money_expect(rent)),
+        (f"What is the late fee if a rent cheque for {where} is paid late?",
+         "No late payment fee is stated.",
+         f"How many rent cheques are there for {where}?", [f"{cheques} cheque", f"{cheques} rent cheque"]),
+    ]
+    return d
 
 
 def tenancy_ar(rng: random.Random, n: int) -> Doc:
@@ -261,8 +280,14 @@ def tenancy_ar(rng: random.Random, n: int) -> Doc:
         (f"كم عدد مواقف السيارات المخصصة {ref}؟", "العقد لا يذكر مواقف السيارات."),
         (f"هل يُسمح بالحيوانات الأليفة في {ref}؟", "العقد لا يذكر الحيوانات الأليفة."),
     ]
-    return Doc(f"tr-tenancy-ar-{n:03d}", f"عقد إيجار — الوحدة {unit}، {b}", "ar",
-               f"tr-tenancy-ar-{n:03d}", sections, facts, absent, key=ref)
+    d = Doc(f"tr-tenancy-ar-{n:03d}", f"عقد إيجار — الوحدة {unit}، {b}", "ar",
+            f"tr-tenancy-ar-{n:03d}", sections, facts, absent, key=ref)
+    d.premises = [(f"لماذا مدة الإشعار في عقد {ref} {notice + 30} يوماً فقط؟",
+                   f"False premise: the contract requires {notice} days.")]
+    d.traps = [(f"كم سيكون الإيجار السنوي {ref} بعد تجديد العقد؟",
+                "Only the current rent is stated; renewal rent is not.",
+                f"كم الإيجار السنوي الحالي {ref}؟", money_expect(rent, "ar"))]
+    return d
 
 
 def utility_bill_en(rng: random.Random, n: int) -> Doc:
@@ -303,8 +328,19 @@ def utility_bill_en(rng: random.Random, n: int) -> Doc:
         (f"What is the {co} bill amount for account {acct} in {_MONTHS[(month.month - 2) % 12]} {month.year - (month.month == 1)}?", "Only one billing period is in the library."),
         (f"Does {co} offer a solar panel discount?", "No discount terms on the bill."),
     ]
-    return Doc(f"tr-bill-{n:03d}", f"{co} — Bill, account {acct}", "en", f"tr-bill-{n:03d}",
-               sections, facts, absent, key=ref)
+    d = Doc(f"tr-bill-{n:03d}", f"{co} — Bill, account {acct}", "en", f"tr-bill-{n:03d}",
+            sections, facts, absent, key=ref)
+    d.traps = [
+        (f"What is the reconnection fee on the {ref}?",
+         "Only a late payment charge is stated; no reconnection fee.",
+         f"What is the late payment charge on the {ref}?", [f"{late} percent"]),
+        # Not "water rate per gallon": amount / gallons derives it, so a model
+        # that computes it is right and the label would be wrong (cf. E20 u045).
+        (f"What is the fuel surcharge on the {ref}?",
+         "The bill lists no fuel surcharge.",
+         f"How much is the water charge on the {ref}?", money_expect(water_amt)),
+    ]
+    return d
 
 
 def utility_bill_ar(rng: random.Random, n: int) -> Doc:
@@ -328,8 +364,11 @@ def utility_bill_ar(rng: random.Random, n: int) -> Doc:
         Fact([f"كم كان استهلاك الكهرباء في {ref}؟"], [str(kwh), str(kwh).translate(_EASTERN)], "usage"),
     ]
     absent = [(f"كم رسوم الصرف الصحي في {ref}؟", "الفاتورة لا تذكر رسوم الصرف الصحي.")]
-    return Doc(f"tr-bill-ar-{n:03d}", f"فاتورة {co} — الحساب {acct}", "ar", f"tr-bill-ar-{n:03d}",
-               sections, facts, absent, key=ref)
+    d = Doc(f"tr-bill-ar-{n:03d}", f"فاتورة {co} — الحساب {acct}", "ar", f"tr-bill-ar-{n:03d}",
+            sections, facts, absent, key=ref)
+    d.traps = [(f"كم رسوم التأخير في {ref}؟", "The bill states no late fee.",
+                f"متى آخر موعد لسداد {ref}؟", ar_date_expect(due))]
+    return d
 
 
 def car_registration(rng: random.Random, n: int) -> Doc:
@@ -364,8 +403,19 @@ def car_registration(rng: random.Random, n: int) -> Doc:
         (f"How many traffic fines are on plate {plate}?", "No fines record in the library."),
         (f"What is the mileage of {ref}?", "Mileage is not recorded."),
     ]
-    return Doc(f"tr-car-{n:03d}", f"Vehicle Registration — {make} {model}, plate {plate}", "en",
-               f"tr-car-{n:03d}", sections, facts, absent, key=plate)
+    d = Doc(f"tr-car-{n:03d}", f"Vehicle Registration — {make} {model}, plate {plate}", "en",
+            f"tr-car-{n:03d}", sections, facts, absent, key=plate)
+    d.premises = [(f"Why is the renewal fee for {ref} AED {fee + 250}?",
+                   f"False premise: the renewal fee is AED {fee}.")]
+    d.traps = [
+        (f"When does the insurance policy for {ref} expire?",
+         "Only the registration expiry is given; the insurance expiry is not.",
+         f"When does the registration of {ref} expire?", [en_date(expiry)]),
+        (f"How much does the technical inspection for {ref} cost?",
+         "Inspection is mentioned but its cost is not.",
+         f"How much is the registration renewal fee for {ref}?", [f"AED {fee}"]),
+    ]
+    return d
 
 
 def school_fees(rng: random.Random, n: int, year: int | None = None, base: dict | None = None) -> Doc:
@@ -404,8 +454,18 @@ def school_fees(rng: random.Random, n: int, year: int | None = None, base: dict 
         (f"Does {school} charge Grade {grade} for after-school activities?", "No activity fees in the schedule."),
     ]
     sid = base["doc_id"] + "-old" if base else f"tr-fees-{n:03d}"
-    return Doc(sid, f"{school} — Fee Schedule {label}, Grade {grade}", "en",
-               base["about"] if base else sid, sections, facts, absent, key=f"{school}|{grade}")
+    d = Doc(sid, f"{school} — Fee Schedule {label}, Grade {grade}", "en",
+            base["about"] if base else sid, sections, facts, absent, key=f"{school}|{grade}")
+    other = grade + 1 if grade < 12 else grade - 1
+    d.traps = [
+        (f"What is the Grade {other} tuition at {school}?",
+         f"The schedule covers Grade {grade} only.",
+         f"What is the Grade {grade} tuition at {school}?", money_expect(tuition)),
+        (f"How much is a one-way school bus for Grade {grade} at {school}?",
+         "Only the annual transport fee is given.",
+         f"How much is the school bus for Grade {grade} at {school}?", money_expect(bus)),
+    ]
+    return d
 
 
 def school_fees_ar(rng: random.Random, n: int) -> Doc:
@@ -422,8 +482,12 @@ def school_fees_ar(rng: random.Random, n: int) -> Doc:
         Fact([f"كم نسبة خصم الإخوة للصف {grade} في {school}؟"], [f"{sibling} بالمئة", f"{sibling}%"], "discounts"),
     ]
     absent = [(f"كم رسوم الحافلة المدرسية للصف {grade} في {school}؟", "الجدول لا يذكر رسوم الحافلة.")]
-    return Doc(f"tr-fees-ar-{n:03d}", f"جدول رسوم {school} — الصف {grade}", "ar", f"tr-fees-ar-{n:03d}",
-               sections, facts, absent, key=f"{school}|{grade}")
+    d = Doc(f"tr-fees-ar-{n:03d}", f"جدول رسوم {school} — الصف {grade}", "ar", f"tr-fees-ar-{n:03d}",
+            sections, facts, absent, key=f"{school}|{grade}")
+    other = grade + 1 if grade < 12 else grade - 1
+    d.traps = [(f"كم الرسوم السنوية للصف {other} في {school}؟", f"The schedule covers Grade {grade} only.",
+                f"كم الرسوم السنوية للصف {grade} في {school}؟", money_expect(tuition, "ar"))]
+    return d
 
 
 def gym(rng: random.Random, n: int) -> Doc:
@@ -455,7 +519,13 @@ def gym(rng: random.Random, n: int) -> Doc:
         (f"What are the opening hours of {g}?", "The membership terms give no opening hours."),
         (f"Does {ref} include swimming pool access?", "Facilities are not described."),
     ]
-    return Doc(f"tr-gym-{n:03d}", f"{g} — Membership Agreement", "en", f"tr-gym-{n:03d}", sections, facts, absent, key=ref)
+    d = Doc(f"tr-gym-{n:03d}", f"{g} — Membership Agreement", "en", f"tr-gym-{n:03d}", sections, facts, absent, key=ref)
+    d.premises = [(f"Why does {ref} need {cancel + 60} days notice to cancel?",
+                   f"False premise: cancellation needs {cancel} days notice.")]
+    d.traps = [(f"How much is {ref} if paid annually up front?",
+                "Only the monthly fee is stated; no annual price.",
+                f"How much is the monthly fee for {ref}?", [f"AED {monthly}"])]
+    return d
 
 
 def telecom(rng: random.Random, n: int) -> Doc:
@@ -483,7 +553,12 @@ def telecom(rng: random.Random, n: int) -> Doc:
         (f"What is the upload speed on {t} {plan}?", "Only download speed is stated."),
         (f"Does {t} {plan} include a TV package?", "No TV terms in the plan."),
     ]
-    return Doc(f"tr-telecom-{n:03d}", f"{t} — {plan} Plan Terms", "en", f"tr-telecom-{n:03d}", sections, facts, absent, key=f"{t} {plan}")
+    d = Doc(f"tr-telecom-{n:03d}", f"{t} — {plan} Plan Terms", "en", f"tr-telecom-{n:03d}", sections, facts, absent,
+            key=f"{t} {plan}")
+    d.traps = [(f"What is the monthly price of {t} {plan} after the commitment period ends?",
+                "Only the price during the commitment is stated.",
+                f"How much is the {t} {plan} plan per month?", [f"AED {monthly}"])]
+    return d
 
 
 def warranty(rng: random.Random, n: int) -> Doc:
@@ -516,8 +591,19 @@ def warranty(rng: random.Random, n: int) -> Doc:
         (f"What is the energy rating of the {brand} {model}?", "The warranty does not state an energy rating."),
         (f"Can I extend the {brand} {model} warranty?", "No extension terms are given."),
     ]
-    return Doc(f"tr-warranty-{n:03d}", f"{brand} {model} {kind.title()} — Warranty", "en",
-               f"tr-warranty-{n:03d}", sections, facts, absent, key=model)
+    d = Doc(f"tr-warranty-{n:03d}", f"{brand} {model} {kind.title()} — Warranty", "en",
+            f"tr-warranty-{n:03d}", sections, facts, absent, key=model)
+    d.premises = [(f"Why is the {brand} {model} warranty only 6 months?",
+                   f"False premise: the warranty is {months} months.")]
+    d.traps = [
+        (f"How long is the warranty on the accessories that came with the {brand} {model}?",
+         "Only the appliance and one part are covered; accessories are not mentioned.",
+         f"How long is the warranty on the {brand} {model}?", [f"{months} months"]),
+        (f"Is a refurbished {brand} {model} covered by the same warranty?",
+         "Refurbished units are not addressed.",
+         f"How long is the {part} on the {model} covered?", [f"{part_years} years"]),
+    ]
+    return d
 
 
 def ac_service(rng: random.Random, n: int) -> Doc:
@@ -542,8 +628,12 @@ def ac_service(rng: random.Random, n: int) -> Doc:
         (f"Does the {s} contract at {b} cover the water heater?", "Only air conditioning is in scope."),
         (f"When does the {s} contract at {b} end?", "The contract gives no end date."),
     ]
-    return Doc(f"tr-acservice-{n:03d}", f"{s} — AC Maintenance Contract, {b}", "en",
-               f"tr-acservice-{n:03d}", sections, facts, absent, key=f"{s}|{b}")
+    d = Doc(f"tr-acservice-{n:03d}", f"{s} — AC Maintenance Contract, {b}", "en",
+            f"tr-acservice-{n:03d}", sections, facts, absent, key=f"{s}|{b}")
+    d.traps = [(f"How quickly does {s} respond to a routine, non-emergency request at {b}?",
+                "Only the emergency call-out time is stated.",
+                f"How fast does {s} respond to a breakdown at {b}?", [f"{response} hours"])]
+    return d
 
 
 # Counts are bounded by how many distinct keys each family's name pool allows.
@@ -618,7 +708,111 @@ def build(seed: int = 7) -> tuple[list[Doc], list[dict]]:
             if probe and any(probe[0] in t for t in texts[d.household]):
                 continue  # the near-miss identifier exists after all
             add("unanswerable", q, d, note=why, tags=["near_miss" if probe else "absent"])
-    return docs, items
+    return docs, items + round_two(docs, seed) + round_three(docs)
+
+
+# ---------------------------------------------------------------------------
+# round 2 (E23): refusals the first student never saw
+# ---------------------------------------------------------------------------
+#
+# The first SFT student cited passages for general knowledge ("The Berlin Wall
+# fell in 1989 [S1][S5]") because every training refusal was a near-miss about
+# a household document. These add the shapes it had not seen: world facts, a
+# document kind the household does not have, and a false premise. None reuse an
+# eval question or its fact (tests/test_train.py checks the questions).
+
+GENERAL_EN = [
+    "What is the capital of Canada?", "Who painted the Mona Lisa?", "How many continents are there?",
+    "What is the tallest mountain in the world?", "Who was the first person to walk on the Moon?",
+    "What is the freezing point of water in Fahrenheit?", "How many days are in a leap year?",
+    "What is the chemical formula for table salt?", "Which planet is closest to the Sun?",
+    "Who wrote Romeo and Juliet?", "What is the longest river in South America?",
+    "In what year did the Titanic sink?", "How many players does a football team have on the pitch?",
+    "What is the square root of 144?", "What language is spoken in Brazil?", "What is the largest ocean?",
+    "Who discovered penicillin?", "What is the capital of Australia?", "How many minutes are in a day?",
+    "What gas do plants absorb from the air?", "In what year was the UAE founded?",
+    "What is the national bird of the UAE?", "How tall is the Burj Khalifa?",
+    "What time does the Dubai Metro open on Fridays?", "What is the population of Abu Dhabi?",
+    "Who is the current FIFA president?",
+]
+GENERAL_AR = [
+    "ما عاصمة كندا؟", "من رسم الموناليزا؟", "كم عدد القارات؟", "ما أطول نهر في العالم؟",
+    "من كتب روميو وجولييت؟", "ما أكبر محيط في العالم؟", "كم يوماً في السنة الكبيسة؟",
+    "ما الطائر الوطني لدولة الإمارات؟", "كم يبلغ ارتفاع برج خليفة؟", "في أي عام تأسست دولة الإمارات؟",
+    "ما عاصمة أستراليا؟", "من اكتشف البنسلين؟",
+]
+# A household without this kind of document is asked about one anyway.
+MISSING_KIND = {
+    "tr-tenancy": ("When does my tenancy contract end?", "متى ينتهي عقد الإيجار الخاص بي؟"),
+    "tr-bill": ("How much is my latest electricity bill?", "كم مبلغ فاتورة الكهرباء الأخيرة؟"),
+    "tr-car": ("When does my car registration expire?", "متى ينتهي تسجيل سيارتي؟"),
+    "tr-fees": ("How much are my child's school fees this year?", "كم الرسوم المدرسية لطفلي هذا العام؟"),
+    "tr-gym": ("How much do I pay for the gym each month?", "كم أدفع للنادي الرياضي شهرياً؟"),
+    "tr-telecom": ("What speed is my home internet plan?", "ما سرعة باقة الإنترنت المنزلي؟"),
+    "tr-warranty": ("How long is the warranty on my washing machine?", "كم مدة ضمان الغسالة؟"),
+    "tr-acservice": ("How many times a year is the air conditioning serviced?", "كم مرة في السنة تتم صيانة المكيف؟"),
+}
+
+
+def _kind(doc_id: str) -> str:
+    return doc_id.removesuffix("-old").rsplit("-", 1)[0].removesuffix("-ar")
+
+
+def round_two(docs: list[Doc], seed: int) -> list[dict]:
+    rng = random.Random(seed + 1)  # its own stream: round-1 documents stay byte-identical
+    homes: dict[int, list[Doc]] = {}
+    for d in docs:
+        homes.setdefault(d.household, []).append(d)
+    split = {h: ds[0].split for h, ds in homes.items()}
+    lang = {h: ds[0].lang for h, ds in homes.items()}
+    out: list[dict] = []
+
+    def add(question: str, h: int, note: str, tag: str) -> None:
+        out.append({"id": f"t2-{len(out) + 1:05d}", "kind": "unanswerable", "question": question,
+                    "lang": lang[h], "split": split[h], "household": h, "note": note, "tags": [tag]})
+
+    for language, pool in (("en", GENERAL_EN), ("ar", GENERAL_AR)):
+        hs = sorted(h for h in homes if lang[h] == language)
+        for q in pool:
+            for h in rng.sample(hs, 2):
+                add(q, h, "General knowledge; no document in the library states it.", "general")
+    for h, ds in sorted(homes.items()):
+        have = {_kind(d.doc_id) for d in ds}
+        missing = sorted(k for k in MISSING_KIND if k not in have)
+        for k in rng.sample(missing, min(2, len(missing))):
+            en, ar = MISSING_KIND[k]
+            add(ar if lang[h] == "ar" else en, h, f"This household has no {k[3:]} document.", "missing_kind")
+    for d in docs:
+        for q, note in d.premises:
+            add(q, d.household, note, "false_premise")
+    return out
+
+
+
+# ---------------------------------------------------------------------------
+# round 3 (E24): adjacent-fact traps
+# ---------------------------------------------------------------------------
+#
+# After run 2 the student failed 8 of 4,264 training items, too few to learn
+# from, while its benchmark failures shared one shape: a question about
+# something next to a stated fact, answered with that fact. These questions
+# are that shape on the training documents. Each comes with an answerable
+# sibling, so preference pairs can teach the line between them rather than a
+# general lean towards refusing.
+
+
+def round_three(docs: list[Doc]) -> list[dict]:
+    out: list[dict] = []
+
+    def add(kind: str, question: str, d: Doc, tag: str, **kw) -> None:
+        out.append({"id": f"t3-{len(out) + 1:05d}", "kind": kind, "question": question, "lang": d.lang,
+                    "split": d.split, "household": d.household, "tags": [tag], **kw})
+
+    for d in docs:
+        for trap, why, sibling, expect in d.traps:
+            add("unanswerable", trap, d, "adjacent", note=why)
+            add("answerable", sibling, d, "adjacent_sibling", expect_any=expect, expect_doc=d.doc_id)
+    return out
 
 
 def household_dir(n: int) -> str:

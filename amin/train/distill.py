@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -208,10 +209,41 @@ def sft_examples(records: list[dict], seed: int = 0) -> dict[str, list[dict]]:
         # refusals / total <= cap  =>  extra gate refusals allowed:
         room = int((MAX_REFUSAL_SHARE * len(model_made) - refusals) / (1 - MAX_REFUSAL_SHARE))
         rng.shuffle(gate_made)
-        rows = model_made + gate_made[: max(room, 0)]
+        rows = [_shuffle_passages(r, rng) for r in model_made + gate_made[: max(room, 0)]]
         rng.shuffle(rows)
         out[split] = rows
     return out
+
+
+_PASSAGE_SPLIT = re.compile(r"\n\n(?=\[S\d+\] )")
+_TAG = re.compile(r"\[S(\d+)\]")
+
+
+def _shuffle_passages(example: dict, rng: random.Random) -> dict:
+    """Shuffle the passages and renumber every tag to match.
+
+    E23 run 1: 93% of the teacher's answers cited [S1] or [S2], because the
+    retriever usually ranks the answer first. The student learned the
+    position, not the passage, and cited [S1] for the Berlin Wall. After this,
+    a tag is only right if the passage it points at says the thing.
+    """
+    msgs = example["messages"]
+    if msgs[0]["content"] != ANSWER_SYSTEM:
+        return example
+    prompt, reply = msgs[1]["content"], msgs[2]["content"]
+    head, sep, tail = prompt.partition("\n\n<question>")
+    blocks = _PASSAGE_SPLIT.split(head)
+    if len(blocks) < 2 or not sep or not all(b.startswith(f"[S{i}] ") for i, b in enumerate(blocks, 1)):
+        return example
+    cited = {int(n) for n in _TAG.findall(reply)}
+    if any(n < 1 or n > len(blocks) for n in cited):
+        return example  # a tag with no passage behind it: leave it for the grader's record
+    order = list(range(1, len(blocks) + 1))
+    rng.shuffle(order)
+    new_of = {old: new for new, old in enumerate(order, 1)}
+    body = "\n\n".join(f"[S{new}] " + blocks[old - 1].split("] ", 1)[1] for new, old in enumerate(order, 1))
+    reply = _TAG.sub(lambda m: f"[S{new_of[int(m.group(1))]}]", reply)
+    return _chat(msgs[0]["content"], body + sep + tail, reply)
 
 
 def _chat(system: str, prompt: str, response: str) -> dict:
