@@ -311,6 +311,186 @@ CONFLICT: list[tuple[str, list[str], str, str]] = [
 ]
 
 
+# E25 - fresh held-out slice, written to its own file so the main benchmark is
+# unchanged. Written without looking at any model's output on the main set. The
+# DPO run (E24) trained on adjacent-fact traps, so this slice asks the same kind
+# of question about facts the training never saw, each paired with an answerable
+# sibling on the fact it sits next to: a system that refuses everything cannot
+# score on both halves. Pair n is ju{n} (unanswerable) and js{n} (sibling).
+# (unanswerable question, why it cannot be answered, sibling question, sibling expect_any, doc)
+SLICE_J_ADJACENT: list[tuple[str, str, str, list[str], str]] = [
+    # -- fridge-manual -------------------------------------------------------
+    ("What temperature should the FR-440's chiller drawer be set to?",
+     "Settings are given for the fresh food compartment and freezer only; no chiller drawer is mentioned.",
+     "What setting does ArcticLine recommend for the FR-440 fresh food compartment?", ["4 degrees", "4°C", "4 °C"], "fridge-manual"),
+    ("Which FR-440 error code signals a freezer thermistor fault?",
+     "E1 is the fresh food compartment thermistor; no freezer thermistor code is listed.",
+     "Which FR-440 error code points to a fault in the fresh food compartment thermistor?", ["E1"], "fridge-manual"),
+    ("How long should the FR-440 be unplugged before calling service about an E4 error?",
+     "The 5-minute unplug instruction is given for E7 only.",
+     "How long should the FR-440 stay unplugged when it shows E7?", ["5 minutes"], "fridge-manual"),
+    ("How much does a replacement ALF-9 filter cartridge cost?",
+     "The manual gives the part number and replacement interval, not a price.",
+     "After how many litres dispensed should the ALF-9 cartridge be replaced?", ["1500 litres", "1500"], "fridge-manual"),
+    ("Where is the model number label on the FR-440?",
+     "Only the serial number's location is given.",
+     "Where on the FR-440 is the serial number needed for warranty service?", ["inner left wall"], "fridge-manual"),
+    ("How long does the FR-440 take to get back to its set point after a power cut?",
+     "The 24-hour figure is for first installation; recovery after a power cut is not stated.",
+     "How long after installation must the FR-440 run before food goes in?", ["24 hours"], "fridge-manual"),
+    ("At what percentage of cartridge life does the FR-440 filter light turn red?",
+     "Only the amber threshold is stated; there is no red state.",
+     "At what percentage of cartridge life does the FR-440 filter light turn amber?", ["90 percent"], "fridge-manual"),
+    # -- tenancy-agreement ---------------------------------------------------
+    ("Who is responsible for repairing the water heater at Al Noor Tower?",
+     "Major maintenance names structure and central air conditioning; minor names light fittings, handles and washers. Water heaters are in neither list.",
+     "Under the Al Noor Tower contract, who pays for replacing tap washers?", ["tenant"], "tenancy-agreement"),
+    ("How many days does the landlord have to complete a major repair at Al Noor Tower?",
+     "The contract assigns major maintenance to the landlord but sets no deadline.",
+     "What does the Al Noor Tower contract count as major maintenance?", ["structural repair", "central air conditioning"], "tenancy-agreement"),
+    ("On what date is the second Al Noor Tower rent cheque due?",
+     "The contract gives the number and size of cheques, not their dates.",
+     "Into how many cheques is the Al Noor Tower rent divided?", ["four"], "tenancy-agreement"),
+    ("What per-incident spending limit applies to the landlord's major maintenance?",
+     "The AED 500 per-incident figure caps the tenant's minor maintenance; no landlord limit is set.",
+     "What per-incident ceiling applies to the tenant's minor repairs at Al Noor Tower?", ["AED 500", "500"], "tenancy-agreement"),
+    ("What agency commission is charged when the Al Noor Tower tenancy renews?",
+     "The summary sheet gives the commission payable on signature; renewal commission is not mentioned.",
+     "What letting agency commission applies to Unit 1204?", ["5 percent"], "tenancy-summary-sheet"),
+    # -- insurance-policy ----------------------------------------------------
+    ("Within how many days must a theft be reported to the police for a HomeGuard claim?",
+     "The 30-day limit is for notifying the insurer; no deadline for the police report is set.",
+     "Within how many days must a HomeGuard claim be notified?", ["30 days"], "insurance-policy"),
+    ("How long does HomeGuard take to settle a claim?",
+     "The schedule covers notification and documents, not settlement times.",
+     "What reference does a HomeGuard theft claim require?", ["police report"], "insurance-policy"),
+    ("What is the HomeGuard per-item limit for jewellery?",
+     "AED 5,000 is the threshold for listing an item separately, not a jewellery limit; jewellery is not mentioned.",
+     "What value triggers separate listing of an item on the HomeGuard schedule?", ["AED 5,000", "5,000"], "insurance-policy"),
+    ("What is the annual premium on the HomeGuard contents policy?",
+     "The schedule states cover limits and excesses, not the premium.",
+     "What is the HomeGuard contents sum insured?", ["AED 150,000", "150,000"], "insurance-policy"),
+    ("What is the single-item limit for portable electronics taken outside the home?",
+     "Only an aggregate AED 10,000 limit is stated, not a per-item one.",
+     "What aggregate limit applies to portable electronics taken out of the home?", ["AED 10,000", "10,000"], "insurance-policy"),
+    # -- electricity-tariff --------------------------------------------------
+    ("What is the Metro Utilities electricity deposit for a townhouse?",
+     "Deposits are given for apartments and villas only.",
+     "What electricity security deposit applies to a villa?", ["AED 2,000", "2,000"], "electricity-tariff"),
+    ("What fee does Metro Utilities charge to disconnect an overdue account?",
+     "Only the reconnection fee is stated.",
+     "What does Metro Utilities charge to reconnect a disconnected supply?", ["AED 300", "300"], "electricity-tariff"),
+    ("What does Metro Utilities charge to upgrade the capacity of an existing connection?",
+     "Only the fee for a new residential connection is stated.",
+     "What one-off fee applies to a new residential electricity connection?", ["AED 2,000", "2,000"], "electricity-tariff"),
+    ("On what day of the month does Metro Utilities issue water bills?",
+     "The schedule is for electricity only.",
+     "On which day of the month are Metro Utilities electricity bills issued?", ["5th"], "electricity-tariff"),
+    ("How long does Metro Utilities take to close an electricity account?",
+     "The 45-day figure is for refunding the deposit after closure, not for closing the account.",
+     "How soon after account closure is the electricity deposit refunded?", ["45 days"], "electricity-tariff"),
+    # -- phone-plan ----------------------------------------------------------
+    ("How much does a weekly roaming pass cost on Freedom 150?",
+     "Only a daily roaming pass is offered.",
+     "What does a Nova Mobile daily roaming pass cost?", ["AED 35"], "phone-plan"),
+    ("What do outgoing calls cost on the Nova Mobile daily roaming pass?",
+     "The pass includes incoming minutes; outgoing call charges are not stated.",
+     "How many incoming call minutes come with the daily roaming pass?", ["60 minutes", "60 incoming"], "phone-plan"),
+    ("What is the monthly cap on out-of-bundle voice charges for Freedom 150?",
+     "The AED 200 cap applies to data; no cap is stated for voice.",
+     "What is the monthly cap on out-of-bundle data charges for Freedom 150?", ["AED 200", "200"], "phone-plan"),
+    ("How much does Nova Mobile charge to replace an eSIM?",
+     "Only a SIM replacement fee is stated; eSIMs are not mentioned.",
+     "What is the Freedom 150 SIM replacement fee?", ["AED 25"], "phone-plan"),
+    ("What is roaming data charged at once the daily pass's 1 GB is used up?",
+     "The AED 2 per MB rate applies to roaming without a pass; usage beyond the pass allowance is not addressed.",
+     "How much data does the Nova Mobile daily roaming pass include?", ["1 GB"], "phone-plan"),
+    # -- laptop-warranty -----------------------------------------------------
+    ("How long is the Vertex V14 power adapter covered for?",
+     "Only the laptop hardware and battery coverage periods are given; the adapter is not.",
+     "For how many months does Vertex cover V14 hardware from purchase?", ["12-month", "12 month", "12 months"], "laptop-warranty"),
+    ("How long is the V14 battery covered under the Vertex extended warranty?",
+     "The extension takes total coverage to 36 months, but battery cover under it is not stated.",
+     "How many charge cycles does the standard V14 battery warranty cover?", ["500 charge cycles", "500"], "laptop-warranty"),
+    ("What is the turnaround for Vertex express warranty service?",
+     "Only a standard turnaround is stated; no express tier exists in the statement.",
+     "How many working days does standard Vertex warranty repair take?", ["7 working days"], "laptop-warranty"),
+    ("What does Vertex charge for an out-of-warranty screen replacement?",
+     "Only the diagnostic fee is stated; repair prices are not.",
+     "How much is an out-of-warranty diagnostic assessment on a Vertex laptop?", ["AED 120", "120"], "laptop-warranty"),
+    # -- library-rules -------------------------------------------------------
+    ("How many items can library staff borrow at once?",
+     "Limits are given for foundation, undergraduate and postgraduate students only.",
+     "What is the borrowing limit for undergraduate students?", ["8 items", "eight", "up to 8"], "library-rules"),
+    ("What is the penalty for not collecting a reserved library item?",
+     "The hold period is stated; no penalty for non-collection is.",
+     "For how many working days is a reserved library item kept after notification?", ["3 working days"], "library-rules"),
+    ("What is the fine for leaving a group study room booking unclaimed?",
+     "Unclaimed bookings are released after 15 minutes; no fine is stated.",
+     "After how many minutes is an unclaimed group study room booking released?", ["15 minutes"], "library-rules"),
+    ("How many group study room bookings can a reader hold at the same time?",
+     "The 5-item limit is for reservations of library items; study rooms are limited by hours per day only.",
+     "What is the maximum number of active item reservations a reader may hold?", ["5 active reservations", "5 reservations", "five", "maximum of 5"], "library-rules"),
+    # -- fee-schedule --------------------------------------------------------
+    ("When is the UFP registration fee due?",
+     "The amount is stated; the due date is given only for tuition instalments.",
+     "How much is the UFP registration fee per academic year?", ["AED 1,500", "1,500"], "fee-schedule"),
+    ("How much of the registration fee is refunded if I withdraw before teaching starts?",
+     "The 90 percent refund applies to tuition paid; registration fee refunds are not addressed.",
+     "What share of tuition paid is refunded on withdrawal before teaching starts?", ["90 percent"], "fee-schedule"),
+    ("How much does it cost to resubmit a failed PHY-104 laboratory report?",
+     "The AED 400 fee is an examination resit fee per module; resubmitting coursework is not addressed in either document.",
+     "What is the UFP examination resit fee per module?", ["AED 400", "400"], "fee-schedule"),
+    # -- ufp-handbook-2026 ---------------------------------------------------
+    ("What mark must I get on PHY-104 coursework alone to pass the module?",
+     "The 40 percent pass mark is for the module; no component pass mark is set.",
+     "What overall mark is needed to pass PHY-104?", ["40 percent"], "ufp-handbook-2026"),
+    ("How long is the PHY-104 resit examination?",
+     "The 2-hour duration is for the final examination; the resit's length is not stated.",
+     "How many times may a student who fails PHY-104 resit the written exam?", ["once"], "ufp-handbook-2026"),
+]
+
+# (question, expect_any, expect_doc) - answerable, phrased fresh, several on
+# facts the main set never asks about.
+SLICE_J_ANSWERABLE: list[tuple[str, list[str], str]] = [
+    ("When is the second UFP tuition instalment due?", ["10 January 2027"], "fee-schedule"),
+    ("Is the UFP application fee refundable?", ["non-refundable", "not refundable"], "fee-schedule"),
+    ("What must a student submit to start a UFP tuition refund?", ["written withdrawal request", "in writing", "written request"], "fee-schedule"),
+    ("How many local SMS does the Freedom 150 plan include?", ["unlimited"], "phone-plan"),
+    ("How long is a Nova Mobile daily roaming pass valid for?", ["24 hours"], "phone-plan"),
+    ("Can short-loan library items be renewed?", ["cannot be renewed", "can't be renewed", "not be renewed", "not renewable", "cannot renew"], "library-rules"),
+    ("Is there a cap on overdue fines for short-loan library items?", ["no cap", "not capped", "uncapped"], "library-rules"),
+    ("Under what condition may a standard library loan be renewed?", ["reserved"], "library-rules"),
+    ("Which components make up the FR-440's sealed cooling system?", ["compressor", "condenser", "evaporator"], "fridge-manual"),
+    ("Does using a third-party water filter affect the FR-440 warranty?", ["non-arcticline", "not cover", "void"], "fridge-manual"),
+    ("Is damage from a non-Vertex charger covered by the V14 warranty?", ["exclude", "not cover"], "laptop-warranty"),
+    ("What do I need to obtain before Vertex warranty service can begin?", ["support reference number"], "laptop-warranty"),
+    ("Is the Vertex diagnostic fee refunded if I go ahead with the repair?", ["credited"], "laptop-warranty"),
+    ("Does the Vertex warranty cover lost data?", ["not covered", "not cover", "exclude"], "laptop-warranty"),
+    ("How many consumption slabs does the Metro Utilities residential tariff have?", ["three", "3 slabs"], "electricity-tariff"),
+    ("Does the HomeGuard policy cover property used for business?", ["exclude", "not cover"], "insurance-policy"),
+    ("Which minor repairs does the Al Noor Tower contract list as the tenant's job?", ["light fittings", "door handles", "tap washers"], "tenancy-agreement"),
+    ("How long is the Al Noor Tower tenancy term?", ["12 months", "twelve-month", "twelve months", "12-month"], "tenancy-agreement"),
+    ("How are the three PHY-104 laboratory reports weighted against each other?", ["equal weight", "equally"], "ufp-handbook-2026"),
+    ("Does a documented absence count against the PHY-104 laboratory attendance requirement?", ["excluded", "does not count", "doesn't count", "not counted"], "ufp-handbook-2026"),
+]
+SLICE_J_OUT = REPO / "data" / "eval" / "eval_slice_j.jsonl"
+
+
+def build_slice_j() -> list[dict]:
+    items: list[dict] = []
+    for i, (q, note, _, _, _) in enumerate(SLICE_J_ADJACENT, start=1):
+        items.append({"id": f"ju{i:03d}", "kind": "unanswerable", "question": q, "note": note,
+                      "lang": "en", "tags": ["adjacent-fact"]})
+    for i, (_, _, q, expect, doc) in enumerate(SLICE_J_ADJACENT, start=1):
+        items.append({"id": f"js{i:03d}", "kind": "answerable", "question": q, "expect_any": expect,
+                      "expect_doc": doc, "lang": "en", "tags": ["adjacent-sibling"]})
+    for i, (q, expect, doc) in enumerate(SLICE_J_ANSWERABLE, start=1):
+        items.append({"id": f"ja{i:03d}", "kind": "answerable", "question": q, "expect_any": expect,
+                      "expect_doc": doc, "lang": "en", "tags": ["fresh"]})
+    return items
+
+
 def is_arabic(text: str) -> bool:
     return any("؀" <= ch <= "ۿ" for ch in text)
 
@@ -432,17 +612,42 @@ def validate(items: list[dict]) -> list[str]:
     return problems
 
 
+def validate_slice(slice_items: list[dict]) -> list[str]:
+    """The slice is checked together with the main set, so no id or question is
+    shared, plus one check the main set leaves to tests: every answerable item's
+    fact is actually in its document."""
+    problems = []
+    texts = {p.stem: _normalise(p.read_text(encoding="utf-8")) for p in CORPUS.glob("*.md")}
+    for item in slice_items:
+        if not item["id"].startswith("j"):
+            problems.append(f"{item['id']} is in the fresh slice but not prefixed 'j'")
+        if item["kind"] == "answerable":
+            doc = texts.get(item["expect_doc"], "")
+            if not any(_normalise(e) in doc for e in item["expect_any"]):
+                problems.append(f"{item['id']} expects a fact not found in {item['expect_doc']}")
+    return problems
+
+
+def _normalise(s: str) -> str:
+    return " ".join(s.lower().replace(",", "").split())
+
+
+def _write(path: Path, items: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(i, ensure_ascii=False) for i in items) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     items = build()
-    if problems := validate(items):
+    slice_j = build_slice_j()
+    if problems := validate(items + slice_j) + validate_slice(slice_j):
         for p in problems:
             print(f"INVALID: {p}", file=sys.stderr)
         return 1
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(
-        "\n".join(json.dumps(i, ensure_ascii=False) for i in items) + "\n", encoding="utf-8"
-    )
+    _write(OUT, items)
+    _write(SLICE_J_OUT, slice_j)
+    print(f"wrote {len(slice_j)} items -> {SLICE_J_OUT.relative_to(REPO)} (fresh held-out slice, E25)")
 
     from collections import Counter
 
