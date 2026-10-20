@@ -845,6 +845,39 @@ unanswerable training items through `general_prompt(searched=True)` under
 there are 21 such examples. Then select on k and test on a *new* final
 slice, because j has now been spent on two rounds.
 
+## E30 — slice m, the amin-3 final test
+
+`data/eval/eval_slice_m.jsonl`, 140 items, built by `scripts/build_eval_set.py`
+alongside the main set:
+
+| ids | n | kind |
+|---|---|---|
+| mu001–032 | 32 | adjacent-fact traps over `data/corpus`, unanswerable (2 Arabic) |
+| ms001–032 | 32 | the answerable sibling of each trap (pair n = mu n + ms n; 2 Arabic) |
+| ma001–033 | 33 | fresh answerables (3 Arabic) |
+| md001–027 | 27 | document-shaped unanswerables a general fallback must decline (2 Arabic) |
+| mg001–016 | 16 | general-knowledge unanswerables with `expect_general` facts (1 Arabic) |
+
+**What it is for.** The final, one-time test of amin-3 in hybrid mode: slice j
+was spent on two rounds and slice k chooses the checkpoint. It is aimed at the
+two places amin-2 fell short of the teacher (E29): fresh adjacent-fact traps,
+and the `md` items, where the documents are silent on a question about them
+("Can I add a second line to my Freedom 150 plan?") and the right answer is
+"your documents don't cover this", not hedged general guidance. Not trained
+on, not used for selection, and not run until amin-3 is final.
+
+**Written blind.** The items were written from the corpus documents alone,
+without opening any report or any model's output. Facts the two tenancy
+documents or the two handbooks disagree on are kept out of the answerables.
+
+**Independent by test.** `tests/test_slice_m.py` fails if any slice m question
+repeats, or shares a 6-gram with, a training item (regenerated at seed 7, plus
+`data/train/items.jsonl` and `general.jsonl` when present), the main set,
+slice j or slice k (each read from its branch until merged). Writing it found
+21 collisions, all rephrased or replaced: seven of the first general questions
+were already training items, and the rest shared stock phrasings ("how long do
+I have to", "what does Metro Utilities charge per") with the main set, j or k.
+
 ## E31 — amin-3: indistinguishable from the 27B on held-out slices, about 4× faster
 
 **Recipe.** amin-2's SFT set plus 795 hybrid-fallback examples
