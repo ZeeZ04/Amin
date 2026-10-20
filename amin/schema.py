@@ -99,6 +99,9 @@ class Outcome(str, Enum):
     REFUSED_NO_EVIDENCE = "refused_no_evidence"
     REFUSED_OUT_OF_SCOPE = "refused_out_of_scope"
     CONFLICT = "conflict"
+    # Answered from the model's own knowledge, not from any document. Shown
+    # labelled as such and never carries a citation (ADR-013).
+    GENERAL = "general"
 
 
 class Answer(BaseModel):

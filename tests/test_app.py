@@ -8,20 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from amin import api as api_mod
-from amin.config import settings
 
 LEASE = b"# Tenancy\nThe annual rent is AED 85,000, payable in four cheques.\n"
 DIARY = b"# Diary\nMy locker combination is 4417.\n"
 RENT_Q = {"question": "What is the annual rent?"}
 LOCKER_Q = {"question": "What is my locker combination?"}
-
-
-@pytest.fixture()
-def users_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "users_path", tmp_path / "users")
-    monkeypatch.setattr(settings, "provider", "echo")
-    api_mod._engines.clear()
-    return tmp_path / "users"
 
 
 def client() -> TestClient:
@@ -39,7 +30,9 @@ def invite_from(admin) -> str:
 
 
 def answered(c, q) -> bool:
-    return bool(c.post("/ask", json=q).json()["claims"])
+    """Answered *from documents*. A general-knowledge fallback is not access."""
+    r = c.post("/ask", json=q).json()
+    return bool(r["claims"]) and r["basis"] == "documents"
 
 
 def test_first_account_is_admin_and_others_need_an_invite(users_dir):
@@ -108,8 +101,9 @@ def test_upload_strips_directories_and_rejects_unknown_types(users_dir):
 
 @pytest.mark.skipif(not shutil.which("tesseract"), reason="tesseract not installed")
 def test_photo_is_read_with_ocr(users_dir, tmp_path):
-    from amin.ocr import ocr_image
     import subprocess
+
+    from amin.ocr import ocr_image
     img = tmp_path / "bill.png"
     subprocess.run(["convert", "-size", "900x120", "xc:white", "-pointsize", "48",
                     "-annotate", "+20+80", "Amount due AED 412", str(img)], check=True)

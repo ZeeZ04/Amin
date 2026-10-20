@@ -1,8 +1,14 @@
 # Amin
 
-A locally-run assistant that answers only from documents you have approved, cites
-the passage behind every sentence it says, and refuses out loud when it has no
-source. `أمين` means trustworthy.
+A locally-run assistant that answers general questions like any good model,
+and answers from your own documents with the passage behind every sentence.
+It never passes one off as the other: an answer with no document behind it
+is labelled general knowledge. `أمين` means trustworthy.
+
+Documents live in **projects**. Each project has its own memory, and every
+crossing between memories is a permission you grant: a project reading your
+library, general chat using a project, sharing a project with family
+(ADR-013).
 
 The thesis of this project is that **truthfulness is not a property of training
 data — it is a property of inference**. A model trained exclusively on true
@@ -219,6 +225,15 @@ AMIN_PROVIDER=openai AMIN_ANSWER_MODEL=gpt-4o-mini OPENAI_API_KEY=... amin bench
 Embeddings deliberately stay local even on a hosted run: swapping the retriever
 and the generator at once would change two variables and measure neither.
 
+## Strict and hybrid
+
+Everything under "Measured behaviour" is the **strict** pipeline: no source,
+no answer. That is still how Amin decides *whether* documents answer. The
+app runs it in **hybrid** mode, where a question the documents don't cover
+gets a labelled general-knowledge answer instead of a refusal. The `hybrid`
+benchmark row scores that mode, with the prior-leak probes graded on getting
+the fact right and personal-detail questions on declining to guess.
+
 ## Amin's own model
 
 Amin can run on its own post-trained model, Qwen3-8B distilled from the 27B
@@ -237,8 +252,12 @@ amin-1 (Qwen3-8B → SFT → DPO, 8-bit) passed the gate on 2026-10-20, on the s
 | **amin-1** | 94.5% ±4% | **1.0% ±3%** | **1.3 s** |
 
 Neither difference is significant on its own (p=0.22 and p=0.06, paired). The
-hallucination gain comes from training aimed at a failure category this
-benchmark exposed, so it awaits a fresh eval slice; see EXPERIMENTS E24.
+hallucination gain came from training aimed at a failure category this
+benchmark exposed, and **it did not hold on a fresh held-out slice** (E25,
+E26). There amin-1 matched the teacher on traps (2 vs 3 of 40, p=1.0) and
+was significantly less accurate, 46 vs 56 of 60 (p=0.006), all of it from
+over-refusal. qwen3.6:27b stays the default answer model until amin-2
+passes on held-out items.
 
 ## Limits, stated plainly
 

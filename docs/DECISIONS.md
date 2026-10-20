@@ -219,3 +219,50 @@ cannot take a new document, and puts private data inside a model file.
 embeddings come from Ollama, not the hash embedder, so a student bench
 compares models rather than retrievers. Every training run is an experiment
 row (E23 onward). The workflow is in `docs/TRAINING.md`.
+
+## ADR-013 — General by default, documents by project, sharing by permission
+**Status:** accepted · **Date:** 2026-10-20 · amends ADR-002's refusal stance
+
+Amin used to refuse anything its documents did not state, including "When
+did the Berlin Wall fall?". The owner wants an assistant that answers what
+any good model knows, plus documents that it answers from with citations. A
+refusal on general knowledge is not a safety property. It is a missing
+feature, and it pushed people to other tools for ordinary questions.
+
+**Decision:**
+1. **General chat answers anything** from the model's own knowledge. If no
+   document backs the answer, it is labelled "General knowledge · not from
+   your documents" and carries no citation. Any `[S…]` tag the model emits is
+   stripped. The general prompt tells the model to decline personal details
+   it cannot know ("my landlord's name") instead of guessing.
+2. **Projects** hold their own documents, indexed on upload, never trained
+   into weights. In a project, answers come from its documents with
+   citations first. Where they don't cover the question, the labelled
+   general answer is used. The general answer never sees the near-miss
+   passages, because stitching them in is the adjacent-fact hallucination
+   in a new coat.
+3. **Every crossing between memories is a permission, off by default**
+   (`amin/spaces.py`): a project may read the owner's private library, a
+   project may read the household library, general chat may use a project,
+   and a project may be shared with named household members. The person's
+   own libraries feed their own chat by default and can be switched off.
+   Documents are copied into each index the permissions allow, so revoking
+   a permission deletes them. Granting the private library to a shared
+   project warns first.
+4. **Unchanged:** the conflict detector and the evidence and identifier
+   gates still decide *whether documents answer*. Medical, legal, financial
+   and crisis routing still refer the person on. Loosening those is a
+   separate decision.
+
+**Measurement.** `Amin(fallback=False)` is the strict pipeline every earlier
+benchmark measured, and it stays the `amin` row. The app's behaviour is the
+new `hybrid` row. The 12 prior-leak probes gained `expect_general` (their
+true answers). A strict system still passes them by refusing. A hybrid
+system passes only with the right fact, and on personal-detail
+unanswerables only by declining. `hallucination` therefore keeps its
+meaning: a fabricated document claim, or an invented personal detail.
+
+**Consequences:** "refuses out loud when it has no source" now reads
+"labels out loud when it has no source". Model training targets change with
+it. amin-2 must keep general answering intact, and preference pairs must
+not teach "refuse" where the product now wants "answer generally".

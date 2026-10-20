@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # measure what it buys. (E16: the amin row died on a 180s ReadTimeout.)
     think: bool = False
     request_timeout: float = 600.0
+    # ADR-013. False = strict: no source, no answer (every benchmark before
+    # 2026-10-20). The app turns it on: no source, so a labelled general answer.
+    general_fallback: bool = False
     # mlx_lm.server, which serves Amin's own post-trained model (ADR-012).
     mlx_host: str = "http://127.0.0.1:8080"
     # Label only: shown in answers and /health. The server decides what it loads.

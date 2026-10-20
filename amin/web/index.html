@@ -186,6 +186,23 @@
   .sheet blockquote { margin: 14px 0 0; padding: 12px 14px; border-inline-start: 4px solid var(--saffron); background: var(--bg);
     border-radius: var(--r-sm); white-space: pre-wrap; font-size: 15px; }
   @media (prefers-reduced-motion: reduce) { .sheet, .scrim, #splash { transition: none; } .typing i { animation: none; opacity: .6; } }
+  /* spaces (ADR-013) */
+  .spacebar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
+  .spacebar label { font-size: 13px; color: var(--muted); }
+  select.field { appearance: none; -webkit-appearance: none; padding-right: 34px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .spacebar select.field { margin: 0; flex: 1; min-width: 0; }
+  .basis { display: inline-block; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--sand);
+    border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+  @media (prefers-color-scheme: dark) { .basis { background: #26302E; } }
+  .toggle { display: flex; gap: 12px; align-items: flex-start; }
+  .toggle input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--teal); flex: none; }
+  .toggle small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .proj { width: 100%; text-align: left; background: none; border: 0; font: inherit; color: inherit; padding: 0; cursor: pointer; }
+  .proj small { display: block; color: var(--muted); font-size: 13px; }
+  .backlink { background: none; border: 0; color: var(--teal); font: inherit; padding: 0 0 10px; cursor: pointer; }
+  .btn.quiet.danger { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -242,8 +259,9 @@
 <div id="app" hidden>
   <main class="screen" id="tab-ask">
     <h1>Ask</h1>
+    <div class="spacebar"><label for="space">In</label><select class="field" id="space" aria-label="Where to ask"></select></div>
     <div id="starters">
-      <p class="lead">Ask about anything in your documents. Every answer shows where it came from.</p>
+      <p class="lead" id="askLead">Ask Amin anything. When your documents hold the answer, it shows the page it came from.</p>
       <div class="starters">
         <button type="button">When does our tenancy end?</button>
         <button type="button">How many days do I have to pay the electricity bill?</button>
@@ -266,17 +284,38 @@
     <div class="stack">
       <button class="btn quiet" id="choose" type="button">Choose a file instead</button>
       <h2>Save to</h2>
-      <div class="seg" role="group" aria-label="Library">
-        <button type="button" data-lib="private" aria-pressed="true">Only me</button>
-        <button type="button" data-lib="household" aria-pressed="false">Household</button>
-      </div>
+      <select class="field" id="scanTarget" aria-label="Save to"></select>
       <button class="btn" id="saveScan" type="button" disabled>Read and save</button>
       <p class="note" id="scanNote"></p>
     </div>
   </main>
 
   <main class="screen" id="tab-library" hidden>
-    <h1>Library</h1>
+    <div id="projList">
+      <h1>Projects</h1>
+      <p class="lead">A project keeps its own documents. Amin answers from them first, and from general knowledge where they don't cover it.</p>
+      <div class="group" id="projects"></div>
+      <div class="stack"><button class="btn quiet" id="newProject" type="button">New project</button></div>
+      <h2>Libraries</h2>
+    </div>
+    <div id="projDetail" hidden>
+      <button class="backlink" id="projBack" type="button">‹ Projects</button>
+      <h1 id="projName"></h1>
+      <p class="lead" id="projLead"></p>
+      <h2>Documents</h2>
+      <div class="group" id="projDocs"></div>
+      <div class="stack"><button class="btn quiet" id="projAdd" type="button">Add a document</button>
+        <input type="file" id="projPicker" accept=".pdf,.txt,.md,.html,image/*" hidden></div>
+      <div id="projOwner">
+        <h2>Permissions</h2>
+        <div class="group" id="projPerms"></div>
+        <h2>Share with</h2>
+        <div class="group" id="projMembers"></div>
+        <div class="stack"><button class="btn quiet danger" id="projDelete" type="button">Delete project</button></div>
+      </div>
+      <p class="note" id="projNote"></p>
+    </div>
+    <div id="libBox">
     <div class="seg" role="group" aria-label="Which documents">
       <button type="button" data-view="private" aria-pressed="true">Only me</button>
       <button type="button" data-view="household" aria-pressed="false">Household</button>
@@ -284,6 +323,7 @@
     <h2 id="libHint"></h2>
     <div class="group" id="docList"></div>
     <p class="note" id="libNote"></p>
+    </div>
   </main>
 
   <main class="screen" id="tab-profile" hidden>
@@ -296,13 +336,18 @@
         <div class="row" id="inviteRow" hidden><div class="grow"><div class="code" id="inviteCode"></div><small class="note">One use. Valid for 7 days.</small></div></div>
       </div>
     </div>
+    <h2>General chat may use</h2>
+    <div class="group">
+      <label class="row toggle"><input type="checkbox" id="prefPrivate"><span class="grow">My library<small>Your “Only me” documents</small></span></label>
+      <label class="row toggle"><input type="checkbox" id="prefHousehold"><span class="grow">Household library<small>Documents everyone in the household shares</small></span></label>
+    </div>
     <h2>Account</h2>
     <div class="group">
       <div class="row"><button class="link" id="signOut" type="button">Sign out</button></div>
       <div class="row"><button class="link danger" id="signOutAll" type="button">Sign out on all devices</button></div>
     </div>
     <h2>About Amin</h2>
-    <div class="group"><p class="about">Everything stays on this computer. Amin only answers from documents in your library and shows the passage each answer came from. It won't give medical, legal or financial advice. For those it tells you who to ask.</p></div>
+    <div class="group"><p class="about">Everything stays on this computer. When your documents hold the answer, Amin quotes them and shows the passage. Otherwise it answers from general knowledge and labels it that way. It won't give medical, legal or financial advice. For those it tells you who to ask.</p></div>
   </main>
 
   <div class="composer" id="composer">
@@ -315,7 +360,7 @@
   <nav class="tabbar" aria-label="Sections">
     <button data-tab="ask" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>Ask</button>
     <button data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Scan</button>
-    <button data-tab="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>Library</button>
+    <button data-tab="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>Projects</button>
     <button data-tab="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Profile</button>
   </nav>
 </div>
@@ -390,8 +435,28 @@ function showApp(me) {
   $("meName").textContent = me.name;
   $("meRole").textContent = me.admin ? "Admin · can invite people and remove household documents" : "Household member";
   $("adminBox").hidden = !me.admin;
-  renderLibrary();
+  $("prefPrivate").checked = me.prefs.chat_private; $("prefHousehold").checked = me.prefs.chat_household;
+  renderSpaces(); renderLibrary(); renderProjects();
 }
+/* -- spaces: general chat or a project ------------------------------------- */
+let SPACE = "";  // "" = general chat, else a project id
+function projectById(id) { return (ME?.projects || []).find(p => p.id === id); }
+function renderSpaces() {
+  if (SPACE && !projectById(SPACE)) SPACE = "";
+  $("space").innerHTML = [`<option value="">General chat</option>`].concat(
+    (ME.projects || []).map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.role === "member" ? ` · shared by ${esc(p.owner)}` : ""}</option>`)).join("");
+  $("space").value = SPACE;
+  const keep = $("scanTarget").value;
+  $("scanTarget").innerHTML = [`<option value="private">Only me</option>`, `<option value="household">Household</option>`]
+    .concat((ME.projects || []).map(p => `<option value="project:${esc(p.id)}">Project · ${esc(p.name)}</option>`)).join("");
+  if ([...$("scanTarget").options].some(o => o.value === keep)) $("scanTarget").value = keep;
+  $("askLead").textContent = SPACE
+    ? `Asking in “${projectById(SPACE).name}”. Answers cite its documents first.`
+    : "Ask Amin anything. When your documents hold the answer, it shows the page it came from.";
+}
+$("space").onchange = () => {
+  SPACE = $("space").value; $("thread").innerHTML = ""; $("starters").hidden = false; renderSpaces();
+};
 function go(tab) {
   for (const t of ["ask", "scan", "library", "profile"]) $(`tab-${t}`).hidden = t !== tab;
   document.querySelectorAll(".tabbar button").forEach(b => b.toggleAttribute("aria-current", b.dataset.tab === tab));
@@ -401,7 +466,7 @@ function go(tab) {
   scrollTo(0, 0);
 }
 document.querySelectorAll(".tabbar button").forEach(b => b.onclick = () => go(b.dataset.tab));
-async function refreshMe() { try { ME = await call("/me"); renderLibrary(); } catch { showAuth(); } }
+async function refreshMe() { try { ME = await call("/me"); renderSpaces(); renderLibrary(); renderProjects(); } catch { showAuth(); } }
 
 /* -- ask ------------------------------------------------------------------ */
 document.querySelectorAll(".starters button").forEach(b => b.onclick = () => { $("question").value = b.textContent; ask(); });
@@ -415,12 +480,17 @@ async function ask() {
   $("thread").insertAdjacentHTML("beforeend", `<div class="msg-q" dir="auto">${esc(q)}</div>`);
   const a = document.createElement("div"); a.className = "msg-a"; a.innerHTML = '<span class="typing" aria-label="Amin is reading your documents"><i></i><i></i><i></i></span>';
   $("thread").append(a); a.scrollIntoView({ behavior: "smooth", block: "end" });
-  try { render(a, await post("/ask", { question: q })); }
+  try { render(a, await post("/ask", { question: q, project: SPACE || null })); }
   catch (err) { a.className = "msg-a refused"; a.textContent = err.message; }
   a.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 function render(el, r) {
   if (!r.claims.length) { el.className = "msg-a refused"; el.dir = "auto"; el.textContent = r.refusal_reason || "No answer found in your documents."; return; }
+  if (r.basis === "general") {
+    el.innerHTML = `<div class="basis">General knowledge · not from your documents</div><div dir="auto">${esc(r.claims.map(c => c.text).join(" "))}</div>`
+      + `<div class="meta">${(r.latency_ms / 1000).toFixed(1)} s</div>`;
+    return;
+  }
   const num = {}; let n = 0;
   const body = r.claims.map(c => esc(c.text) + c.citations.map(id => {
     num[id] ??= ++n; return `<button class="cite" data-id="${esc(id)}" aria-label="Show source ${num[id]}">${num[id]}</button>`;
@@ -434,11 +504,13 @@ function render(el, r) {
 function libName(docId) {
   if (docId.startsWith("h.")) return ["Household", docId.slice(2)];
   if (docId.startsWith("p.")) return ["Only me", docId.slice(2)];
+  const m = /^j\.([a-z0-9]+)\.(.*)$/.exec(docId);
+  if (m) return [`Project · ${projectById(m[1])?.name ?? "project"}`, m[2]];
   return ["Library", docId];
 }
 async function openSource(id) {
   try {
-    const c = await call(`/chunks/${encodeURIComponent(id)}`);
+    const c = await call(`/chunks/${encodeURIComponent(id)}` + (SPACE ? `?project=${encodeURIComponent(SPACE)}` : ""));
     const [lib, file] = libName(c.doc_id);
     $("sheetTitle").textContent = file;
     $("sheetSub").textContent = c.heading ? `${lib} · ${c.heading}` : lib;
@@ -451,7 +523,7 @@ $("scrim").onclick = closeSheet;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
 
 /* -- scan ----------------------------------------------------------------- */
-let pending = null, scanLib = "private";
+let pending = null;
 $("shoot").onclick = () => $("camera").click();
 $("choose").onclick = () => $("picker").click();
 for (const input of [$("camera"), $("picker")]) input.onchange = () => {
@@ -461,10 +533,14 @@ for (const input of [$("camera"), $("picker")]) input.onchange = () => {
   if (f.type.startsWith("image/")) { $("preview").src = URL.createObjectURL(f); $("preview").hidden = false; }
   else { $("preview").hidden = true; $("shootLabel").textContent = f.name; }
 };
-document.querySelectorAll("[data-lib]").forEach(b => b.onclick = () => {
-  scanLib = b.dataset.lib;
-  document.querySelectorAll("[data-lib]").forEach(x => x.setAttribute("aria-pressed", x === b));
-});
+function uploadUrl(name, target) {
+  const [lib, pid] = target.split(":");
+  return `/upload?filename=${encodeURIComponent(name)}&library=${lib}` + (pid ? `&project=${encodeURIComponent(pid)}` : "");
+}
+function targetName(target) {
+  const [lib, pid] = target.split(":");
+  return lib === "project" ? `“${projectById(pid)?.name}”` : lib === "household" ? "Household" : "Only me";
+}
 $("saveScan").onclick = async () => {
   if (!pending) return;
   // iPhone camera files are all called image.jpg; give each scan its own name.
@@ -473,8 +549,9 @@ $("saveScan").onclick = async () => {
   $("saveScan").disabled = true; $("scanNote").classList.remove("bad");
   $("scanNote").textContent = "Reading the text… photos and scans take a little longer.";
   try {
-    const r = await call(`/upload?filename=${encodeURIComponent(name)}&library=${scanLib}`, { method: "POST", body: pending });
-    $("scanNote").textContent = `Saved ${r.document} to ${r.library === "household" ? "Household" : "Only me"}. You can ask about it now.`;
+    const target = $("scanTarget").value;
+    const r = await call(uploadUrl(name, target), { method: "POST", body: pending });
+    $("scanNote").textContent = `Saved ${r.document} to ${targetName(target)}. You can ask about it now.`;
     pending = null; $("preview").hidden = true; $("shootLabel").textContent = "Take a photo";
   } catch (err) { $("scanNote").textContent = err.message; $("scanNote").classList.add("bad"); $("saveScan").disabled = false; }
 };
@@ -504,6 +581,83 @@ function renderLibrary() {
     } catch (err) { $("libNote").textContent = err.message; }
   });
 }
+
+/* -- projects ------------------------------------------------------------- */
+let OPEN = null;  // project id shown in detail
+const patchJSON = (path, body) => call(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+function renderProjects() {
+  if (!ME) return;
+  const ps = ME.projects || [];
+  $("projects").innerHTML = ps.length ? ps.map(p => `
+    <div class="row"><button class="proj" data-p="${esc(p.id)}"><b dir="auto">${esc(p.name)}</b>
+      <small>${p.documents.length} document${p.documents.length === 1 ? "" : "s"}${p.role === "member" ? ` · shared by ${esc(p.owner)}` : p.members.length ? ` · shared with ${p.members.length}` : ""}</small></button></div>`).join("")
+    : `<div class="empty">No projects yet. A project keeps a set of documents together, such as a flat, a car or a school year.</div>`;
+  $("projects").querySelectorAll(".proj").forEach(b => b.onclick = () => openProject(b.dataset.p));
+  if (OPEN) openProject(OPEN);
+}
+function showList() { OPEN = null; $("projList").hidden = false; $("libBox").hidden = false; $("projDetail").hidden = true; }
+$("projBack").onclick = showList;
+$("newProject").onclick = async () => {
+  const name = prompt("Name the project, for example “Flat in Marina” or “Car”"); if (!name?.trim()) return;
+  try { const p = await post("/projects", { name: name.trim() }); OPEN = p.id; await refreshMe(); }
+  catch (err) { alert(err.message); }
+};
+function openProject(id) {
+  const p = projectById(id); if (!p) return showList();
+  OPEN = id; $("projList").hidden = true; $("libBox").hidden = true; $("projDetail").hidden = false;
+  const owner = p.role === "owner";
+  $("projName").textContent = p.name;
+  $("projLead").textContent = owner ? (p.members.length ? `Shared with ${p.members.join(", ")}.` : "Only you can see this project unless you share it below.") : `Shared with you by ${p.owner}.`;
+  $("projDocs").innerHTML = p.documents.length ? p.documents.map(f => `
+    <div class="row"><span class="filetag">${esc((f.split(".").pop() || "").slice(0, 4).toUpperCase())}</span>
+      <span class="grow" dir="auto">${esc(f)}</span>
+      ${owner ? `<button class="del" data-f="${esc(f)}" aria-label="Delete ${esc(f)}">Delete</button>` : ""}</div>`).join("")
+    : `<div class="empty">No documents yet.</div>`;
+  $("projDocs").querySelectorAll(".del").forEach(b => b.onclick = async () => {
+    if (!confirm(`Delete ${b.dataset.f} from ${p.name}?`)) return;
+    try { await call(`/documents?filename=${encodeURIComponent(b.dataset.f)}&library=project&project=${p.id}`, { method: "DELETE" }); refreshMe(); }
+    catch (err) { $("projNote").textContent = err.message; }
+  });
+  $("projOwner").hidden = !owner;
+  if (!owner) return;
+  const perm = (key, title, sub) => `<label class="row toggle"><input type="checkbox" data-perm="${key}" ${p[key] ? "checked" : ""}>
+    <span class="grow">${title}<small>${sub}</small></span></label>`;
+  $("projPerms").innerHTML =
+      perm("general_chat", "General chat may use this project", "Its documents also answer questions outside the project, for everyone who can open it.")
+    + perm("grant_private", "This project may read my library", p.members.length ? "Everyone you share this project with could then get answers from your private documents." : "Your “Only me” documents answer questions here too.")
+    + perm("grant_household", "This project may read the household library", "Shared household documents answer questions here too.");
+  $("projPerms").querySelectorAll("[data-perm]").forEach(i => i.onchange = async () => {
+    if (i.checked && i.dataset.perm === "grant_private" && p.members.length
+        && !confirm("People you've shared this project with will be able to get answers from your private library. Allow?")) { i.checked = false; return; }
+    try { await patchJSON(`/projects/${p.id}`, { [i.dataset.perm]: i.checked }); refreshMe(); }
+    catch (err) { i.checked = !i.checked; $("projNote").textContent = err.message; }
+  });
+  const others = (ME.people || []).filter(n => n !== ME.name);
+  $("projMembers").innerHTML = others.length ? others.map(n => `<label class="row toggle"><input type="checkbox" data-m="${esc(n)}" ${p.members.includes(n) ? "checked" : ""}>
+    <span class="grow">${esc(n)}</span></label>`).join("") : `<div class="empty">No one else in the household yet. Invite them from Profile.</div>`;
+  $("projMembers").querySelectorAll("[data-m]").forEach(i => i.onchange = async () => {
+    if (i.checked && p.grant_private && !confirm(`${i.dataset.m} will be able to get answers from your private library through this project. Share?`)) { i.checked = false; return; }
+    const members = [...$("projMembers").querySelectorAll("[data-m]:checked")].map(x => x.dataset.m);
+    try { await patchJSON(`/projects/${p.id}`, { members }); refreshMe(); }
+    catch (err) { i.checked = !i.checked; $("projNote").textContent = err.message; }
+  });
+}
+$("projAdd").onclick = () => $("projPicker").click();
+$("projPicker").onchange = async () => {
+  const f = $("projPicker").files[0]; $("projPicker").value = ""; if (!f || !OPEN) return;
+  $("projNote").textContent = `Reading ${f.name}…`;
+  try { await call(uploadUrl(f.name, `project:${OPEN}`), { method: "POST", body: f }); $("projNote").textContent = `Added ${f.name}.`; refreshMe(); }
+  catch (err) { $("projNote").textContent = err.message; }
+};
+$("projDelete").onclick = async () => {
+  const p = projectById(OPEN); if (!p || !confirm(`Delete “${p.name}” and all its documents? This can't be undone.`)) return;
+  try { await call(`/projects/${p.id}`, { method: "DELETE" }); if (SPACE === p.id) SPACE = ""; showList(); refreshMe(); }
+  catch (err) { $("projNote").textContent = err.message; }
+};
+for (const [id, key] of [["prefPrivate", "chat_private"], ["prefHousehold", "chat_household"]]) $(id).onchange = async () => {
+  try { await patchJSON("/me/prefs", { [key]: $(id).checked }); }
+  catch (err) { $(id).checked = !$(id).checked; alert(err.message); }
+};
 
 /* -- profile -------------------------------------------------------------- */
 $("newInvite").onclick = async () => {

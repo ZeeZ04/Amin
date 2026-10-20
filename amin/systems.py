@@ -137,6 +137,7 @@ class AminSystem:
         provider: Provider | None = None,
         verifier: Verifier | None = None,
         covenant: Covenant | None = None,
+        fallback: bool = False,
     ):
         prov = provider or get_provider()
         self.engine = Amin(
@@ -144,6 +145,7 @@ class AminSystem:
             provider=prov,
             covenant=covenant,
             verifier=verifier or Verifier(prov),
+            fallback=fallback,
         )
 
     def answer(self, question: str) -> Answer:
@@ -152,7 +154,17 @@ class AminSystem:
 
 # ---------------------------------------------------------------------------
 
-SYSTEMS = {"bare": BareSystem, "naive": NaiveRagSystem, "amin": AminSystem}
+class HybridSystem(AminSystem):
+    """What the app runs (ADR-013): cited where documents answer, labelled
+    general knowledge where they don't. Same retriever and gates as `amin`."""
+
+    name = "hybrid"
+
+    def __init__(self, **kw):
+        super().__init__(fallback=True, **kw)
+
+
+SYSTEMS = {"bare": BareSystem, "naive": NaiveRagSystem, "amin": AminSystem, "hybrid": HybridSystem}
 
 
 def build_system(
@@ -169,7 +181,7 @@ def build_system(
         return BareSystem(provider=prov)
     if kind == "naive":
         return NaiveRagSystem(store=store or Store(), provider=prov)
-    return AminSystem(
+    return SYSTEMS[kind](
         store=store or Store(),
         provider=prov,
         verifier=Verifier(prov, mode=verifier_mode),

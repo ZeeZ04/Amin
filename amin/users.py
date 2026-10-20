@@ -161,3 +161,17 @@ def sign_out_everywhere(name: str) -> None:
     reg = _load("users.json")
     reg[name]["session"] += 1
     _save("users.json", reg)
+
+
+# -- preferences ---------------------------------------------------------------
+
+
+def get_prefs(name: str) -> dict:
+    return dict(_load("users.json").get(name, {}).get("prefs", {}))
+
+
+def set_prefs(name: str, **values: bool) -> dict:
+    reg = _load("users.json")
+    reg[name].setdefault("prefs", {}).update(values)
+    _save("users.json", reg)
+    return dict(reg[name]["prefs"])

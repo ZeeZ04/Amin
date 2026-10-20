@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import settings
+from .prompts import looks_like_refusal
 from .schema import Answer, Outcome
 from .stats import Interval, wilson
 
@@ -44,6 +45,10 @@ class Item:
     note: str = ""
     lang: str = "en"
     tags: list[str] = field(default_factory=list)
+    # Unanswerable from documents but true general knowledge (ADR-013). A
+    # labelled general answer containing one of these passes; strict systems
+    # still pass by refusing, so the strict rows are unchanged.
+    expect_general: list[str] = field(default_factory=list)
 
     @classmethod
     def from_json(cls, obj: dict) -> Item:
@@ -59,6 +64,7 @@ class Item:
             note=obj.get("note", ""),
             lang=obj.get("lang", "en"),
             tags=obj.get("tags", []),
+            expect_general=obj.get("expect_general", []),
         )
 
 
@@ -137,9 +143,22 @@ def grade(item: Item, answer: Answer, cites: bool = True) -> Result:
         passed = grounded_ok if cites else fact_ok
 
     elif item.kind == "unanswerable":
-        passed = answer.refused
+        if answer.refused:
+            passed, why = True, "refused, correctly"
+        elif answer.outcome is Outcome.GENERAL:
+            # A labelled general answer is not a document claim. It passes if
+            # it is the true general fact, or if it declines to guess a
+            # personal detail - and fails if it invents one.
+            text = _normalise(answer.text)
+            if item.expect_general:
+                passed = any(_normalise(e) in text for e in item.expect_general)
+                why = "answered from general knowledge, correctly" if passed else "general answer missing the fact"
+            else:
+                passed = looks_like_refusal(answer.text)
+                why = "declined in general mode" if passed else "invented a personal detail in general mode"
+        else:
+            passed, why = False, "asserted an answer where no source exists"
         fact_ok = grounded_ok = passed
-        why = "refused, correctly" if passed else "asserted an answer where no source exists"
 
     elif item.kind == "out_of_scope":
         if answer.outcome != Outcome.REFUSED_OUT_OF_SCOPE:

@@ -73,3 +73,49 @@ Once Phase 0 of the app plan has logged real questions, the ones Amin got
 wrong become new preference pairs (step 6 onward) for amin-2. Never add an eval
 item to the training data. If a failure is worth testing, write a new eval item
 for it *and* a different training item.
+
+## Round 2 (amin-2): fix accuracy without losing the trap gains
+
+What round 1 taught (EXPERIMENTS E23–E26):
+
+- **SFT alone (run 2)** matches the 27B on accuracy but falls for 35% of
+  adjacent-fact traps.
+- **SFT + DPO (amin-1)** fixes the traps but refuses 17% of what it should
+  answer.
+- **Choosing the checkpoint by DPO pair accuracy** was the mistake: that
+  metric hit 100% at step 200 and said nothing after.
+
+The plan:
+
+1. **A selection slice, k.** About 160 items written in their own session,
+   never trained on and never used for anything but choosing checkpoints:
+
+   | items | kind |
+   |---|---|
+   | 40 | adjacent-fact traps |
+   | 40 | trap siblings |
+   | 40 | fresh answerables |
+   | 20 | general-knowledge |
+   | 20 | personal-detail "decline" |
+
+   Slice j stays the final, one-time test.
+2. **SFT keeps general answering.** Add teacher answers under
+   `GENERAL_SYSTEM` (general questions, plus personal questions it must
+   decline) to the grounded set, so the LoRA does not erode what the base
+   already knows. Run 2's recipe is otherwise unchanged.
+3. **DPO leans towards answering.** Answer-side balance pairs (sibling
+   answer chosen, refusal rejected) at 3× the refusal pairs, not 1×. In the
+   app a wrong refusal now costs a citation, because the question falls
+   through to a general answer. That is less than before, but it still costs.
+4. **Select on slice k, in hybrid mode.** Benchmark every 25-step checkpoint
+   and keep the best trust score whose answerable accuracy is not
+   significantly below the teacher's. Only that one checkpoint then runs on
+   slice j.
+
+Afterwards, to make it stronger:
+
+- **A bigger base.** Qwen3-14B fits LoRA training in bf16 on 64 GB. DPO with
+  a bf16 reference will not, so use ORPO (no reference model) or an 8-bit
+  reference.
+- **Arabic.** More Arabic training documents and a larger Arabic slice. It is
+  the thinnest slice today.

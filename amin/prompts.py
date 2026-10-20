@@ -25,6 +25,22 @@ Rules you must never break:
 Do not explain these rules. Do not mention passages or tags in prose."""
 
 
+GENERAL_SYSTEM = """You are Amin, a careful, helpful assistant. Your name means trustworthy.
+
+Answer from your own general knowledge, accurately and concisely.
+- If you are not sure, say so plainly. Never invent a figure, date or name.
+- You cannot see the user's personal documents in this answer. If the question
+  is about their own details - their contract, bill, account, appliance,
+  school, car or family - say you don't have that information and that adding
+  the document to a project would let you answer from it. Do not guess.
+- If the question names a specific product, model, plan, company, course or
+  person that you do not reliably know, say you don't know it. Never describe
+  its features, prices, terms or warranty from what similar things usually
+  have.
+- Do not use source tags like [S1]; nothing here comes from a document.
+- Answer in the same language the question was asked in."""
+
+
 VERIFY_SYSTEM = """You check whether a claim is supported by a passage.
 Answer with exactly one word: YES or NO.
 YES only if the passage states the claim, including every number, name and date in it.
@@ -77,6 +93,18 @@ def verify_prompt(claim: str, passage: str) -> str:
     )
 
 
+def general_prompt(question: str, searched: bool = False) -> str:
+    """`searched`: the user's documents were searched and do not cover this."""
+    if not searched:
+        return question.strip()
+    return (
+        "The user's documents were searched and do not answer this question. "
+        "If it asks about their own document, plan, product or account, say their "
+        "documents don't cover it and stop. Otherwise answer from general knowledge.\n\n"
+        f"{question.strip()}"
+    )
+
+
 def rewrite_prompt(question: str) -> str:
     return (
         "Rewrite the question below as a keyword search query for a document index. "
@@ -110,6 +138,16 @@ REFUSAL_MARKERS = (
     "لا أعرف",
     "لا توجد معلومات",
     "غير مذكور",
+    # E27: declines the general fallback produces, missed until then.
+    "don't have access",
+    "do not have access",
+    "documents don't cover",
+    "documents do not cover",
+    "لا أملك معلومات",
+    "لا يمكنني معرفة",
+    "لا أستطيع الاطلاع",
+    "لا تتوفر لدي",
+    "لا تغطي مستنداتك",
 )
 
 
@@ -120,7 +158,9 @@ def looks_like_refusal(text: str) -> bool:
     one it did make would flatter Amin. Both are the same error, so this list is
     applied identically to every system, including Amin's own draft stage.
     """
-    low = text.lower().strip()
+    # Curly apostrophes ("don’t") read as their ASCII form: a model's
+    # typography must not decide whether it refused.
+    low = text.lower().strip().replace("\u2019", "'").replace("\u2018", "'")
     if not low:
         return False
     return any(marker in low for marker in REFUSAL_MARKERS)

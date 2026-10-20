@@ -627,3 +627,70 @@ more refusals of answerable questions is the ADR-011 trade, and gets rejected.
    corpus is synthetic, so no hosted model has it memorised — which makes this a
    fair test of grounding rather than of recall, and the right comparison is
    against `naive` with the same retriever, not against the bare API.
+
+## E26 — SFT run 2 on the fresh held-out slice (slice j)
+
+Slice j (100 items: 40 adjacent-fact traps, 40 answerable siblings, 20 fresh
+answerables) was written in its own session for E25 and is on branch
+`claude/peaceful-liskov-6728c3`. The run-2 SFT student (8-bit, before DPO) on
+it is `bench-20261020T104403`. The teacher and amin-1 rows are E25's.
+
+| | fact accuracy (60) | hallucination (40 traps) | p50 |
+|---|---|---|---|
+| qwen3.6:27b | 56/60 | 3/40 | 5.1 s |
+| amin-1-sft-r2 | **57/60** | **14/40** | 1.1 s |
+| amin-1 (r2 + DPO step 100) | 46/60 | 2/40 | 2.2 s |
+
+Paired: r2 vs teacher, answerable p=1.0 and traps p=0.003. r2 vs amin-1,
+answerable p=0.001 and traps p<0.001.
+
+The two 8B models bracket the teacher from opposite sides. SFT alone answers
+like the teacher and falls for adjacent facts at 35%. DPO fixed the traps and
+then refused what it should have answered. The target lies between them, so
+amin-2 keeps the DPO but changes what decides it:
+1. answer-side balance pairs at 2-3x the refusal pairs, not 1x;
+2. stop on a held-out mix of answerable and trap items (a new slice, k), not
+   on pair accuracy, which saturated at step 200 and stopped carrying signal.
+
+## E27 — the hybrid core (ADR-013) on the 237-item set, teacher model
+
+The `hybrid` system is strict Amin plus a labelled general-knowledge fallback.
+It ran on qwen3.6:27b and is paired against the strict run of the same day
+(`bench-20261019T040121`).
+
+| | strict | hybrid v1 (`T113033`) | hybrid v2 (`T120905`) |
+|---|---|---|---|
+| answerable fact accuracy | 108/110 | 108/110 | 108/110 |
+| unanswerables passed | 93/99 | 58/99 | **84/99** (p=0.004 vs strict) |
+| general-knowledge probes right | 0/12 (refused by design) | 12/12 | 12/12 |
+| conflict / routing | 5/6, 21/22 | 5/6, 21/22 | 5/6, 21/22 |
+
+v1 → v2 made three changes, all made after reading v1's failures:
+1. The refusal detector now treats curly apostrophes as straight ones. It
+   had been missing "I don’t have access…". This is a bug fix applied to
+   every system.
+2. The detector gained the general fallback's decline phrasings, in English
+   and Arabic. Checked against all 1,797 saved correct answers across every
+   report, it flags exactly one, and that one is a genuine non-answer.
+3. The general prompt now refuses to describe products, plans or people it
+   doesn't reliably know, and the fallback tells the model the user's
+   documents were searched and don't cover the question.
+
+v1 failures included confident inventions about fictional entities ("the
+Vertex V16 typically comes with a 1-year warranty", "Mitsubishi FR-440
+inverters… 200–240V"). v2 removed most of them.
+
+v2's 15 unanswerable failures:
+- 6 are document claims, the same 6 the strict pipeline makes (u009 u045
+  u065 u072 u083 u087; E20 doubts three of those labels).
+- 6 are hedged general guidance about the user's own documents ("If a rent
+  cheque bounces, it typically depends on your lease…"). They are labelled
+  general, but the stricter ideal is "your documents don't cover this".
+- 2 are confident misfires: u030 confuses UFP with the UK medical
+  Foundation Programme, and u046 says "a 7-day item's loan is 7 days".
+- 1 (u097) is a correct Arabic decline the detector missed; its phrase was
+  added afterwards.
+
+The 9-item gap to strict is the price of answering generally. It is reported,
+not rounded away. Note that items 1 and 2 above changed the instrument after
+seeing results, and are written down here for that reason.
