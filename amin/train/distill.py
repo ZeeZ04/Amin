@@ -259,9 +259,19 @@ def _is_refusal(example: dict) -> bool:
 
 
 @app.command()
-def export():
+def export(general: bool = typer.Option(True, help="Mix in general-chat examples (amin.train.general).")):
     """Write SFT data in the chat format mlx_lm.lora reads."""
     sets = sft_examples(read_jsonl(paths()["raw"]))
+    if general:
+        from .general import examples
+
+        g = examples()
+        rng = random.Random(1)
+        for i, ex in enumerate(g):  # 1 in 10 held out, like the documents
+            sets["valid" if i % 10 == 9 else "train"].append(ex)
+        for rows in sets.values():
+            rng.shuffle(rows)
+        console.print(f"[dim]+{len(g)} general-chat examples[/dim]")
     d = paths()["sft"]
     d.mkdir(parents=True, exist_ok=True)
     for split, rows in sets.items():

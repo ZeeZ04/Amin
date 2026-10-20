@@ -276,3 +276,22 @@ def test_dpo_balance_adds_one_answer_pair_per_refusal_pair():
     answer = [r for r in rows if r["rejected"] == "NO_EVIDENCE"]
     assert len(refuse) == 2 and len(answer) == 2  # unanswerable weighted x2, matched one for one
     assert all(r["chosen"].endswith("[S1].") for r in answer)
+
+
+def test_dpo_balance_ratio_three():
+    student = [{"id": "u", "split": "train", "kind": "unanswerable", "lang": "en",
+                "pairs": [{"prompt": "G", "chosen": "NO_EVIDENCE", "rejected": "made up [S1]."}]}]
+    teacher = [_record("s", "train", True, [{"prompt": "P", "response": "fact [S1].", "role": "answer",
+                                              "system": ANSWER_SYSTEM}])]
+    rows = dpo_rows(student, balance=teacher, ratio=3.0)["train"]
+    assert sum(r["chosen"] == "NO_EVIDENCE" for r in rows) == 2
+    assert sum(r["rejected"] == "NO_EVIDENCE" for r in rows) == 6
+
+
+def test_general_bank_stays_clear_of_the_main_eval_set():
+    from amin.config import settings
+    from amin.train.general import bank, overlaps
+
+    hits = overlaps(bank(), [settings.eval_set])
+    # The run drops these; this pins how many the bank collides with today.
+    assert len(hits) <= 6, hits

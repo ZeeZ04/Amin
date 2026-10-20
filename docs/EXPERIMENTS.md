@@ -694,3 +694,62 @@ v2's 15 unanswerable failures:
 The 9-item gap to strict is the price of answering generally. It is reported,
 not rounded away. Note that items 1 and 2 above changed the instrument after
 seeing results, and are written down here for that reason.
+
+## E29 — amin-2: accuracy fixed, the gate still fails on declining
+
+**Recipe.** The round-1 grounded SFT set now carries the round-3 trap items as
+plain SFT examples: correct refusals and sibling answers, since the export
+includes every grader-passed record. On top of that come 143 general-chat
+examples (`amin/train/general.py`, answered by the teacher under
+`GENERAL_SYSTEM`, kept clear of every eval set by exact match and 6-gram).
+That is 4,862 train / 541 valid examples, LoRA on bf16 Qwen3-8B, lr 2e-5
+cosine, one epoch (1,215 steps, 4.5 h).
+
+Val loss was noisy rather than divergent: 0.026 (step 400), 0.160, 0.027
+(800), 0.027 (1000), 0.296 (1200), 0.202 (1215).
+
+**No DPO stage.** Having learnt the traps in SFT, the student failed 1 of
+1,288 training traps, which left 8 pairs and 0 validation pairs, and
+`mlx_lm_lora` exited. It is not needed for this round.
+
+**Selection on slice k** (160 items, hybrid, 8-bit, the first use of that slice):
+
+| | answerable 80 | general 20 | personal 20 | traps 40 | p50 |
+|---|---|---|---|---|---|
+| qwen3.6:27b | 71 | 20 | 19 | 38 | 7.0 s |
+| amin-2-sft final | 73 | 20 | 19 | 36 | 1.7 s |
+| **amin-2-sft step 1000** | **74** | 20 | 19 | 36 | 1.7 s |
+
+No difference from the teacher is significant (all p ≥ 0.38). Step 1000 was
+picked by the pre-set rule (best trust score, accuracy not significantly
+below the teacher).
+
+**Final test** (slice j, used once for this round; main set; both hybrid,
+same grader):
+
+| | amin-2 | 27B | p |
+|---|---|---|---|
+| slice j answerable | 56/60 | 56/60 | 1.0 |
+| slice j traps | 30/40 | 37/40 | **0.039** |
+| main answerable | 108/110 | 108/110 | 1.0 |
+| main unanswerable | 71/99 | 85/99 | **0.007** |
+| conflict / routing / Arabic | 5/6 · 21/22 · 17/18 | same | |
+| p50 | 1.6 s | 6.7 s | |
+
+**What it means.**
+- The accuracy loss is fixed: slice j 56/60, against amin-1's 46/60 and the
+  teacher's 56/60.
+- It fails ADR-012 on declining. Of its 28 main-set unanswerable failures,
+  16 are hedged general guidance where the teacher said "your documents
+  don't cover this", and 3 are document claims the teacher did not make. On
+  fresh adjacent-fact traps it gets 30/40, between SFT run 2 (26) and the
+  teacher (37).
+- Slice k did not predict the trap gap (36 vs 38 there). 40 items cannot
+  resolve a 5-point difference; that is a limit of slice size, not a
+  contradiction.
+
+**Next (amin-3).** Teach the fallback decline at scale. Run the ~1,500
+unanswerable training items through `general_prompt(searched=True)` under
+`GENERAL_SYSTEM`, keep the teacher's declines, and add them to SFT; today
+there are 21 such examples. Then select on k and test on a *new* final
+slice, because j has now been spent on two rounds.

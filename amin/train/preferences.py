@@ -124,7 +124,9 @@ def run(
     console.print(f"[green]done[/green]: the student failed on {found}/{len(todo)} items")
 
 
-def dpo_rows(records: list[dict], seed: int = 0, balance: list[dict] | None = None) -> dict[str, list[dict]]:
+def dpo_rows(
+    records: list[dict], seed: int = 0, balance: list[dict] | None = None, ratio: float = 1.0
+) -> dict[str, list[dict]]:
     """Preference rows from the student's failures.
 
     `balance` holds teacher records for answerable items. Each becomes a pair
@@ -153,7 +155,12 @@ def dpo_rows(records: list[dict], seed: int = 0, balance: list[dict] | None = No
             for c in b["calls"] if c["role"] == "answer"
         ]
         rng.shuffle(pool)
-        rows.extend(pool[:refusal_side])
+        # amin-1 used ratio 1 and over-refused (E25); amin-2 uses 3. Pairs are
+        # reused when the pool is short, since repeats are cheaper than a
+        # model that refuses what it should answer.
+        want = int(refusal_side * ratio)
+        if pool:
+            rows.extend((pool * (want // len(pool) + 1))[:want])
         rng.shuffle(rows)
     return out
 
@@ -161,10 +168,11 @@ def dpo_rows(records: list[dict], seed: int = 0, balance: list[dict] | None = No
 @app.command()
 def export(
     balance_prefix: str = typer.Option("t3-", help="Answerable teacher items used to balance refusal pairs."),
+    ratio: float = typer.Option(3.0, help="Answer-side pairs per refusal-side pair."),
 ):
     """Write DPO data in the prompt/chosen/rejected format mlx_lm_lora reads."""
     balance = [r for r in read_jsonl(paths()["raw"]) if r["id"].startswith(balance_prefix)] if balance_prefix else []
-    sets = dpo_rows(read_jsonl(pref_paths()["raw"]), balance=balance)
+    sets = dpo_rows(read_jsonl(pref_paths()["raw"]), balance=balance, ratio=ratio)
     d = pref_paths()["dpo"]
     d.mkdir(parents=True, exist_ok=True)
     for split, rows in sets.items():
