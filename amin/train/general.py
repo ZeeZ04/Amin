@@ -259,12 +259,62 @@ def run(provider: str = typer.Option(None), exclude: list[Path] = typer.Option([
     console.print(f"[green]done[/green]: kept {kept} of {len(rows) - len(done)} new")
 
 
+def fallback_path() -> Path:
+    return settings.train_path / "fallback.jsonl"
+
+
+@app.command()
+def fallback(
+    provider: str = typer.Option(None),
+    declines: int = typer.Option(600, help="Cap on decline examples (3:1 against answers)."),
+    seed: int = typer.Option(3),
+):
+    """amin-3 (E29): the hybrid fallback prompt, after documents were searched.
+
+    In the app, a general answer with `searched=True` follows a document
+    search that found nothing. amin-2 hedged there ("it depends on your
+    provider") where the teacher declined. This teaches the line between
+    them: training unanswerables about the user's documents -> decline,
+    genuine general questions asked inside a project -> answer.
+    """
+    import random
+
+    items = [json.loads(x) for x in (settings.train_path / "items.jsonl").read_text(encoding="utf-8").splitlines()]
+    unans = [i for i in items if i["kind"] == "unanswerable"]
+    decline = [i for i in unans if "general" not in i.get("tags", [])]
+    answer = [i for i in unans if "general" in i.get("tags", [])]
+    answer += [{"id": r["id"] + "-s", "question": r["question"], "lang": r["lang"], "split": "train"}
+               for r in bank() if r["kind"] == "general"]
+    rng = random.Random(seed)
+    rng.shuffle(decline)
+    rows = [dict(i, want="decline") for i in decline[:declines]] + [dict(i, want="answer") for i in answer]
+    out = fallback_path()
+    done = {json.loads(x)["id"] for x in out.read_text().splitlines()} if out.exists() else set()
+    prov = get_provider(provider)
+    kept = n = 0
+    with out.open("a", encoding="utf-8") as fh:
+        for r in rows:
+            if r["id"] in done:
+                continue
+            prompt = general_prompt(r["question"], searched=True)
+            reply = prov.complete(prompt, system=GENERAL_SYSTEM).strip()
+            declined = looks_like_refusal(reply)
+            ok = bool(reply) and (declined if r["want"] == "decline" else not declined)
+            kept += ok
+            n += 1
+            fh.write(json.dumps({"id": r["id"], "split": r.get("split", "train"), "want": r["want"],
+                                 "question": r["question"], "prompt": prompt, "response": reply, "kept": ok},
+                                ensure_ascii=False) + "\n")
+            fh.flush()
+    console.print(f"[green]done[/green]: kept {kept} of {n} new")
+
+
 def examples() -> list[dict]:
-    """Kept rows as chat examples for distill.export."""
-    out = out_path()
-    if not out.exists():
-        return []
-    rows = [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines() if x.strip()]
+    """Kept rows (general bank + fallback) as chat examples for distill.export."""
+    rows = []
+    for out in (out_path(), fallback_path()):
+        if out.exists():
+            rows += [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines() if x.strip()]
     return [
         {"messages": [{"role": "system", "content": GENERAL_SYSTEM}, {"role": "user", "content": r["prompt"]},
                       {"role": "assistant", "content": r["response"]}]}

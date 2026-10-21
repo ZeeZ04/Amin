@@ -205,3 +205,37 @@ def test_general_answer_to_a_personal_question_must_decline():
     item = Item(id="u", question="What is my landlord's name?", kind="unanswerable")
     assert grade(item, _general("I don't have access to your documents, so I don't know.")).passed
     assert not grade(item, _general("Your landlord is Ahmed Saeed.")).passed
+
+
+# -- auto provider (E31) ---------------------------------------------------------
+
+
+def test_auto_provider_falls_back_to_ollama_and_back():
+    import httpx
+
+    from amin.providers import AutoProvider
+
+    class Fake:
+        def __init__(self, name, reply=None, fail=False):
+            self.name, self.reply, self.fail, self.up = name, reply, fail, True
+
+        def available(self):
+            return self.up
+
+        def complete(self, prompt, *, model=None, system=""):
+            if self.fail:
+                raise httpx.ConnectError("down")
+            return self.reply
+
+    auto = AutoProvider()
+    auto.mlx, auto.ollama = Fake("mlx", "from amin-3"), Fake("ollama", "from 27b")
+    assert auto.complete("q") == "from amin-3" and auto.name == "mlx"
+
+    auto.mlx.up = False
+    auto._up = None  # force a recheck
+    assert auto.complete("q") == "from 27b" and auto.name == "ollama"
+
+    auto.mlx.up, auto._up = True, None
+    auto.mlx.fail = True  # says it is up, dies mid-call
+    assert auto.complete("q") == "from 27b"
+    assert auto._up is False

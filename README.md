@@ -256,8 +256,25 @@ hallucination gain came from training aimed at a failure category this
 benchmark exposed, and **it did not hold on a fresh held-out slice** (E25,
 E26). There amin-1 matched the teacher on traps (2 vs 3 of 40, p=1.0) and
 was significantly less accurate, 46 vs 56 of 60 (p=0.006), all of it from
-over-refusal. qwen3.6:27b stays the default answer model until amin-2
-passes on held-out items.
+over-refusal.
+
+**amin-3 is the default answer model since 2026-10-21 (E31).** On slice m,
+140 items written blind and used once, and on the main set, both in the
+app's hybrid mode, no difference from qwen3.6:27b is significant:
+
+| | amin-3 | qwen3.6:27b |
+|---|---|---|
+| slice m answerable | 58/65 | 61/65 (p=0.38) |
+| slice m doc-silent declines | 25/27 | 23/27 (p=0.63) |
+| slice m adjacent-fact traps | 26/32 | 28/32 (p=0.63) |
+| main answerable | 109/110 | 108/110 |
+| main unanswerable | 80/99 | 85/99 (p=0.30) |
+| p50 latency | 1.6–2.0 s | 6.7–7.2 s |
+
+That is "no detectable difference" at these sample sizes, not "proven
+equal". `AMIN_PROVIDER=auto` (the default) uses amin-3 when `make serve` has
+started it and falls back to the 27B when it is down. `AMIN_PROVIDER=ollama`
+keeps the 27B.
 
 ## Limits, stated plainly
 

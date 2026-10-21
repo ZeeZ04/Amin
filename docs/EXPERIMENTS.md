@@ -753,3 +753,50 @@ unanswerable training items through `general_prompt(searched=True)` under
 `GENERAL_SYSTEM`, keep the teacher's declines, and add them to SFT; today
 there are 21 such examples. Then select on k and test on a *new* final
 slice, because j has now been spent on two rounds.
+
+## E31 — amin-3: indistinguishable from the 27B on held-out slices, about 4× faster
+
+**Recipe.** amin-2's SFT set plus 795 hybrid-fallback examples
+(`general.py fallback`). These are training unanswerables put through
+`general_prompt(searched=True)`: 600 sampled to be declined, plus 76
+general-knowledge items and the general bank to be answered, capped at 3:1
+against over-declining. The teacher kept 795 of 805. That is 5,578 train /
+620 valid examples, one epoch (1,394 steps). Val loss sits higher than in
+E29 (0.21–0.40) because the longer general replies dominate the validation
+tokens. It is not comparable across recipes.
+
+**Selection on slice k.** Candidates were steps 1000 and 1200 and the final
+weights. Step 1000 was best: traps 39/40, answerable 75/80, general 20/20,
+personal 19/20. The 27B scores 38 / 71 / 20 / 19 there. All differences
+p ≥ 0.22.
+
+**Final test, slice m** (140 items written blind for this, E30, used once;
+both hybrid, same grader):
+
+| | amin-3 | qwen3.6:27b | p |
+|---|---|---|---|
+| answerable | 58/65 | 61/65 | 0.38 |
+| doc-silent declines | 25/27 | 23/27 | 0.63 |
+| adjacent-fact traps | 26/32 | 28/32 | 0.63 |
+| general knowledge | 16/16 | 16/16 | 1.0 |
+| Arabic | 9/10 | 8/10 | |
+| p50 | 2.0 s | 7.2 s | |
+
+**Main set** (hybrid; the teacher row is E29's, same grader): answerable
+109/110 vs 108/110 (p=1.0), unanswerable 80/99 vs 85/99 (p=0.30, against
+amin-2's 71/99 at p=0.007), conflict 5/6 and routing 21/22 for both, Arabic
+18/18 vs 17/18, p50 1.6 s vs 6.7 s.
+
+**Reading it.** No difference from the teacher is significant on any slice
+of either set. The fallback decline examples closed the gap that failed
+amin-2. That is not proof of equality: slice m's point estimates are 3 lower
+on answerables and 2 lower on traps, and n≈30–65 per slice cannot resolve
+gaps of that size.
+
+**Gate.** ADR-012's "hallucination ≤ 7.1%" was defined for strict mode. In
+hybrid mode the teacher itself fails 14/99 main unanswerables. amin-3 passes
+the comparative form: not significantly worse than the teacher on accuracy
+or declining, on a held-out final slice and the main set, with p50 ≤ 2.5 s.
+That is the same rule slice k selected by, fixed before slice m was run.
+Whether amin-3 becomes the app's default is the owner's decision, not this
+log's.

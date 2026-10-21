@@ -328,10 +328,66 @@ def content_tokens(text: str) -> set[str]:
     return {t for t in _tokens(text) if t not in STOPWORDS and len(t) > 1}
 
 
+class AutoProvider:
+    """Amin's own model when its server is up, the Ollama model when not.
+
+    Decided per call, not at startup: if mlx_lm.server stops or starts while
+    the app runs, answers follow without a restart. Embeddings always come
+    from Ollama, as for the MLX provider, so the index never changes.
+    """
+
+    RECHECK_S = 30.0
+
+    def __init__(self):
+        self.mlx = MLXProvider()
+        self.ollama = OllamaProvider()
+        self._up: bool | None = None
+        self._checked = 0.0
+        self._last = self.mlx
+
+    def _mlx_up(self) -> bool:
+        import time
+
+        now = time.monotonic()
+        if self._up is None or now - self._checked > self.RECHECK_S:
+            self._up, self._checked = self.mlx.available(), now
+        return bool(self._up)
+
+    def _pick(self) -> Provider:
+        self._last = self.mlx if self._mlx_up() else self.ollama
+        return self._last
+
+    @property
+    def name(self) -> str:
+        return self._last.name
+
+    @property
+    def model_label(self) -> str:
+        return settings.mlx_model if self._last is self.mlx else settings.answer_model
+
+    def complete(self, prompt: str, *, model: str | None = None, system: str = "") -> str:
+        prov = self._pick()
+        try:
+            return prov.complete(prompt, model=model, system=system)
+        except httpx.TransportError:
+            if prov is self.ollama:
+                raise
+            self._up, self._last = False, self.ollama  # it went away mid-run
+            return self.ollama.complete(prompt, model=model, system=system)
+
+    def stream(self, prompt: str, *, model: str | None = None, system: str = "") -> Iterator[str]:
+        yield from self._pick().stream(prompt, model=model, system=system)
+
+    def embed(self, texts: list[str]) -> np.ndarray:
+        return self.ollama.embed(texts)
+
+
 def get_provider(kind: str | None = None) -> Provider:
     kind = (kind or settings.provider).lower()
     if kind == "echo":
         return EchoProvider()
+    if kind == "auto":
+        return AutoProvider()
     if kind == "mlx":
         return MLXProvider()
     if kind == "ollama":
@@ -341,5 +397,5 @@ def get_provider(kind: str | None = None) -> Provider:
 
         return HOSTED[kind]()
     raise ValueError(
-        f"unknown provider {kind!r} (expected ollama | mlx | echo | openai | anthropic)"
+        f"unknown provider {kind!r} (expected auto | ollama | mlx | echo | openai | anthropic)"
     )
