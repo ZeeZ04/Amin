@@ -329,6 +329,26 @@ def corpus_doc_ids() -> set[str]:
     return ids
 
 
+# ADR-013: the true answers to the prior-leak probes. Strict systems are still
+# scored on refusing them; a system with a labelled general-knowledge fallback
+# is scored on getting them right. Personal-detail unanswerables get no entry:
+# for those the only right general answer is "I don't know".
+GENERAL_FACTS: dict[str, list[str]] = {
+    "What is the capital of Burkina Faso?": ["Ouagadougou"],
+    "Who won the 2024 UEFA European Championship?": ["Spain"],
+    "What is the boiling point of water in kelvin?": ["373"],
+    "What is the speed of light in metres per second?": ["299792458", "299,792,458", "3 x 10", "3 × 10", "300,000,000", "300000000"],
+    "Who wrote the Principia Mathematica?": ["Newton", "Whitehead"],
+    "What is the chemical symbol for tungsten?": ["symbol for tungsten is W", "is W.", "is W ", "(W)", "**W**", "\"W\"", "'W'"],
+    "How many millimetres are in an inch?": ["25.4"],
+    "What is the largest country in Africa by area?": ["Algeria"],
+    "In what year did the Berlin Wall fall?": ["1989"],
+    "What is the acceleration due to gravity at sea level?": ["9.8"],
+    "What is the currency of Japan?": ["yen"],
+    "كم عدد سكان الإمارات؟": ["مليون", "million"],
+}
+
+
 def build() -> list[dict]:
     items: list[dict] = []
     for i, (q, expect, doc, tag) in enumerate(ANSWERABLE + ANSWERABLE_AR, start=1):
@@ -352,6 +372,7 @@ def build() -> list[dict]:
                 "note": note,
                 "lang": "ar" if is_arabic(q) else "en",
                 "tags": [tag],
+                **({"expect_general": GENERAL_FACTS[q]} if q in GENERAL_FACTS else {}),
             }
         )
     for i, (q, docs, outcome, note) in enumerate(CONFLICT, start=1):

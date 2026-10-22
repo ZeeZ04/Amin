@@ -26,7 +26,7 @@ from .providers import Provider, content_tokens
 from .schema import Claim, Verdict
 
 CITE_RE = re.compile(r"\[(S\d+)\]")
-SENT_SPLIT = re.compile(r"(?<=[.!?؟۔])\s+(?=[A-Z؀-ۿ\[])|\n+")
+SENT_SPLIT = re.compile(r"(?<=[.!?؟۔])\s+(?=[A-Z؀-ۿഀ-ൿ\[])|\n+")
 NUM_RE = re.compile(r"\d+(?:[.,]\d+)*")
 # Models place the tag either side of the full stop. Normalise to one form
 # before splitting, or a trailing tag detaches and its sentence loses its

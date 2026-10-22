@@ -8,20 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from amin import api as api_mod
-from amin.config import settings
 
 LEASE = b"# Tenancy\nThe annual rent is AED 85,000, payable in four cheques.\n"
 DIARY = b"# Diary\nMy locker combination is 4417.\n"
 RENT_Q = {"question": "What is the annual rent?"}
 LOCKER_Q = {"question": "What is my locker combination?"}
-
-
-@pytest.fixture()
-def users_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "users_path", tmp_path / "users")
-    monkeypatch.setattr(settings, "provider", "echo")
-    api_mod._engines.clear()
-    return tmp_path / "users"
 
 
 def client() -> TestClient:
@@ -39,7 +30,9 @@ def invite_from(admin) -> str:
 
 
 def answered(c, q) -> bool:
-    return bool(c.post("/ask", json=q).json()["claims"])
+    """Answered *from documents*. A general-knowledge fallback is not access."""
+    r = c.post("/ask", json=q).json()
+    return bool(r["claims"]) and r["basis"] == "documents"
 
 
 def test_first_account_is_admin_and_others_need_an_invite(users_dir):
@@ -108,9 +101,41 @@ def test_upload_strips_directories_and_rejects_unknown_types(users_dir):
 
 @pytest.mark.skipif(not shutil.which("tesseract"), reason="tesseract not installed")
 def test_photo_is_read_with_ocr(users_dir, tmp_path):
-    from amin.ocr import ocr_image
     import subprocess
+
+    if not shutil.which("convert"):
+        pytest.skip("ImageMagick's convert renders the test image: brew install imagemagick")
+
+    from amin.ocr import ocr_image
     img = tmp_path / "bill.png"
     subprocess.run(["convert", "-size", "900x120", "xc:white", "-pointsize", "48",
                     "-annotate", "+20+80", "Amount due AED 412", str(img)], check=True)
     assert "412" in ocr_image(img)
+
+
+def test_history_is_per_person_and_follows_project_access(users_dir):
+    abdul = signup(client(), "abdul")
+    sara = signup(client(), "sara", invite_from(abdul))
+    first = abdul.post("/ask", json=RENT_Q).json()
+    cid = first["conversation_id"]
+    again = abdul.post("/ask", json={**LOCKER_Q, "conversation_id": cid}).json()
+    assert again["conversation_id"] == cid
+    conv = abdul.get(f"/conversations/{cid}").json()
+    assert [m["question"] for m in conv["messages"]] == [RENT_Q["question"], LOCKER_Q["question"]]
+    assert [c["id"] for c in abdul.get("/conversations").json()] == [cid]
+
+    # another person can neither read nor continue it
+    assert sara.get(f"/conversations/{cid}").status_code == 404
+    assert sara.post("/ask", json={**RENT_Q, "conversation_id": cid}).json()["conversation_id"] != cid
+    assert len(abdul.get(f"/conversations/{cid}").json()["messages"]) == 2
+
+    # losing a project takes its conversations with it
+    pid = abdul.post("/projects", json={"name": "Flat"}).json()["id"]
+    abdul.patch(f"/projects/{pid}", json={"members": ["sara"]})
+    sara.post("/ask", json={**RENT_Q, "project": pid})
+    assert len(sara.get("/conversations").json()) == 2
+    abdul.patch(f"/projects/{pid}", json={"members": []})
+    assert len(sara.get("/conversations").json()) == 1
+
+    assert abdul.delete(f"/conversations/{cid}").status_code == 200
+    assert abdul.get(f"/conversations/{cid}").status_code == 404

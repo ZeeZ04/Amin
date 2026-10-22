@@ -1,8 +1,14 @@
 # Amin
 
-A locally-run assistant that answers only from documents you have approved, cites
-the passage behind every sentence it says, and refuses out loud when it has no
-source. `أمين` means trustworthy.
+A locally-run assistant that answers general questions like any good model,
+and answers from your own documents with the passage behind every sentence.
+It never passes one off as the other: an answer with no document behind it
+is labelled general knowledge. `أمين` means trustworthy.
+
+Documents live in **projects**. Each project has its own memory, and every
+crossing between memories is a permission you grant: a project reading your
+library, general chat using a project, sharing a project with family
+(ADR-013).
 
 The thesis of this project is that **truthfulness is not a property of training
 data — it is a property of inference**. A model trained exclusively on true
@@ -182,11 +188,26 @@ amin/
   systems.py     the three comparable systems: bare, naive RAG, amin
   benchmark.py   multi-system runner, significance tests, markdown report
   hosted.py      OpenAI-compatible + Anthropic adapters with cost accounting
+  users.py       accounts, invites, sessions; spaces.py: projects and permissions
+  history.py     conversation history, one SQLite file per person
+  ocr.py         photos and scans, English + Arabic + Malayalam
+  web/           the app: index.html, app.css, app.js, bundled Malayalam font
+scripts/ml_eval.py  Malayalam eval (E32): IndicQA-ml and Aya held-out
 data/corpus/     14 synthetic source documents, exact ground truth
 data/eval/       237 items: 110 answerable, 99 unanswerable, 22 out-of-scope, 6 conflict
-docs/            ARCHITECTURE · EVAL · EXPERIMENTS · DECISIONS
+docs/            ARCHITECTURE · EVAL · EXPERIMENTS · DECISIONS · TRAINING · ROADMAP
 private/         gitignored. Real documents go here and never into a commit.
 ```
+
+## The app
+
+`make serve`, then open the address it prints on any phone, tablet or
+computer on the same Wi-Fi. It installs to the home screen. On a phone it has
+tabs. On an iPad or a Mac it has a sidebar with your conversation history, and
+the passage behind each citation opens beside the answer. It works in light
+and dark mode, and in English, Arabic (right to left) and Malayalam, with the
+Malayalam font bundled so nothing is fetched from the internet. Conversations
+are saved per person, and no one else can read them.
 
 ## The data wall
 
@@ -219,6 +240,57 @@ AMIN_PROVIDER=openai AMIN_ANSWER_MODEL=gpt-4o-mini OPENAI_API_KEY=... amin bench
 Embeddings deliberately stay local even on a hosted run: swapping the retriever
 and the generator at once would change two variables and measure neither.
 
+## Strict and hybrid
+
+Everything under "Measured behaviour" is the **strict** pipeline: no source,
+no answer. That is still how Amin decides *whether* documents answer. The
+app runs it in **hybrid** mode, where a question the documents don't cover
+gets a labelled general-knowledge answer instead of a refusal. The `hybrid`
+benchmark row scores that mode, with the prior-leak probes graded on getting
+the fact right and personal-detail questions on declining to guess.
+
+## Amin's own model
+
+Amin can run on its own post-trained model, Qwen3-8B distilled from the 27B
+teacher and then preference-tuned on its own graded failures. All of it runs
+on this Mac with MLX. Only behaviour goes into the weights (citing, refusing,
+Arabic register); your documents stay in the index. A trained model ships
+only if it passes the bench gate in ADR-012. The runbook, with timings, is in
+[`docs/TRAINING.md`](docs/TRAINING.md).
+
+amin-1 (Qwen3-8B → SFT → DPO, 8-bit) passed the gate on 2026-10-20, on the same
+237 items, retriever and pipeline:
+
+| | fact accuracy | hallucination | p50 latency |
+|---|---|---|---|
+| qwen3.6:27b (teacher) | 98.2% ±3% | 6.1% ±5% | 6.7 s |
+| **amin-1** | 94.5% ±4% | **1.0% ±3%** | **1.3 s** |
+
+Neither difference is significant on its own (p=0.22 and p=0.06, paired). The
+hallucination gain came from training aimed at a failure category this
+benchmark exposed, and **it did not hold on a fresh held-out slice** (E25,
+E26). There amin-1 matched the teacher on traps (2 vs 3 of 40, p=1.0) and
+was significantly less accurate, 46 vs 56 of 60 (p=0.006), all of it from
+over-refusal.
+
+**amin-3 is the default answer model since 2026-10-21 (E31).** On slice m,
+140 items written blind and used once, and on the main set, both in the
+app's hybrid mode, no difference from qwen3.6:27b is significant:
+
+| | amin-3 | qwen3.6:27b |
+|---|---|---|
+| slice m answerable | 58/65 | 61/65 (p=0.38) |
+| slice m doc-silent declines | 25/27 | 23/27 (p=0.63) |
+| slice m adjacent-fact traps | 26/32 | 28/32 (p=0.63) |
+| main answerable | 109/110 | 108/110 |
+| main unanswerable | 80/99 | 85/99 (p=0.30) |
+| p50 latency | 1.6–2.0 s | 6.7–7.2 s |
+
+That is "no detectable difference" at these sample sizes, not "proven
+equal". `AMIN_PROVIDER=auto` (the default) uses amin-3 when `make serve` has
+started it and falls back to the 27B when it is down. `AMIN_PROVIDER=ollama`
+keeps the 27B.
+
 ## Limits, stated plainly
 
 - A 27B model is far from frontier on hard multi-step reasoning. It is close
@@ -235,12 +307,19 @@ and the generator at once would change two variables and measure neither.
 - Document titles are deliberately not indexed. Indexing them raises fact
   accuracy by 2.7pp and hallucination by 13.1pp, because every chunk inherits
   the document's name and the evidence gate stops working (EXPERIMENTS E12).
-- No real-model numbers exist yet. Every figure above is from the no-model
-  provider. The ablation's *shape* should survive attaching a model; the
-  absolute numbers will not.
+- The ablation table under "Measured behaviour" is from the no-model
+  provider. Real-model numbers are in "Amin's own model" and
+  `docs/EXPERIMENTS.md` E16 onward.
+- Malayalam works but is slow and declines too rarely on amin-3: 83.5%
+  answerable correct, 59.6% correct declines and a p50 of 14.8 s on IndicQA
+  (E32). Qwen3's tokenizer spends 4.7× the tokens on Malayalam, and no
+  fine-tune changes that. The next base model is chosen with it in mind
+  (ADR-014).
 - The verifier's LLM backend is one small-model call per sentence. That is the
   dominant latency cost and the obvious thing to batch.
-- No fine-tuning yet, by design. See `docs/DECISIONS.md` ADR-004.
+- Phones, watches and TVs cannot yet run the model themselves. Today
+  they reach Amin on a computer in the same household. Fully on-device is
+  the goal (ADR-014, `docs/ROADMAP.md`).
 
 ## License
 

@@ -1,522 +1,326 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E5E5A">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#F7F8F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1615" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Amin">
+<meta name="description" content="A private assistant that runs on your own computer and answers from your documents with the source.">
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="preload" href="/static/fonts/noto-sans-malayalam.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/app.css">
 <title>Amin</title>
-<style>
-  /* System fonts on purpose: Amin runs offline on the home network, and SF Pro /
-     SF Arabic give native-looking Latin and Arabic with no download. */
-  :root {
-    --teal: #0E5E5A; --teal-deep: #0A4643; --saffron: #E3A72F; --sand: #F3EFE4;
-    --bg: #EEF2F1; --surface: #FFFFFF; --ink: #16302E; --muted: #5D706D;
-    --line: #D6DEDC; --danger: #A2322B; --bubble: #DCEBE8;
-    --r-lg: 22px; --r-md: 14px; --r-sm: 10px;
-    --tabbar: calc(64px + env(safe-area-inset-bottom));
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Arabic", "Segoe UI", "Noto Sans Arabic", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0B1716; --surface: #13211F; --ink: #E8EEEC; --muted: #93A5A2;
-      --line: #22332F; --bubble: #1C3A37; --teal: #2F8F88; --danger: #E07A70;
-    }
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; }
-  body { background: var(--bg); color: var(--ink); font-size: 17px; line-height: 1.45; overscroll-behavior: none; }
-  button, input, textarea { font: inherit; color: inherit; }
-  button { cursor: pointer; }
-  :focus-visible { outline: 3px solid var(--saffron); outline-offset: 2px; }
-  [hidden] { display: none !important; }
-
-  /* -- splash: the one orchestrated moment --------------------------------
-     An Emirati door draws itself, its keyhole glows, the two leaves swing
-     open and warm light spills out into the app. ~2.6 s, once per launch. */
-  #splash { position: fixed; inset: 0; z-index: 50; overflow: hidden; display: grid; place-items: center;
-    background: radial-gradient(120% 80% at 50% 40%, #0F5A56 0%, var(--teal-deep) 55%, #062E2C 100%);
-    transition: opacity .5s ease, transform .5s ease; }
-  #splash.gone { opacity: 0; transform: scale(1.04); pointer-events: none; }
-  .splash-inner { display: grid; justify-items: center; gap: 22px; color: var(--sand); position: relative; z-index: 2; }
-  .portal { position: relative; width: 150px; height: 196px; perspective: 700px; }
-  .portal .light { position: absolute; inset: 6px; border-radius: 70px 70px 4px 4px;
-    background: radial-gradient(80% 70% at 50% 60%, #FFE3A3 0%, #E3A72F 45%, #9A6A12 100%);
-    opacity: 0; animation: glow .6s ease-out 1.35s forwards; }
-  .portal .leaf { position: absolute; top: 6px; bottom: 6px; width: calc(50% - 6px); background: #0B4F4B;
-    backface-visibility: hidden; animation: var(--swing) .95s cubic-bezier(.55,.05,.25,1) 1.35s forwards; }
-  .portal .leaf::after { content: ""; position: absolute; inset: 0;
-    background: radial-gradient(circle, #F3EFE4 0 4px, transparent 5px) 0 0 / 100% 48px repeat-y; background-position: 50% 52px;
-    opacity: 0; animation: fade .3s ease .7s forwards; }
-  .portal .leaf.l { left: 6px; border-radius: 70px 0 0 4px; transform-origin: left center; --swing: swingL; }
-  .portal .leaf.r { right: 6px; border-radius: 0 70px 4px 0; transform-origin: right center; --swing: swingR; }
-  @keyframes swingL { to { transform: rotateY(-108deg); } }
-  @keyframes swingR { to { transform: rotateY(108deg); } }
-  .portal .frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .portal .frame path { fill: none; stroke: var(--sand); stroke-width: 7; stroke-linejoin: round;
-    stroke-dasharray: 620; stroke-dashoffset: 620; animation: draw .9s cubic-bezier(.6,0,.3,1) .1s forwards; }
-  .portal .seam { stroke-width: 4 !important; stroke-dasharray: 190 !important; stroke-dashoffset: 190 !important;
-    animation: draw .5s ease .55s forwards, vanish .2s ease 1.35s forwards !important; }
-  @keyframes vanish { to { opacity: 0; } }
-  .portal .kh { position: absolute; left: 50%; top: 92px; width: 26px; translate: -50% 0; opacity: 0;
-    animation: keyin .45s cubic-bezier(.3,1.6,.5,1) .85s forwards, keyout .25s ease 1.3s forwards; filter: drop-shadow(0 0 0 #E3A72F); }
-  @keyframes keyin { from { opacity: 0; scale: .3; } to { opacity: 1; scale: 1; filter: drop-shadow(0 0 10px #E3A72F); } }
-  @keyframes keyout { to { opacity: 0; scale: 1.4; } }
-  @keyframes glow { to { opacity: 1; } }
-  .bloom { position: fixed; left: 50%; top: 40%; width: 60px; height: 60px; border-radius: 50%; translate: -50% -50%;
-    background: radial-gradient(circle, rgba(255,227,163,.55), rgba(227,167,47,0) 70%); scale: 0; z-index: 1;
-    animation: bloom 1.1s ease-out 1.75s forwards; }
-  @keyframes bloom { to { scale: 18; opacity: .6; } }
-  @keyframes draw { to { stroke-dashoffset: 0; } }
-  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-  .wordmark { display: flex; align-items: baseline; gap: 12px; opacity: 0; translate: 0 10px; animation: rise .7s ease-out 1.9s forwards; }
-  .wordmark b { font-size: 34px; font-weight: 700; letter-spacing: .02em; }
-  .wordmark span { font-size: 30px; font-weight: 600; opacity: .85; }
-  .tagline { margin: -8px 0 0; font-size: 15px; color: #BFD6D2; opacity: 0; animation: rise .7s ease-out 2.1s forwards; translate: 0 10px; }
-  @keyframes rise { to { opacity: 1; translate: 0 0; } }
-  @media (prefers-reduced-motion: reduce) {
-    #splash *, #splash *::after { animation: none !important; }
-    .portal .frame path { stroke-dashoffset: 0 !important; }
-    .portal .leaf::after, .wordmark, .tagline { opacity: 1; translate: 0 0; }
-    .bloom, .portal .light, .portal .kh { display: none; }
-  }
-
-  /* -- shell ------------------------------------------------------------- */
-  .screen { min-height: 100%; padding: calc(env(safe-area-inset-top) + 12px) 16px calc(var(--tabbar) + 24px); max-width: 640px; margin: 0 auto; }
-  .bar { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
-  h1 { font-size: 32px; line-height: 1.15; margin: 6px 0 14px; font-weight: 700; letter-spacing: -.01em; }
-  h2 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 22px 4px 8px; }
-  .lead { color: var(--muted); margin: -6px 0 18px; }
-
-  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--tabbar);
-    padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(4, 1fr);
-    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px); border-top: 1px solid var(--line); }
-  .tabbar button { background: none; border: 0; display: grid; justify-items: center; align-content: center;
-    gap: 3px; font-size: 11px; color: var(--muted); padding: 6px 0; }
-  .tabbar svg { width: 26px; height: 26px; }
-  .tabbar button[aria-current="page"] { color: var(--teal); font-weight: 600; }
-
-  .group { background: var(--surface); border-radius: var(--r-md); overflow: hidden; }
-  .row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; border-top: 1px solid var(--line); }
-  .row:first-child { border-top: 0; }
-  .row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row button.link { background: none; border: 0; padding: 6px 0; color: var(--teal); font-weight: 600; text-align: left; width: 100%; }
-  .row button.danger { color: var(--danger); }
-  .row .del { background: none; border: 0; color: var(--danger); font-size: 15px; padding: 8px; }
-  .filetag { flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
-    font-size: 11px; font-weight: 700; background: var(--bubble); color: var(--teal); }
-  .empty { padding: 18px 16px; color: var(--muted); font-size: 15px; }
-
-  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 50px;
-    border: 0; border-radius: var(--r-md); background: var(--teal); color: #fff; font-weight: 600; font-size: 17px; }
-  .btn.quiet { background: var(--surface); color: var(--teal); }
-  .btn:disabled { opacity: .5; }
-  .field { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
-  .note { font-size: 14px; color: var(--muted); margin: 8px 4px 0; min-height: 20px; }
-  .note.bad { color: var(--danger); }
-
-  .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--line); border-radius: var(--r-sm); padding: 2px; }
-  .seg button { border: 0; background: none; border-radius: 8px; padding: 8px; font-size: 15px; font-weight: 500; color: var(--muted); }
-  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(22,48,46,.18); }
-
-  /* -- auth -------------------------------------------------------------- */
-  #auth { min-height: 100%; display: grid; grid-template-rows: auto 1fr; }
-  .auth-head { background: var(--teal-deep); color: var(--sand); padding: calc(env(safe-area-inset-top) + 48px) 24px 40px;
-    display: grid; justify-items: center; gap: 10px; text-align: center; }
-  .auth-head svg { width: 76px; height: 76px; }
-  .auth-head h1 { margin: 6px 0 0; color: var(--sand); }
-  .auth-head p { margin: 0; color: #BFD6D2; max-width: 30ch; }
-  .auth-body { padding: 24px 20px 40px; max-width: 440px; width: 100%; margin: 0 auto; display: grid; gap: 10px; align-content: start; }
-  .auth-body .seg { margin-bottom: 8px; }
-
-  /* -- ask --------------------------------------------------------------- */
-  #thread { display: grid; gap: 14px; padding-bottom: 96px; }
-  .msg-q { justify-self: end; max-width: 85%; background: var(--teal); color: #fff; padding: 10px 14px;
-    border-radius: 20px 20px 6px 20px; }
-  .msg-a { justify-self: start; max-width: 92%; background: var(--surface); padding: 12px 14px; border-radius: 20px 20px 20px 6px; }
-  .msg-a.refused { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
-  .msg-a .meta { font-size: 13px; color: var(--muted); margin-top: 8px; }
-  .msg-a .clash { font-size: 14px; font-weight: 600; color: var(--danger); margin-bottom: 4px; }
-  .cite { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; margin: 0 2px;
-    border: 0; border-radius: 11px; background: var(--saffron); color: #3A2A05; font-size: 12px; font-weight: 700; vertical-align: 2px; }
-  .typing { display: inline-flex; gap: 5px; padding: 4px 2px; }
-  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
-  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
-  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
-  .starters { display: grid; gap: 8px; }
-  .starters button { text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
-  .composer { position: fixed; left: 0; right: 0; bottom: var(--tabbar); z-index: 15; padding: 8px 12px;
-    background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-  .composer form { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
-  .composer textarea { flex: 1; resize: none; max-height: 120px; min-height: 46px; padding: 11px 16px; border-radius: 23px;
-    border: 1px solid var(--line); background: var(--surface); }
-  .send { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--teal); color: #fff; display: grid; place-items: center; }
-  .send svg { width: 22px; height: 22px; }
-
-  /* -- scan -------------------------------------------------------------- */
-  .shutter { width: 100%; aspect-ratio: 16 / 11; border-radius: var(--r-lg); border: 0; background: var(--teal-deep); color: var(--sand);
-    display: grid; place-items: center; align-content: center; gap: 12px; font-size: 18px; font-weight: 600; position: relative; overflow: hidden; }
-  .shutter svg { width: 56px; height: 56px; }
-  .shutter img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .stack { display: grid; gap: 10px; margin-top: 12px; }
-
-  /* -- profile ----------------------------------------------------------- */
-  .me { display: flex; gap: 14px; align-items: center; background: var(--surface); border-radius: var(--r-md); padding: 16px; }
-  .avatar { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--teal); color: #fff; font-size: 24px; font-weight: 700; }
-  .me small { display: block; color: var(--muted); font-size: 14px; }
-  .code { font: 700 26px ui-monospace, "SF Mono", monospace; letter-spacing: .12em; padding: 10px 0 2px; }
-  .about { font-size: 15px; color: var(--muted); padding: 14px 16px; line-height: 1.5; }
-
-  /* -- source sheet ------------------------------------------------------ */
-  .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(6,20,19,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
-  .scrim.open { opacity: 1; pointer-events: auto; }
-  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 70%; overflow: auto; background: var(--surface);
-    border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
-    transform: translateY(100%); transition: transform .28s cubic-bezier(.2,.8,.2,1); max-width: 640px; margin: 0 auto; }
-  .sheet.open { transform: none; }
-  .grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 14px; }
-  .sheet h3 { margin: 0 0 2px; font-size: 17px; }
-  .sheet small { color: var(--muted); }
-  .sheet blockquote { margin: 14px 0 0; padding: 12px 14px; border-inline-start: 4px solid var(--saffron); background: var(--bg);
-    border-radius: var(--r-sm); white-space: pre-wrap; font-size: 15px; }
-  @media (prefers-reduced-motion: reduce) { .sheet, .scrim, #splash { transition: none; } .typing i { animation: none; opacity: .6; } }
-</style>
+<script>
+  // Theme before first paint, so a dark-mode user never sees a white flash.
+  try { const t = localStorage.getItem("amin.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+</script>
 </head>
 <body>
 
-<!-- Logo: a studded Emirati door with a gold keyhole. Amin means "trustworthy":
-     the one you trust with the keys to the house. -->
+<!-- Icons: one stroke family, 24px grid, 1.75 stroke. The logo is a studded
+     Emirati door with a gold keyhole: the one you trust with the house keys. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="logo" viewBox="0 0 512 512">
-    <path d="M156 410 V236 a100 100 0 0 1 200 0 V410 Z" fill="none" stroke="currentColor" stroke-width="20" stroke-linejoin="round"/>
-    <path d="M256 140 V410" stroke="currentColor" stroke-width="12"/>
-    <g fill="currentColor"><circle cx="196" cy="250" r="8"/><circle cx="196" cy="300" r="8"/><circle cx="196" cy="350" r="8"/><circle cx="316" cy="250" r="8"/><circle cx="316" cy="300" r="8"/><circle cx="316" cy="350" r="8"/></g>
+    <path d="M156 410 V236 a100 100 0 0 1 200 0 V410 Z" fill="none" stroke="currentColor" stroke-width="22" stroke-linejoin="round"/>
+    <path d="M256 140 V410" stroke="currentColor" stroke-width="13"/>
+    <g fill="currentColor"><circle cx="196" cy="250" r="9"/><circle cx="196" cy="300" r="9"/><circle cx="196" cy="350" r="9"/><circle cx="316" cy="250" r="9"/><circle cx="316" cy="300" r="9"/><circle cx="316" cy="350" r="9"/></g>
     <circle cx="256" cy="282" r="22" fill="#E3A72F"/><path d="M243 292 H269 L276 336 H236 Z" fill="#E3A72F"/>
   </symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 18.5 3.5 21l.5-4A8 8 0 1 1 8 19.5"/><path d="M8.5 10.5h7M8.5 14h4.5"/></symbol>
+  <symbol id="i-add-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.3l1.7-2.5h7l1.7 2.5h2.3A1.5 1.5 0 0 1 21 8.5V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.6 3 5.2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M5 17h4l1-5V6H4v6h3zM14 17h4l1-5V6h-6v6h3z"/></symbol>
 </svg>
 
-<div id="splash" role="status" aria-label="Opening Amin">
+<div id="splash" role="status" aria-label="Opening Amin" hidden>
   <div class="bloom" aria-hidden="true"></div>
   <div class="splash-inner">
     <div class="portal" aria-hidden="true">
       <div class="light"></div>
       <div class="leaf l"></div><div class="leaf r"></div>
-      <svg class="frame" viewBox="0 0 150 196">
-        <path d="M6 192 V78 a69 69 0 0 1 138 0 V192 Z"/>
-        <path class="seam" d="M75 10 V192"/>
-      </svg>
+      <svg class="frame" viewBox="0 0 132 172"><path d="M6 168 V70 a60 60 0 0 1 120 0 V168 Z"/><path class="seam" d="M66 10 V168"/></svg>
       <svg class="kh" viewBox="0 0 26 50"><circle cx="13" cy="12" r="11" fill="#E3A72F"/><path d="M6 17 H20 L24 48 H2 Z" fill="#E3A72F"/></svg>
     </div>
     <div class="wordmark"><b>Amin</b><span lang="ar">أمين</span></div>
-    <p class="tagline">Your home's documents, answered.</p>
   </div>
 </div>
 
-<!-- sign in -->
+<!-- sign in -------------------------------------------------------------- -->
 <section id="auth" hidden>
-  <div class="auth-head">
-    <svg><use href="#logo"/></svg>
-    <h1>Amin <span lang="ar">أمين</span></h1>
-    <p id="authLead">Answers from your household's own papers, with the page it came from.</p>
-  </div>
-  <form class="auth-body" id="authForm">
-    <div class="seg" role="group" aria-label="Sign in or create account">
-      <button type="button" id="modeIn" aria-pressed="true">Sign in</button>
-      <button type="button" id="modeUp" aria-pressed="false">Create account</button>
+  <div class="auth-brand">
+    <svg class="door-bg" aria-hidden="true"><use href="#logo"/></svg>
+    <div>
+      <svg class="mark" aria-hidden="true"><use href="#logo"/></svg>
     </div>
-    <input class="field" id="name" placeholder="Name, e.g. abdul" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-    <input class="field" id="pass" type="password" placeholder="Password, 6 or more characters" autocomplete="current-password" required>
-    <input class="field" id="invite" placeholder="Invite code from the admin" autocapitalize="none" hidden>
-    <button class="btn" id="authGo">Sign in</button>
-    <p class="note" id="authNote"></p>
-  </form>
+    <div>
+      <h1 id="authHeadline">An assistant that keeps your papers at home.</h1>
+      <p id="authLead">Amin runs on your own computer. It answers everyday questions, and when your documents hold the answer, it shows you the passage.</p>
+      <ul class="auth-points">
+        <li><svg class="i"><use href="#i-lock"/></svg><span>Nothing you ask or upload leaves this computer.</span></li>
+        <li><svg class="i"><use href="#i-quote"/></svg><span>Answers from your documents come with the exact passage behind them.</span></li>
+        <li><svg class="i"><use href="#i-globe"/></svg><span>English, العربية and മലയാളം.</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="auth-panel">
+    <form class="auth-form" id="authForm" novalidate>
+      <h2 id="authTitle">Sign in</h2>
+      <div class="segmented" role="group" aria-label="Sign in or create an account">
+        <button type="button" id="modeIn" aria-pressed="true">Sign in</button>
+        <button type="button" id="modeUp" aria-pressed="false">Create account</button>
+      </div>
+      <div>
+        <label class="field-label" for="name">Name</label>
+        <input class="field" id="name" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="e.g. abdul">
+        <p class="hint" id="nameHint" hidden>Lowercase letters, numbers, - or _. No spaces.</p>
+      </div>
+      <div>
+        <label class="field-label" for="pass">Password</label>
+        <input class="field" id="pass" type="password" autocomplete="current-password" required minlength="6">
+      </div>
+      <div id="inviteBox" hidden>
+        <label class="field-label" for="invite">Invite code</label>
+        <input class="field" id="invite" autocapitalize="none" spellcheck="false" autocomplete="one-time-code" placeholder="From the person who runs Amin">
+      </div>
+      <button class="btn block" id="authGo">Sign in</button>
+      <p class="error" id="authNote" role="alert"></p>
+    </form>
+  </div>
 </section>
 
-<!-- app -->
+<!-- app ------------------------------------------------------------------ -->
 <div id="app" hidden>
-  <main class="screen" id="tab-ask">
-    <h1>Ask</h1>
-    <div id="starters">
-      <p class="lead">Ask about anything in your documents. Every answer shows where it came from.</p>
-      <div class="starters">
-        <button type="button">When does our tenancy end?</button>
-        <button type="button">How many days do I have to pay the electricity bill?</button>
-        <button type="button" dir="rtl">متى ينتهي عقد الإيجار؟</button>
+  <aside class="sidebar" id="sidebar" aria-label="Amin">
+    <div class="brand"><svg aria-hidden="true"><use href="#logo"/></svg><b>Amin</b><span lang="ar">أمين</span></div>
+    <button class="btn secondary new-chat" id="newChat" type="button"><svg class="i"><use href="#i-edit"/></svg>New chat</button>
+    <nav class="nav" aria-label="Sections">
+      <button data-go="chat" aria-current="page"><svg class="i"><use href="#i-chat"/></svg>Chat</button>
+      <button data-go="add"><svg class="i"><use href="#i-add-doc"/></svg>Add documents</button>
+      <button data-go="projects"><svg class="i"><use href="#i-folder"/></svg>Projects</button>
+      <button data-go="settings"><svg class="i"><use href="#i-settings"/></svg>Settings</button>
+    </nav>
+    <div class="side-heading">Recent</div>
+    <div class="history" id="history"></div>
+    <button class="me-chip" id="meChip" type="button"><span class="avatar" id="sideAvatar"></span><span class="text"><b id="sideName"></b><small id="sideRole"></small></span></button>
+  </aside>
+  <div class="drawer-scrim" id="drawerScrim"></div>
+
+  <div class="main">
+    <!-- chat -->
+    <section class="view" id="view-chat" style="display:flex;flex-direction:column;overflow:hidden">
+      <header class="topbar">
+        <button class="icon-btn only-phone" id="openDrawer" aria-label="Conversations"><svg class="i"><use href="#i-menu"/></svg></button>
+        <div class="title"><button class="space-btn" id="spaceBtn" type="button" aria-haspopup="menu"><svg class="i"><use href="#i-globe"/></svg><span id="spaceName">General chat</span><svg class="i"><use href="#i-down"/></svg></button></div>
+        <button class="icon-btn only-phone" id="newChatPhone" aria-label="New chat"><svg class="i"><use href="#i-edit"/></svg></button>
+      </header>
+      <div class="chat-scroll" id="chatScroll">
+        <div class="welcome" id="welcome">
+          <svg class="mark" aria-hidden="true"><use href="#logo"/></svg>
+          <h1 id="greeting">How can I help?</h1>
+          <p id="welcomeLead">Ask anything. When your documents hold the answer, Amin shows you the passage it came from.</p>
+          <div class="starters" id="starters">
+            <button type="button" lang="en"><small>Your documents</small>When does our tenancy end?</button>
+            <button type="button" lang="ar" dir="rtl"><small>مستنداتك</small>كم يوماً لدي لدفع فاتورة الكهرباء؟</button>
+            <button type="button" lang="ml"><small>പൊതുവിജ്ഞാനം</small>കേരളത്തിലെ ഏറ്റവും നീളം കൂടിയ നദി ഏതാണ്?</button>
+          </div>
+          <div class="privacy-note"><svg class="i"><use href="#i-lock"/></svg>Runs on this computer. Nothing you ask leaves it.</div>
+        </div>
+        <div class="thread" id="thread" aria-live="polite"></div>
       </div>
-    </div>
-    <div id="thread" aria-live="polite"></div>
-  </main>
-
-  <main class="screen" id="tab-scan" hidden>
-    <h1>Scan</h1>
-    <p class="lead">Photograph a bill, contract or letter. Amin reads English and Arabic.</p>
-    <input type="file" id="camera" accept="image/*" capture="environment" hidden>
-    <input type="file" id="picker" accept=".pdf,.txt,.md,.html,image/*" hidden>
-    <button class="shutter" id="shoot" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg>
-      <span id="shootLabel">Take a photo</span>
-      <img id="preview" alt="" hidden>
-    </button>
-    <div class="stack">
-      <button class="btn quiet" id="choose" type="button">Choose a file instead</button>
-      <h2>Save to</h2>
-      <div class="seg" role="group" aria-label="Library">
-        <button type="button" data-lib="private" aria-pressed="true">Only me</button>
-        <button type="button" data-lib="household" aria-pressed="false">Household</button>
+      <div class="composer-wrap">
+        <form class="composer" id="askForm">
+          <button class="icon-btn" type="button" id="attach" aria-label="Add a document"><svg class="i"><use href="#i-plus"/></svg></button>
+          <label class="sr" for="question">Message Amin</label>
+          <textarea id="question" rows="1" dir="auto" placeholder="Message Amin"></textarea>
+          <button class="send" id="send" aria-label="Send" disabled><svg class="i"><use href="#i-up"/></svg></button>
+        </form>
       </div>
-      <button class="btn" id="saveScan" type="button" disabled>Read and save</button>
-      <p class="note" id="scanNote"></p>
-    </div>
-  </main>
+    </section>
 
-  <main class="screen" id="tab-library" hidden>
-    <h1>Library</h1>
-    <div class="seg" role="group" aria-label="Which documents">
-      <button type="button" data-view="private" aria-pressed="true">Only me</button>
-      <button type="button" data-view="household" aria-pressed="false">Household</button>
-    </div>
-    <h2 id="libHint"></h2>
-    <div class="group" id="docList"></div>
-    <p class="note" id="libNote"></p>
-  </main>
+    <!-- add documents -->
+    <section class="view" id="view-add" hidden>
+      <header class="topbar"><button class="icon-btn only-phone" data-drawer aria-label="Conversations"><svg class="i"><use href="#i-menu"/></svg></button><div class="title only-phone">Add documents</div></header>
+      <div class="page">
+        <h1 class="only-wide">Add documents</h1>
+        <p class="lead">Bills, contracts, letters, manuals. Amin reads PDFs, text and photos in English, Arabic and Malayalam, and keeps them on this computer only.</p>
+        <div class="dropzone" id="dropzone">
+          <span class="badge"><svg class="i"><use href="#i-upload"/></svg></span>
+          <b class="only-wide">Drop a file here</b>
+          <b class="only-phone">Photograph or choose a file</b>
+          <p>PDF, TXT, Markdown, HTML or an image, up to 25 MB.</p>
+          <div class="actions">
+            <button class="btn" type="button" id="takePhoto"><svg class="i"><use href="#i-camera"/></svg>Take a photo</button>
+            <button class="btn secondary" type="button" id="chooseFile">Choose a file</button>
+          </div>
+          <input type="file" id="camera" accept="image/*" capture="environment" hidden>
+          <input type="file" id="picker" accept=".pdf,.txt,.md,.html,image/*" hidden>
+        </div>
+        <div class="pending" id="pending" hidden>
+          <img id="preview" alt="" hidden>
+          <span class="filetype" id="pendingType" hidden></span>
+          <div class="text"><b class="title" id="pendingName"></b><span class="sub" id="pendingSize"></span></div>
+          <button class="icon-btn" id="clearPending" type="button" aria-label="Remove"><svg class="i"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="form-row inline">
+          <div>
+            <label class="field-label" for="target">Save to</label>
+            <select class="field" id="target"></select>
+          </div>
+          <button class="btn" id="save" type="button" disabled>Read and save</button>
+        </div>
+        <div class="progress" id="saving" hidden><i></i></div>
+        <p class="hint" id="saveNote"></p>
 
-  <main class="screen" id="tab-profile" hidden>
-    <h1>Profile</h1>
-    <div class="me"><div class="avatar" id="avatar"></div><div><b id="meName"></b><small id="meRole"></small></div></div>
-    <div id="adminBox" hidden>
-      <h2>Invite someone</h2>
-      <div class="group">
-        <div class="row"><button class="link" id="newInvite" type="button">Create an invite code</button></div>
-        <div class="row" id="inviteRow" hidden><div class="grow"><div class="code" id="inviteCode"></div><small class="note">One use. Valid for 7 days.</small></div></div>
+        <h2 class="section-title">Libraries</h2>
+        <div class="segmented" role="group" aria-label="Which library">
+          <button type="button" data-lib="private" aria-pressed="true">Only me</button>
+          <button type="button" data-lib="household" aria-pressed="false">Household</button>
+        </div>
+        <p class="hint" id="libHint"></p>
+        <div class="list" id="docList" style="margin-top:12px"></div>
       </div>
-    </div>
-    <h2>Account</h2>
-    <div class="group">
-      <div class="row"><button class="link" id="signOut" type="button">Sign out</button></div>
-      <div class="row"><button class="link danger" id="signOutAll" type="button">Sign out on all devices</button></div>
-    </div>
-    <h2>About Amin</h2>
-    <div class="group"><p class="about">Everything stays on this computer. Amin only answers from documents in your library and shows the passage each answer came from. It won't give medical, legal or financial advice. For those it tells you who to ask.</p></div>
-  </main>
+    </section>
 
-  <div class="composer" id="composer">
-    <form id="askForm">
-      <textarea id="question" rows="1" dir="auto" placeholder="Ask Amin… / اسأل أمين" aria-label="Your question"></textarea>
-      <button class="send" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
-    </form>
+    <!-- projects -->
+    <section class="view" id="view-projects" hidden>
+      <header class="topbar"><button class="icon-btn only-phone" data-drawer aria-label="Conversations"><svg class="i"><use href="#i-menu"/></svg></button><div class="title only-phone">Projects</div></header>
+      <div class="page" id="projList">
+        <div class="proj-head"><div class="grow"><h1 class="only-wide">Projects</h1>
+          <p class="lead">A project keeps a set of documents together — a flat, a car, a school year. Answers in a project come from its documents first.</p></div>
+          <button class="btn" id="newProject" type="button"><svg class="i"><use href="#i-plus"/></svg>New project</button></div>
+        <div class="list" id="projects" style="margin-top:8px"></div>
+      </div>
+      <div class="page" id="projDetail" hidden>
+        <button class="back" id="projBack" type="button"><svg class="i"><use href="#i-back"/></svg>Projects</button>
+        <div class="proj-head">
+          <div class="grow"><h1 id="projName" dir="auto"></h1><p class="lead" id="projLead"></p></div>
+          <button class="btn secondary" id="askProject" type="button"><svg class="i"><use href="#i-chat"/></svg>Ask in this project</button>
+        </div>
+        <div class="proj-head"><h2 class="section-title grow" style="margin-top:6px">Documents</h2>
+          <button class="btn sm secondary" id="projAdd" type="button" style="margin-top:14px"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+          <input type="file" id="projPicker" accept=".pdf,.txt,.md,.html,image/*" hidden></div>
+        <div class="list" id="projDocs"></div>
+        <div id="projOwner">
+          <h2 class="section-title">Permissions</h2>
+          <div class="list" id="projPerms"></div>
+          <h2 class="section-title">Shared with</h2>
+          <div class="list" id="projMembers"></div>
+          <h2 class="section-title">Project</h2>
+          <div class="list">
+            <button class="item" id="projRename" type="button"><span class="text"><span class="title">Rename</span></span><svg class="i chev"><use href="#i-chev"/></svg></button>
+            <button class="item" id="projDelete" type="button" style="color:var(--danger)"><span class="text"><span class="title">Delete project</span><span class="sub">Removes its documents from this computer.</span></span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- settings -->
+    <section class="view" id="view-settings" hidden>
+      <header class="topbar"><button class="icon-btn only-phone" data-drawer aria-label="Conversations"><svg class="i"><use href="#i-menu"/></svg></button><div class="title only-phone">Settings</div></header>
+      <div class="page">
+        <h1 class="only-wide">Settings</h1>
+        <div class="list"><div class="profile-card"><span class="avatar lg" id="avatar"></span><div><b id="meName"></b><small id="meRole"></small></div></div></div>
+
+        <div id="adminBox" hidden>
+          <h2 class="section-title">Invite someone</h2>
+          <div class="list">
+            <button class="item" id="newInvite" type="button"><svg class="i" style="color:var(--teal-ink)"><use href="#i-users"/></svg><span class="text"><span class="title">Create an invite code</span><span class="sub">One use, valid for 7 days.</span></span></button>
+            <div class="item" id="inviteRow" hidden><span class="text"><span class="code" id="inviteCode"></span></span>
+              <button class="btn sm secondary" id="copyInvite" type="button"><svg class="i"><use href="#i-copy"/></svg>Copy</button></div>
+          </div>
+        </div>
+
+        <h2 class="section-title">General chat may use</h2>
+        <div class="list">
+          <label class="toggle-row"><span class="text"><span class="title">My library</span><span class="sub">Your “Only me” documents</span></span><span class="switch"><input type="checkbox" id="prefPrivate"><span></span></span></label>
+          <label class="toggle-row"><span class="text"><span class="title">Household library</span><span class="sub">Documents everyone in the household shares</span></span><span class="switch"><input type="checkbox" id="prefHousehold"><span></span></span></label>
+        </div>
+
+        <h2 class="section-title">Appearance</h2>
+        <div class="list"><div class="item"><span class="text"><span class="title">Theme</span></span>
+          <div class="segmented" role="group" aria-label="Theme">
+            <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+            <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+          </div></div></div>
+
+        <h2 class="section-title">Account</h2>
+        <div class="list">
+          <button class="item" id="signOut" type="button"><span class="text"><span class="title">Sign out</span></span></button>
+          <button class="item" id="signOutAll" type="button" style="color:var(--danger)"><span class="text"><span class="title">Sign out on all devices</span></span></button>
+        </div>
+
+        <h2 class="section-title">About Amin</h2>
+        <div class="list"><div class="about">
+          <p>Amin runs on this computer. Your questions, documents and conversations are stored here and nowhere else.</p>
+          <p>When your documents hold the answer, Amin quotes them and shows the passage. Otherwise it answers from general knowledge and says so. For medical, legal or financial questions it tells you who to ask instead of advising.</p>
+          <p id="version"></p>
+        </div></div>
+      </div>
+    </section>
   </div>
 
   <nav class="tabbar" aria-label="Sections">
-    <button data-tab="ask" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>Ask</button>
-    <button data-tab="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Scan</button>
-    <button data-tab="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>Library</button>
-    <button data-tab="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Profile</button>
+    <button data-go="chat" aria-current="page"><svg class="i"><use href="#i-chat"/></svg>Chat</button>
+    <button data-go="add"><svg class="i"><use href="#i-add-doc"/></svg>Add</button>
+    <button data-go="projects"><svg class="i"><use href="#i-folder"/></svg>Projects</button>
+    <button data-go="settings"><svg class="i"><use href="#i-settings"/></svg>Settings</button>
   </nav>
+
+  <div class="sheet-scrim" id="sheetScrim"></div>
+  <aside class="inspector" id="inspector" role="dialog" aria-labelledby="srcTitle" aria-hidden="true">
+    <div class="grabber"></div>
+    <header>
+      <span class="filetype" id="srcType"></span>
+      <div class="text"><h3 id="srcTitle" dir="auto"></h3><small id="srcSub"></small></div>
+      <button class="icon-btn" id="closeSrc" aria-label="Close source"><svg class="i"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="passage">
+      <blockquote id="srcText" dir="auto"></blockquote>
+      <p class="why">This is the passage Amin cited. A sentence that its passage does not support is removed before you see the answer.</p>
+    </div>
+  </aside>
 </div>
 
-<div class="scrim" id="scrim"></div>
-<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-  <div class="grabber"></div>
-  <h3 id="sheetTitle"></h3><small id="sheetSub"></small>
-  <blockquote id="sheetText" dir="auto"></blockquote>
-</aside>
+<dialog class="modal" id="dialog">
+  <form method="dialog">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <input class="field" id="dlgInput" hidden dir="auto">
+    <div class="actions">
+      <button class="btn secondary" value="cancel" id="dlgCancel">Cancel</button>
+      <button class="btn" value="ok" id="dlgOk">OK</button>
+    </div>
+  </form>
+</dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script>
-const $ = id => document.getElementById(id);
-const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
-
-async function call(path, opts = {}) {
-  const res = await fetch(path, { credentials: "same-origin", ...opts });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const d = data.detail;
-    throw new Error(typeof d === "string" ? d
-      : Array.isArray(d) ? d.map(e => `${e.loc?.at(-1) ?? "input"}: ${e.msg}`).join("; ")
-      : `${res.status} ${res.statusText}`);
-  }
-  return data;
-}
-const post = (path, body) => call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
-
-let ME = null, mode = "in", firstAccount = false;
-
-/* -- splash then route ---------------------------------------------------- */
-const minSplash = new Promise(r => setTimeout(r, matchMedia("(prefers-reduced-motion: reduce)").matches ? 400 : 2900));
-async function boot() {
-  const [me] = await Promise.all([call("/me").catch(() => null), minSplash]);
-  if (me) showApp(me); else await showAuth();
-  $("splash").classList.add("gone");
-}
-
-/* -- auth ----------------------------------------------------------------- */
-async function showAuth() {
-  ME = null; $("app").hidden = true; $("auth").hidden = false;
-  const s = await call("/setup").catch(() => ({}));
-  firstAccount = !!s.first_account;
-  setMode(firstAccount ? "up" : "in");
-  if (firstAccount) $("authLead").textContent = "Welcome. Create the first account: it becomes the admin, who invites the rest of the household.";
-}
-function setMode(m) {
-  mode = m;
-  $("modeIn").setAttribute("aria-pressed", m === "in"); $("modeUp").setAttribute("aria-pressed", m === "up");
-  $("authGo").textContent = m === "in" ? "Sign in" : "Create account";
-  $("invite").hidden = m === "in" || firstAccount;
-  $("pass").autocomplete = m === "in" ? "current-password" : "new-password";
-  $("authNote").textContent = m === "up" ? "Names use lowercase letters, numbers, - or _, with no spaces." : "";
-  $("authNote").classList.remove("bad");
-}
-$("modeIn").onclick = () => setMode("in");
-$("modeUp").onclick = () => setMode("up");
-$("authForm").onsubmit = async e => {
-  e.preventDefault();
-  const name = $("name").value.trim().toLowerCase();
-  try {
-    await post(mode === "in" ? "/login" : "/signup", { name, password: $("pass").value, invite: $("invite").value.trim() || null });
-    $("pass").value = ""; $("invite").value = "";
-    showApp(await call("/me"));
-  } catch (err) { $("authNote").textContent = err.message; $("authNote").classList.add("bad"); }
-};
-
-/* -- app shell ------------------------------------------------------------ */
-function showApp(me) {
-  ME = me; $("auth").hidden = true; $("app").hidden = false;
-  $("avatar").textContent = me.name[0].toUpperCase();
-  $("meName").textContent = me.name;
-  $("meRole").textContent = me.admin ? "Admin · can invite people and remove household documents" : "Household member";
-  $("adminBox").hidden = !me.admin;
-  renderLibrary();
-}
-function go(tab) {
-  for (const t of ["ask", "scan", "library", "profile"]) $(`tab-${t}`).hidden = t !== tab;
-  document.querySelectorAll(".tabbar button").forEach(b => b.toggleAttribute("aria-current", b.dataset.tab === tab));
-  document.querySelectorAll(".tabbar button[aria-current]").forEach(b => b.setAttribute("aria-current", "page"));
-  $("composer").hidden = tab !== "ask";
-  if (tab === "library") refreshMe();
-  scrollTo(0, 0);
-}
-document.querySelectorAll(".tabbar button").forEach(b => b.onclick = () => go(b.dataset.tab));
-async function refreshMe() { try { ME = await call("/me"); renderLibrary(); } catch { showAuth(); } }
-
-/* -- ask ------------------------------------------------------------------ */
-document.querySelectorAll(".starters button").forEach(b => b.onclick = () => { $("question").value = b.textContent; ask(); });
-$("askForm").onsubmit = e => { e.preventDefault(); ask(); };
-$("question").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
-$("question").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; });
-
-async function ask() {
-  const q = $("question").value.trim(); if (!q) return;
-  $("starters").hidden = true; $("question").value = ""; $("question").style.height = "";
-  $("thread").insertAdjacentHTML("beforeend", `<div class="msg-q" dir="auto">${esc(q)}</div>`);
-  const a = document.createElement("div"); a.className = "msg-a"; a.innerHTML = '<span class="typing" aria-label="Amin is reading your documents"><i></i><i></i><i></i></span>';
-  $("thread").append(a); a.scrollIntoView({ behavior: "smooth", block: "end" });
-  try { render(a, await post("/ask", { question: q })); }
-  catch (err) { a.className = "msg-a refused"; a.textContent = err.message; }
-  a.scrollIntoView({ behavior: "smooth", block: "end" });
-}
-function render(el, r) {
-  if (!r.claims.length) { el.className = "msg-a refused"; el.dir = "auto"; el.textContent = r.refusal_reason || "No answer found in your documents."; return; }
-  const num = {}; let n = 0;
-  const body = r.claims.map(c => esc(c.text) + c.citations.map(id => {
-    num[id] ??= ++n; return `<button class="cite" data-id="${esc(id)}" aria-label="Show source ${num[id]}">${num[id]}</button>`;
-  }).join("")).join(" ");
-  el.innerHTML = (r.outcome === "conflict" ? '<div class="clash">Your documents disagree on this</div>' : "")
-    + `<div dir="auto">${body}</div><div class="meta">Tap a number to see the source · ${(r.latency_ms / 1000).toFixed(1)} s</div>`;
-  el.querySelectorAll(".cite").forEach(b => b.onclick = () => openSource(b.dataset.id));
-}
-
-/* -- source sheet --------------------------------------------------------- */
-function libName(docId) {
-  if (docId.startsWith("h.")) return ["Household", docId.slice(2)];
-  if (docId.startsWith("p.")) return ["Only me", docId.slice(2)];
-  return ["Library", docId];
-}
-async function openSource(id) {
-  try {
-    const c = await call(`/chunks/${encodeURIComponent(id)}`);
-    const [lib, file] = libName(c.doc_id);
-    $("sheetTitle").textContent = file;
-    $("sheetSub").textContent = c.heading ? `${lib} · ${c.heading}` : lib;
-    $("sheetText").textContent = c.text;
-    $("scrim").classList.add("open"); $("sheet").classList.add("open");
-  } catch (err) { alert(err.message); }
-}
-function closeSheet() { $("scrim").classList.remove("open"); $("sheet").classList.remove("open"); }
-$("scrim").onclick = closeSheet;
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
-
-/* -- scan ----------------------------------------------------------------- */
-let pending = null, scanLib = "private";
-$("shoot").onclick = () => $("camera").click();
-$("choose").onclick = () => $("picker").click();
-for (const input of [$("camera"), $("picker")]) input.onchange = () => {
-  const f = input.files[0]; if (!f) return;
-  pending = f; input.value = "";
-  $("saveScan").disabled = false; $("scanNote").textContent = f.name; $("scanNote").classList.remove("bad");
-  if (f.type.startsWith("image/")) { $("preview").src = URL.createObjectURL(f); $("preview").hidden = false; }
-  else { $("preview").hidden = true; $("shootLabel").textContent = f.name; }
-};
-document.querySelectorAll("[data-lib]").forEach(b => b.onclick = () => {
-  scanLib = b.dataset.lib;
-  document.querySelectorAll("[data-lib]").forEach(x => x.setAttribute("aria-pressed", x === b));
-});
-$("saveScan").onclick = async () => {
-  if (!pending) return;
-  // iPhone camera files are all called image.jpg; give each scan its own name.
-  const name = /^image\.(jpe?g|heic|png)$/i.test(pending.name)
-    ? `scan-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.${pending.name.split(".").pop()}` : pending.name;
-  $("saveScan").disabled = true; $("scanNote").classList.remove("bad");
-  $("scanNote").textContent = "Reading the text… photos and scans take a little longer.";
-  try {
-    const r = await call(`/upload?filename=${encodeURIComponent(name)}&library=${scanLib}`, { method: "POST", body: pending });
-    $("scanNote").textContent = `Saved ${r.document} to ${r.library === "household" ? "Household" : "Only me"}. You can ask about it now.`;
-    pending = null; $("preview").hidden = true; $("shootLabel").textContent = "Take a photo";
-  } catch (err) { $("scanNote").textContent = err.message; $("scanNote").classList.add("bad"); $("saveScan").disabled = false; }
-};
-
-/* -- library -------------------------------------------------------------- */
-let libView = "private";
-document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
-  libView = b.dataset.view;
-  document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", x === b));
-  renderLibrary();
-});
-function renderLibrary() {
-  if (!ME) return;
-  const files = ME[libView] || [];
-  const canDelete = libView === "private" || ME.admin;
-  $("libHint").textContent = libView === "private" ? "Only you can see and ask about these." : "Everyone in the household can ask about these.";
-  $("docList").innerHTML = files.length ? files.map(f => `
-    <div class="row"><span class="filetag">${esc((f.split(".").pop() || "").slice(0, 4).toUpperCase())}</span>
-      <span class="grow" dir="auto">${esc(f)}</span>
-      ${canDelete ? `<button class="del" data-f="${esc(f)}" aria-label="Delete ${esc(f)}">Delete</button>` : ""}</div>`).join("")
-    : `<div class="empty">Nothing here yet. Add a document from the Scan tab.</div>`;
-  $("docList").querySelectorAll(".del").forEach(b => b.onclick = async () => {
-    if (!confirm(`Delete ${b.dataset.f}? Amin will stop answering from it on every device.`)) return;
-    try {
-      await call(`/documents?filename=${encodeURIComponent(b.dataset.f)}&library=${libView}`, { method: "DELETE" });
-      $("libNote").textContent = `Deleted ${b.dataset.f}.`; refreshMe();
-    } catch (err) { $("libNote").textContent = err.message; }
-  });
-}
-
-/* -- profile -------------------------------------------------------------- */
-$("newInvite").onclick = async () => {
-  try { $("inviteCode").textContent = (await post("/invites")).code; $("inviteRow").hidden = false; }
-  catch (err) { alert(err.message); }
-};
-$("signOut").onclick = async () => { await post("/logout"); $("thread").innerHTML = ""; $("starters").hidden = false; go("ask"); showAuth(); };
-$("signOutAll").onclick = async () => {
-  if (!confirm("Sign out on every phone and computer, including this one?")) return;
-  await post("/logout-all"); $("thread").innerHTML = ""; $("starters").hidden = false; go("ask"); showAuth();
-};
-
-boot();
-</script>
+<script src="/static/app.js"></script>
 </body>
 </html>

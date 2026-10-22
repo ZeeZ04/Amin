@@ -14,10 +14,10 @@ import pytest
 from amin.benchmark import compare_runs, run_benchmark, stratified_sample, to_markdown
 from amin.evaluate import load_items
 from amin.ingest import ingest
+from amin.prompts import looks_like_refusal as _looks_like_refusal
 from amin.providers import EchoProvider, HashEmbedder
 from amin.stats import bootstrap_delta, mcnemar, required_n, wilson
 from amin.store import Store
-from amin.prompts import looks_like_refusal as _looks_like_refusal
 from amin.systems import BareSystem, NaiveRagSystem, build_system
 
 REPO = Path(__file__).resolve().parent.parent

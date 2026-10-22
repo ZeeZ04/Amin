@@ -26,6 +26,11 @@ dependencies = [
 pdf = ["pypdf>=4.2"]
 st = ["sentence-transformers>=3.0"]
 dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
+# Post-training Amin's own model on Apple silicon. Not needed to run Amin.
+train = [
+  "mlx-lm>=0.32; python_version >= '3.11' and sys_platform == 'darwin'",
+  "mlx-lm-lora>=5.8; python_version >= '3.11' and sys_platform == 'darwin'",
+]
 
 [project.scripts]
 amin = "amin.cli:app"

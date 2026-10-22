@@ -182,3 +182,113 @@ through.
 honest record of a real limitation rather than a number bought by weakening the
 safety property. Any future change that moves accuracy and hallucination in the
 same direction gets this treatment.
+
+## ADR-012 — Post-train a student once the eval can judge it
+**Status:** accepted · **Date:** 2026-10-18 · amends ADR-004
+
+ADR-004 said: no fine-tuning until the eval set says what is broken. It now
+does. E16–E20 put `qwen3.6:27b` at 98.2% fact accuracy and 7.1% hallucination,
+at a p50 of 5.6 s. The native-app plan names that latency as a risk for phone
+use, and the residual hallucination is something no pipeline change has moved.
+
+**Decision:** post-train a smaller Qwen (Qwen3-8B) into Amin's own model in
+two stages, on Apple silicon with MLX:
+
+1. *Distillation (SFT, LoRA).* The 27B runs the real pipeline over a synthetic
+   training corpus. Only exchanges `evaluate.grade()` passes become examples.
+2. *Preference tuning (DPO).* The student is sampled; its graded failures are
+   the `rejected` side of pairs whose `chosen` side is the teacher's reply to
+   the same prompt.
+
+Facts never go into the weights; only behaviour does. Every example is a
+passage-grounded `answer_prompt()`, the same one used at inference, so retrieval
+and citations stay and new documents need no retraining. Training a model on
+the household's own papers was considered and rejected: it loses citations,
+cannot take a new document, and puts private data inside a model file.
+
+**Guardrails:**
+- The training corpus (`amin/train/corpus.py`) shares no document, question,
+  8-gram of text or eval entity name with `data/corpus` or the eval set.
+  `tests/test_train.py` checks this on every commit.
+- **Ship gate.** On the 237-item bench, hallucination ≤ 7.1%, fact accuracy
+  not significantly below the teacher (paired McNemar, ADR-006), and p50
+  latency ≤ 2.5 s. An adapter that misses any of the three is discarded, as
+  ADR-004 always required.
+
+**Consequence:** the `mlx` provider becomes a first-class path. Its
+embeddings come from Ollama, not the hash embedder, so a student bench
+compares models rather than retrievers. Every training run is an experiment
+row (E23 onward). The workflow is in `docs/TRAINING.md`.
+
+## ADR-013 — General by default, documents by project, sharing by permission
+**Status:** accepted · **Date:** 2026-10-20 · amends ADR-002's refusal stance
+
+Amin used to refuse anything its documents did not state, including "When
+did the Berlin Wall fall?". The owner wants an assistant that answers what
+any good model knows, plus documents that it answers from with citations. A
+refusal on general knowledge is not a safety property. It is a missing
+feature, and it pushed people to other tools for ordinary questions.
+
+**Decision:**
+1. **General chat answers anything** from the model's own knowledge. If no
+   document backs the answer, it is labelled "General knowledge · not from
+   your documents" and carries no citation. Any `[S…]` tag the model emits is
+   stripped. The general prompt tells the model to decline personal details
+   it cannot know ("my landlord's name") instead of guessing.
+2. **Projects** hold their own documents, indexed on upload, never trained
+   into weights. In a project, answers come from its documents with
+   citations first. Where they don't cover the question, the labelled
+   general answer is used. The general answer never sees the near-miss
+   passages, because stitching them in is the adjacent-fact hallucination
+   in a new coat.
+3. **Every crossing between memories is a permission, off by default**
+   (`amin/spaces.py`): a project may read the owner's private library, a
+   project may read the household library, general chat may use a project,
+   and a project may be shared with named household members. The person's
+   own libraries feed their own chat by default and can be switched off.
+   Documents are copied into each index the permissions allow, so revoking
+   a permission deletes them. Granting the private library to a shared
+   project warns first.
+4. **Unchanged:** the conflict detector and the evidence and identifier
+   gates still decide *whether documents answer*. Medical, legal, financial
+   and crisis routing still refer the person on. Loosening those is a
+   separate decision.
+
+**Measurement.** `Amin(fallback=False)` is the strict pipeline every earlier
+benchmark measured, and it stays the `amin` row. The app's behaviour is the
+new `hybrid` row. The 12 prior-leak probes gained `expect_general` (their
+true answers). A strict system still passes them by refusing. A hybrid
+system passes only with the right fact, and on personal-detail
+unanswerables only by declining. `hallucination` therefore keeps its
+meaning: a fabricated document claim, or an invented personal detail.
+
+**Consequences:** "refuses out loud when it has no source" now reads
+"labels out loud when it has no source". Model training targets change with
+it. amin-2 must keep general answering intact, and preference pairs must
+not teach "refuse" where the product now wants "answer generally".
+
+## ADR-014 — Public, on-device, and Malayalam decide the next base model
+**Status:** proposed · **Date:** 2026-10-22
+
+Amin is to be released to the public as a private assistant that runs fully on
+each person's own devices: iPhone, iPad, Mac, Apple Watch, Vision Pro, Apple
+TV, Apple's home hub, and Android phones and tablets. Malayalam joins English
+and Arabic, and has to be accurate. Each person's data, including their
+conversation history (`amin/history.py`, one SQLite file per person), stays in
+their own store.
+
+E32 showed that Qwen3, amin-3's base, spends 4.7× the tokens on Malayalam that
+it spends on English. On a phone, that cost is paid in seconds and battery.
+
+**Decision (proposed):** train the next student on the base that does best on
+E32's Malayalam sets, with tokenizer cost and on-device size weighed in.
+Gemma 4 E4B is the leading candidate (2.94 characters per token on Malayalam,
+designed for phones). It still has to pass the same comparative gate amin-3
+passed (E31): not significantly worse than the teacher on the main set, slice
+m and the Malayalam test slice, so English and Arabic cannot regress.
+
+**Rejected:** fine-tuning Malayalam into amin-3, which keeps the tokenizer
+cost; LangChain, which would replace the measured pipeline with an
+unmeasured one; and hosted classifiers such as Jev, which are API-only and so
+break "nothing leaves the device". The single-pass classification idea behind
+Jev can run locally on Amin's own model.

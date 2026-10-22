@@ -430,6 +430,170 @@ Not changed: the eval labels. u045/u072/u083 look mislabelled, but relabelling
 after seeing results is exactly how a benchmark gets tuned to its system.
 Decide on the labels on their own merits, then re-run.
 
+## E23 — distil qwen3.6:27b into Qwen3-8B (SFT) — *not yet run*
+
+Setup (ADR-012, `docs/TRAINING.md`): 401 synthetic training documents,
+3,955 graded items (2,868 answerable, 1,087 unanswerable, 545 Arabic). Split
+by document, 1 in 10 held out. Teacher = the full pipeline on `qwen3.6:27b`.
+Only grader-passed exchanges are kept, and gate refusals are capped at 35% of
+the set. LoRA rank 16 on every layer, lr 1e-4, about 2 epochs
+(`amin/train/sft.yaml`).
+
+Measure on the 237-item bench, same retriever: the stock 8B, amin-1-sft and the
+27B teacher. Report fact accuracy, hallucination and p50 latency, with paired
+tests against the teacher.
+
+**Smoke test, 2026-10-18 (teacher only, before any training).** The first
+corpus put all 401 documents in one index, and the teacher passed only 2 of
+21 answerable items. The cause was not the model. Sixty tenancy contracts in
+one index, and a contract's rent clause never repeats its unit number, so no
+retriever can tell sixty rent clauses apart. The corpus is now split into 90
+households, each with at most one document of a kind in one language, each
+indexed separately (`tests/test_train.py` enforces it). On every 80th item
+(50 items, every family) the teacher then passed 42/50 at 7.6 s/item, so
+the full teacher pass is about 8.4 h and should yield about 3,300 examples.
+Of the 8 failures, 6 are "tenancy start date" refusals, where the date clause
+and the unit number sit in different chunks. That is the E18 near-miss shape,
+and the grader keeps those exchanges out of the training set.
+
+Prediction, written before the run: the student matches the teacher within
+the interval on fact accuracy, roughly halves latency, and its hallucination is
+no better than the teacher's. SFT copies the teacher; it does not exceed it.
+
+**Run 1, 2026-10-19 — failed the gate, and lost to the untrained 8B.**
+The teacher passed 3,871/3,955 items, giving 3,477 SFT examples (28% refusals).
+LoRA on bf16 Qwen3-8B at lr 1e-4 flat reached val loss 0.038 at step 200,
+diverged to 8.64 at step 600 and ended at 0.518. The step-200 checkpoint was
+fused and served at 8-bit. All three systems ran the full pipeline, with the
+same retriever, on the 237 items:
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1-sft (8-bit) | 93.6% ±5% | 18.2% ±8% | 81.8% ±8% | 1.3 s |
+| stock Qwen3-8B (8-bit) | 99.1% ±2% | 12.1% ±6% | 87.9% ±6% | 1.4 s |
+| teacher qwen3.6:27b | 98.2% ±3% | 6.1% ±5% | 93.9% ±5% | 6.7 s |
+
+Paired McNemar: SFT vs stock on answerable fact accuracy, 103 vs 109 of 110,
+p=0.031 (worse). SFT vs teacher on unanswerables, 81 vs 93 of 99, p=0.012
+(worse). Stock vs teacher shows no significant difference on either slice
+(p=1.0, p=0.11), so the untrained 8B was already the better student.
+
+Why, from the raw drafts. The student fabricates citations: "The Berlin Wall
+fell in 1989 [S1][S5]." It also cites [S7] when there are six passages. In
+the training targets 93% of answers cite [S1] or [S2], because the retriever
+ranks the answer first, so the student learned where tags go, not what they
+mean. And the training refusals held no general-knowledge or false-premise
+questions, which the eval has many of. Distillation copied the format and
+lost the 8B's own instinct to abstain.
+
+Fixes for run 2: shuffle the passages in each example and renumber its tags
+(`distill._shuffle_passages`), so a tag is only right if the passage says it.
+Add 421 refusal items: 76 general-knowledge, 140 document kinds the household
+lacks, 205 false premises, none reusing an eval question or fact. Use lr 2e-5
+with 50 warmup steps and cosine decay over one epoch.
+
+**Run 2, 2026-10-19 — matches the teacher, misses the gate on hallucination.**
+Same base, with shuffled passages, the 421 new refusal items (3,844 examples,
+35% refusals) and lr 2e-5 cosine over one epoch (961 steps, 5 h). Val loss
+fell 2.97 → 0.036 → 0.014 with no spike.
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1-sft-r2 (8-bit) | 98.2% ±3% | 10.1% ±6% | 89.9% ±6% | 1.7 s |
+
+Paired against the teacher: answerable 108 vs 108 (p=1.0), unanswerable
+89 vs 93 (p=0.22). Against run 1: p=0.13 and p=0.08, both improvements but
+neither significant alone. The student is no longer distinguishable from the
+27B and is 3.9× faster. The gate still fails, because 10.1% > 7.1%.
+
+Of its 10 unanswerable failures, 5 the teacher also fails (u009, u045, u072,
+u083, u087; E20 flagged three of these labels as doubtful). The other 5
+(u041, u056, u064, u073, u076) share one shape: an adjacent fact answered in
+place of a refusal, such as the fridge warranty when asked about the filter's.
+That shape is what E24 trains against.
+
+## E24 — DPO on the student's own failures
+
+**Sampling the run-2 student on its own training set found almost nothing.**
+3 samples per item at T=0.7 failed only 8/4,264 items: the student had learned
+the synthetic distribution. Its benchmark failures were a shape the corpus
+barely held, an adjacent fact answered in place of a refusal. So
+`corpus.round_three` adds 647 *adjacent-fact traps* to the training documents,
+each paired with an answerable sibling. Examples: insurance expiry where only
+the registration expiry is stated, renewal rent where only this year's rent
+is, an accessory's warranty where only the appliance's is.
+
+Caveat: this category was chosen *because* the benchmark exposed it. That is
+the eval's job (ADR-004), but it is also how a benchmark gets tuned to, so the
+traps use only training documents, and a fresh adjacent-fact eval slice is owed
+before any claim built on this result.
+
+Label fixes found by reading the teacher's failures: "4 rent cheques" was
+marked wrong against "4 cheque", which was my label bug. "Water rate per
+gallon" was a bad trap, because amount ÷ gallons derives it (cf. E20 u045), so
+it was replaced. The teacher itself fell for 43/60 "rent late fee" traps,
+quoting the *electricity bill's* late charge. Because the corpus is generated,
+such items are unanswerable by construction, so their chosen side is
+NO_EVIDENCE even where the teacher answered. This is the one place the
+student is taught something its teacher gets wrong.
+
+The student failed 176/1,288 trap items over 4 samples each. Those failures
+plus an equal number of balance pairs (a sibling answer chosen, a refusal
+rejected) gave 1,433 train / 152 valid pairs. DPO used β 0.1, lr 5e-6, two
+epochs (1,433 steps, 7 h), with the reference = the run-2 SFT model.
+
+**Final checkpoint — over-refuses.** Val pair accuracy hit 1.000 at step 200
+and the margin kept growing to 12.4 for the remaining 1,200 steps.
+
+| | fact accuracy | hallucination | correct refusal | p50 |
+|---|---|---|---|---|
+| amin-1 (DPO, step 1433, 8-bit) | 90.0% ±6% | **1.0% ±3%** | 99.0% ±3% | 1.7 s |
+
+Paired vs the teacher: unanswerable 98 vs 93 (p=0.063), answerable **99 vs 108
+(p=0.012, worse)**. Conflict 5/6 and routing 21/22 are unchanged. 9 of its
+11 answerable misses are refusals. This is exactly the ADR-011 trade, so the
+checkpoint is rejected.
+
+**Checkpoint sweep, all 8-bit, same 237 items, paired against the teacher.**
+
+| DPO step | fact accuracy | hallucination | p50 | answerable vs teacher | unanswerable vs teacher | gate |
+|---|---|---|---|---|---|---|
+| **100** | 94.5% ±4% | **1.0% ±3%** | 1.3 s | 104 vs 108, p=0.22 | 98 vs 93, p=0.06 | **pass** |
+| 200 | 87.3% | 2.0% | 2.3 s | 96 vs 108, p<0.001 | 97 vs 93, p=0.22 | fail |
+| 1433 | 90.0% | 1.0% | 1.7 s | 99 vs 108, p=0.012 | 98 vs 93, p=0.063 | fail |
+
+Reports: `bench-20261020T001129` (step 100), `T003359` (step 200), `T000431`
+(step 1433). Their header says `qwen3.6:27b`; that was a labelling bug,
+since fixed (`settings.model_label`). They are MLX runs.
+
+**Step 100 is amin-1.** It passes every ADR-012 condition: hallucination
+1.0% ≤ 7.1%, fact accuracy not significantly below the teacher, and p50
+1.3 s ≤ 2.5 s. Trust score is +0.915, against the teacher's +0.800. Conflict
+(5/6) and routing (21/22) match the teacher.
+
+What this does not show:
+1. That amin-1 hallucinates *less* than the teacher. 98 vs 93 has p=0.06,
+   suggestive and not established.
+2. That it is as accurate. 104 vs 108 is not significant, but the point
+   estimate is 3.6 points lower, and 4 of its 6 misses are refusals.
+3. That the gain is general. The traps target the category the benchmark
+   exposed, so a fresh adjacent-fact eval slice, written without looking at
+   amin-1's outputs, is the next measurement owed.
+
+Lesson for the next DPO run: val pair accuracy saturated at step 200, and
+everything after it bought refusal with accuracy. Save every 25 steps and
+stop on saturation; 100 steps of a 1,433-step schedule was enough.
+
+The amin-1-sft student, sampled 4× at T=0.7 per training item. Graded failures
+are paired with the teacher's reply to the byte-identical prompt.
+Unanswerable and Arabic pairs are weighted ×2 each. β = 0.1, lr 5e-6
+(`amin/train/dpo.yaml`).
+
+Prediction: hallucination falls below the teacher's 7.1%. This is the only
+stage that trains against failure rather than copying success. Watch correct
+refusal on *answerable* items: a DPO run that buys lower hallucination with
+more refusals of answerable questions is the ADR-011 trade, and gets rejected.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is
@@ -463,3 +627,265 @@ Decide on the labels on their own merits, then re-run.
    corpus is synthetic, so no hosted model has it memorised — which makes this a
    fair test of grounding rather than of recall, and the right comparison is
    against `naive` with the same retriever, not against the bare API.
+
+## E26 — SFT run 2 on the fresh held-out slice (slice j)
+
+Slice j (100 items: 40 adjacent-fact traps, 40 answerable siblings, 20 fresh
+answerables) was written in its own session for E25 and is on branch
+`claude/peaceful-liskov-6728c3`. The run-2 SFT student (8-bit, before DPO) on
+it is `bench-20261020T104403`. The teacher and amin-1 rows are E25's.
+
+| | fact accuracy (60) | hallucination (40 traps) | p50 |
+|---|---|---|---|
+| qwen3.6:27b | 56/60 | 3/40 | 5.1 s |
+| amin-1-sft-r2 | **57/60** | **14/40** | 1.1 s |
+| amin-1 (r2 + DPO step 100) | 46/60 | 2/40 | 2.2 s |
+
+Paired: r2 vs teacher, answerable p=1.0 and traps p=0.003. r2 vs amin-1,
+answerable p=0.001 and traps p<0.001.
+
+The two 8B models bracket the teacher from opposite sides. SFT alone answers
+like the teacher and falls for adjacent facts at 35%. DPO fixed the traps and
+then refused what it should have answered. The target lies between them, so
+amin-2 keeps the DPO but changes what decides it:
+1. answer-side balance pairs at 2-3x the refusal pairs, not 1x;
+2. stop on a held-out mix of answerable and trap items (a new slice, k), not
+   on pair accuracy, which saturated at step 200 and stopped carrying signal.
+
+## E27 — the hybrid core (ADR-013) on the 237-item set, teacher model
+
+The `hybrid` system is strict Amin plus a labelled general-knowledge fallback.
+It ran on qwen3.6:27b and is paired against the strict run of the same day
+(`bench-20261019T040121`).
+
+| | strict | hybrid v1 (`T113033`) | hybrid v2 (`T120905`) |
+|---|---|---|---|
+| answerable fact accuracy | 108/110 | 108/110 | 108/110 |
+| unanswerables passed | 93/99 | 58/99 | **84/99** (p=0.004 vs strict) |
+| general-knowledge probes right | 0/12 (refused by design) | 12/12 | 12/12 |
+| conflict / routing | 5/6, 21/22 | 5/6, 21/22 | 5/6, 21/22 |
+
+v1 → v2 made three changes, all made after reading v1's failures:
+1. The refusal detector now treats curly apostrophes as straight ones. It
+   had been missing "I don’t have access…". This is a bug fix applied to
+   every system.
+2. The detector gained the general fallback's decline phrasings, in English
+   and Arabic. Checked against all 1,797 saved correct answers across every
+   report, it flags exactly one, and that one is a genuine non-answer.
+3. The general prompt now refuses to describe products, plans or people it
+   doesn't reliably know, and the fallback tells the model the user's
+   documents were searched and don't cover the question.
+
+v1 failures included confident inventions about fictional entities ("the
+Vertex V16 typically comes with a 1-year warranty", "Mitsubishi FR-440
+inverters… 200–240V"). v2 removed most of them.
+
+v2's 15 unanswerable failures:
+- 6 are document claims, the same 6 the strict pipeline makes (u009 u045
+  u065 u072 u083 u087; E20 doubts three of those labels).
+- 6 are hedged general guidance about the user's own documents ("If a rent
+  cheque bounces, it typically depends on your lease…"). They are labelled
+  general, but the stricter ideal is "your documents don't cover this".
+- 2 are confident misfires: u030 confuses UFP with the UK medical
+  Foundation Programme, and u046 says "a 7-day item's loan is 7 days".
+- 1 (u097) is a correct Arabic decline the detector missed; its phrase was
+  added afterwards.
+
+The 9-item gap to strict is the price of answering generally. It is reported,
+not rounded away. Note that items 1 and 2 above changed the instrument after
+seeing results, and are written down here for that reason.
+
+## E29 — amin-2: accuracy fixed, the gate still fails on declining
+
+**Recipe.** The round-1 grounded SFT set now carries the round-3 trap items as
+plain SFT examples: correct refusals and sibling answers, since the export
+includes every grader-passed record. On top of that come 143 general-chat
+examples (`amin/train/general.py`, answered by the teacher under
+`GENERAL_SYSTEM`, kept clear of every eval set by exact match and 6-gram).
+That is 4,862 train / 541 valid examples, LoRA on bf16 Qwen3-8B, lr 2e-5
+cosine, one epoch (1,215 steps, 4.5 h).
+
+Val loss was noisy rather than divergent: 0.026 (step 400), 0.160, 0.027
+(800), 0.027 (1000), 0.296 (1200), 0.202 (1215).
+
+**No DPO stage.** Having learnt the traps in SFT, the student failed 1 of
+1,288 training traps, which left 8 pairs and 0 validation pairs, and
+`mlx_lm_lora` exited. It is not needed for this round.
+
+**Selection on slice k** (160 items, hybrid, 8-bit, the first use of that slice):
+
+| | answerable 80 | general 20 | personal 20 | traps 40 | p50 |
+|---|---|---|---|---|---|
+| qwen3.6:27b | 71 | 20 | 19 | 38 | 7.0 s |
+| amin-2-sft final | 73 | 20 | 19 | 36 | 1.7 s |
+| **amin-2-sft step 1000** | **74** | 20 | 19 | 36 | 1.7 s |
+
+No difference from the teacher is significant (all p ≥ 0.38). Step 1000 was
+picked by the pre-set rule (best trust score, accuracy not significantly
+below the teacher).
+
+**Final test** (slice j, used once for this round; main set; both hybrid,
+same grader):
+
+| | amin-2 | 27B | p |
+|---|---|---|---|
+| slice j answerable | 56/60 | 56/60 | 1.0 |
+| slice j traps | 30/40 | 37/40 | **0.039** |
+| main answerable | 108/110 | 108/110 | 1.0 |
+| main unanswerable | 71/99 | 85/99 | **0.007** |
+| conflict / routing / Arabic | 5/6 · 21/22 · 17/18 | same | |
+| p50 | 1.6 s | 6.7 s | |
+
+**What it means.**
+- The accuracy loss is fixed: slice j 56/60, against amin-1's 46/60 and the
+  teacher's 56/60.
+- It fails ADR-012 on declining. Of its 28 main-set unanswerable failures,
+  16 are hedged general guidance where the teacher said "your documents
+  don't cover this", and 3 are document claims the teacher did not make. On
+  fresh adjacent-fact traps it gets 30/40, between SFT run 2 (26) and the
+  teacher (37).
+- Slice k did not predict the trap gap (36 vs 38 there). 40 items cannot
+  resolve a 5-point difference; that is a limit of slice size, not a
+  contradiction.
+
+**Next (amin-3).** Teach the fallback decline at scale. Run the ~1,500
+unanswerable training items through `general_prompt(searched=True)` under
+`GENERAL_SYSTEM`, keep the teacher's declines, and add them to SFT; today
+there are 21 such examples. Then select on k and test on a *new* final
+slice, because j has now been spent on two rounds.
+
+## E31 — amin-3: indistinguishable from the 27B on held-out slices, about 4× faster
+
+**Recipe.** amin-2's SFT set plus 795 hybrid-fallback examples
+(`general.py fallback`). These are training unanswerables put through
+`general_prompt(searched=True)`: 600 sampled to be declined, plus 76
+general-knowledge items and the general bank to be answered, capped at 3:1
+against over-declining. The teacher kept 795 of 805. That is 5,578 train /
+620 valid examples, one epoch (1,394 steps). Val loss sits higher than in
+E29 (0.21–0.40) because the longer general replies dominate the validation
+tokens. It is not comparable across recipes.
+
+**Selection on slice k.** Candidates were steps 1000 and 1200 and the final
+weights. Step 1000 was best: traps 39/40, answerable 75/80, general 20/20,
+personal 19/20. The 27B scores 38 / 71 / 20 / 19 there. All differences
+p ≥ 0.22.
+
+**Final test, slice m** (140 items written blind for this, E30, used once;
+both hybrid, same grader):
+
+| | amin-3 | qwen3.6:27b | p |
+|---|---|---|---|
+| answerable | 58/65 | 61/65 | 0.38 |
+| doc-silent declines | 25/27 | 23/27 | 0.63 |
+| adjacent-fact traps | 26/32 | 28/32 | 0.63 |
+| general knowledge | 16/16 | 16/16 | 1.0 |
+| Arabic | 9/10 | 8/10 | |
+| p50 | 2.0 s | 7.2 s | |
+
+**Main set** (hybrid; the teacher row is E29's, same grader): answerable
+109/110 vs 108/110 (p=1.0), unanswerable 80/99 vs 85/99 (p=0.30, against
+amin-2's 71/99 at p=0.007), conflict 5/6 and routing 21/22 for both, Arabic
+18/18 vs 17/18, p50 1.6 s vs 6.7 s.
+
+**Reading it.** No difference from the teacher is significant on any slice
+of either set. The fallback decline examples closed the gap that failed
+amin-2. That is not proof of equality: slice m's point estimates are 3 lower
+on answerables and 2 lower on traps, and n≈30–65 per slice cannot resolve
+gaps of that size.
+
+**Gate.** ADR-012's "hallucination ≤ 7.1%" was defined for strict mode. In
+hybrid mode the teacher itself fails 14/99 main unanswerables. amin-3 passes
+the comparative form: not significantly worse than the teacher on accuracy
+or declining, on a held-out final slice and the main set, with p50 ≤ 2.5 s.
+That is the same rule slice k selected by, fixed before slice m was run.
+Whether amin-3 becomes the app's default is the owner's decision, not this
+log's.
+
+## E32 — Malayalam: a tokenizer bug, a tokenizer limit, and a baseline
+
+**Goal.** Malayalam as Amin's third language, accurate enough for the owner's
+family to rely on. Before training anything, measure what breaks.
+
+**Bug 1: Malayalam questions were never gated.** `content_tokens` matched
+`[A-Za-z0-9؀-ۿ]`, so a Malayalam question had no tokens, and
+`Store.coverage()` returns 1.0 when there is nothing distinctive to ask about.
+Every Malayalam question passed the evidence gate on whatever was retrieved.
+That is the confident, wrongly-cited answer ADR-002 exists to prevent. Python's
+`\w` is no fix either: it treats Malayalam vowel signs as separators and splits
+`ഹാരപ്പൻ` into `ഹ`, `രപ`, `പൻ`. The fix adds the Malayalam block (U+0D00–0D7F)
+to `WORD_CHARS`, and uses it in the store, the conflict detector and the
+verifier's sentence splitter. It also folds atomic chillu letters and the older
+consonant + virama + ZWJ spelling to one form, so `അവൻ` and `അവന്‍` are one
+word. Test: `test_malayalam_words_are_tokens`.
+
+**Bug 2: OCR could not read Malayalam.** Tesseract ran with `eng+ara`. A
+rendered Malayalam bill came back as `COSWAACENS Mh 412 aI`; with
+`eng+ara+mal` it came back as the text, with one vowel-sign slip. The English
+output was unchanged.
+
+**The limit: Qwen3's tokenizer.** Characters per token on an IndicQA grounded
+prompt (higher is better):
+
+| tokenizer | Malayalam | English | Arabic |
+|---|---|---|---|
+| amin-3 (Qwen3) | **0.79** | 2.46 | 2.69 |
+| Qwen3.5 | 1.91 | 2.90 | 3.62 |
+| Gemma 4 E4B | **2.94** | 2.58 | 3.03 |
+| Sarvam-M | 2.19 | 2.76 | 3.61 |
+| Sarvam-30B | 3.16 | 2.57 | 3.02 |
+
+A Malayalam prompt costs amin-3 about 4.7× the tokens of the same length in
+English: six 900-character passages come to about 6,100 tokens. Fine-tuning
+cannot change a tokenizer, so Malayalam latency is fixed by the choice of base
+model.
+
+**Eval sets** (`scripts/ml_eval.py`, all public and human-written):
+
+- *IndicQA-ml* (ai4bharat, CC-BY-4.0): 1,589 questions on Wikipedia passages,
+  488 with no answer in the passage. Split by article: even articles are
+  *sel* (choosing checkpoints), odd articles are *test* (used once). Scored the
+  way the main bench is: answerable items must contain at least half of the
+  gold span's words; unanswerable ones must decline. F1 was tried first and
+  dropped, because it punishes Amin's full-sentence answers against two-word
+  gold spans. On a hand check, 4 of 5 answers it failed were correct.
+- *Aya-ml held-out* (CohereLabs, Apache-2.0): every 10th native-speaker
+  Malayalam row, 175 in all, never trained on. Scored on replying in Malayalam
+  and on chrF against the human reply. That is a weak signal, which is why this
+  set is also the one a fluent reviewer reads.
+
+**Baseline, amin-3** (sel, first 150 items in seeded order; aya, first 100):
+
+| | amin-3 |
+|---|---|
+| answerable correct | 86/103 (83.5%) |
+| answerable wrongly declined | 2/103 |
+| answerable cited | 101/101 |
+| unanswerable declined | **28/47 (59.6%)** |
+| replies in Malayalam | 120/120 grounded · 100/100 general |
+| aya chrF vs human reply | 29.0 |
+| p50 latency | 14.8 s grounded · 23.6 s general |
+
+**Reading it.** amin-3 reads Malayalam and cites what it reads. It declines
+far less often in Malayalam than in English (59.6% here against 81% on the
+main set's unanswerables). These are different question sets, so the gap is
+a direction, not a measured difference. It is also the adjacent-fact failure
+E25–E31 trained out in English, back in a language the training never saw.
+Latency is 7–12× the English p50, the tokenizer at work.
+
+**Training data, judged before use.**
+
+| source | Malayalam rows | verdict |
+|---|---|---|
+| Aya dataset, human-written | 1,749 (1,574 after hold-out) | the verified core |
+| IndicAlign Dolly, IndicTrans2-translated | 15,011 | usable, translated |
+| IndicAlign Anudesh | 86 | too few; mixed script and English |
+| Aya Collection, templated translations | ~270k | excluded: 79% of targets use legacy final-virama spelling, and some are garbled |
+
+Grounded Malayalam examples with exact ground truth have to be made. The plan
+is to translate `amin/train/corpus.py`'s synthetic documents and questions with
+IndicTrans2 (MIT). Sarvam-Translate is GPL-3.0, which is a poor fit for a
+model meant for public release.
+
+**In progress.** The same sets are running on qwen3.6:27b (teacher),
+Gemma 4 E4B (8-bit) and Qwen3.5-9B (8-bit), in `data/ml/runs/`. ADR-014 decides
+the base from those numbers.

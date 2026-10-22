@@ -1,0 +1,32 @@
+# Stage 2 — preference tuning on the student's own failures.
+# `mlx_lm_lora.train -c amin/train/dpo.yaml`
+# The SFT adapter is fused first, so the reference model is the SFT student.
+model: data/models/amin-1-sft-r2
+reference_model_path: data/models/amin-1-sft-r2
+train: true
+train_mode: dpo
+data: data/train/dpo
+fine_tune_type: lora
+adapter_path: data/adapters/amin-1-dpo
+seed: 0
+
+beta: 0.1
+dpo_cpo_loss_type: sigmoid
+max_seq_length: 3072
+grad_checkpoint: true
+
+batch_size: 2
+# E24: val pair accuracy saturated at step 200 and later steps over-refused;
+# step 100 shipped. Keep it short and checkpoint often.
+iters: 100
+learning_rate: 5.0e-6
+num_layers: -1
+lora_parameters:
+  rank: 16
+  scale: 20.0
+  dropout: 0.05
+
+steps_per_report: 20
+steps_per_eval: 25
+val_batches: 20
+save_every: 25

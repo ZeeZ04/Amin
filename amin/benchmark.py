@@ -129,7 +129,7 @@ def run_benchmark(
                 Run(
                     system=kind,
                     provider=prov.name,
-                    model=settings.answer_model,
+                    model=settings.model_label,
                     results=[],
                     metrics=metrics([]),
                     wall_seconds=0.0,
@@ -155,7 +155,7 @@ def run_benchmark(
             Run(
                 system=kind,
                 provider=prov.name,
-                model=settings.answer_model,
+                model=settings.model_label,
                 results=results,
                 metrics=metrics(results),
                 wall_seconds=time.perf_counter() - started,
@@ -231,7 +231,7 @@ def to_markdown(bench: Benchmark) -> str:
         f"({counts.get('answerable', 0)} answerable / "
         f"{counts.get('unanswerable', 0)} unanswerable / "
         f"{counts.get('out_of_scope', 0)} out-of-scope), "
-        f"provider `{settings.provider}`, model `{settings.answer_model}`, "
+        f"provider `{settings.provider}`, model `{settings.model_label}`, "
         f"run {time.strftime('%Y-%m-%d %H:%M')}."
     )
     lines.append("")
@@ -333,7 +333,7 @@ def write_benchmark(bench: Benchmark, out_dir: Path) -> tuple[Path, Path]:
                 "timestamp": stamp,
                 "config": {
                     "provider": settings.provider,
-                    "answer_model": settings.answer_model,
+                    "answer_model": settings.model_label,
                     "verifier": settings.verifier,
                     "evidence_floor": settings.evidence_floor,
                     "top_k_final": settings.top_k_final,

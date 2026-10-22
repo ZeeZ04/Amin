@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AMIN_", env_file=".env", extra="ignore")
 
     # -- provider ------------------------------------------------------------
-    provider: str = "ollama"  # ollama | echo | mlx
+    # auto: Amin's own model (mlx_lm.server) when it is up, else Ollama.
+    # E31 made amin-3 the default; AMIN_PROVIDER=ollama keeps the 27B.
+    provider: str = "auto"  # auto | ollama | mlx | echo
     ollama_host: str = "http://127.0.0.1:11434"
     answer_model: str = "qwen3.6:27b"
     # A small fast model does the mechanical work: query rewriting and verification.
@@ -27,6 +29,18 @@ class Settings(BaseSettings):
     # measure what it buys. (E16: the amin row died on a 180s ReadTimeout.)
     think: bool = False
     request_timeout: float = 600.0
+    # ADR-013. False = strict: no source, no answer (every benchmark before
+    # 2026-10-20). The app turns it on: no source, so a labelled general answer.
+    general_fallback: bool = False
+    # mlx_lm.server, which serves Amin's own post-trained model (ADR-012).
+    mlx_host: str = "http://127.0.0.1:8080"
+    # Label only: shown in answers and /health. The server decides what it loads.
+    mlx_model: str = "amin-3"
+
+    # -- post-training (amin/train, ADR-012) ---------------------------------
+    # The teacher is whatever answer_model is; the student is what gets tuned.
+    student_model: str = "mlx-community/Qwen3-8B-bf16"
+    train_path: Path = REPO_ROOT / "data" / "train"
 
     # -- storage -------------------------------------------------------------
     index_path: Path = REPO_ROOT / "data" / "index" / "amin.db"
@@ -86,6 +100,15 @@ class Settings(BaseSettings):
     lexical_overlap_floor: float = 0.28
     # Refuse rather than return an answer whose claims mostly failed the check.
     min_citation_precision: float = 0.5
+
+    @property
+    def model_label(self) -> str:
+        """The model actually answering: the MLX server's, not the Ollama tag."""
+        if self.provider == "mlx":
+            return self.mlx_model
+        if self.provider == "auto":
+            return f"{self.mlx_model} (else {self.answer_model})"
+        return self.answer_model
 
 
 settings = Settings()

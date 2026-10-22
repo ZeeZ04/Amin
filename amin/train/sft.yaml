@@ -1,0 +1,36 @@
+# Stage 1 — supervised distillation. `mlx_lm.lora -c amin/train/sft.yaml`
+# Every run that changes a number here gets a row in docs/EXPERIMENTS.md.
+model: data/models/Qwen3-8B-bf16   # `make train-sft` passes the base explicitly
+train: true
+data: data/train/sft
+fine_tune_type: lora
+adapter_path: data/adapters/amin-1-sft-r2
+seed: 0
+
+# The loss is on Amin's reply only; the passages are context, not targets.
+mask_prompt: true
+# Six 900-character passages plus the question fit with room to spare.
+max_seq_length: 3072
+grad_checkpoint: true
+
+batch_size: 4
+# E23 run 1: lr 1e-4 flat reached val 0.038 at step 200, diverged to 8.64 at
+# step 600 and ended at 0.518. The step-200 checkpoint was kept. Lower peak,
+# warmup and cosine decay; one epoch is enough for a task this narrow.
+iters: 961             # 1 epoch of 3,844 examples (E23 run 2)
+learning_rate: 2.0e-5
+lr_schedule:
+  name: cosine_decay
+  warmup: 50
+  warmup_init: 1.0e-7
+  arguments: [2.0e-5, 961, 1.0e-6]
+num_layers: -1         # adapt every layer
+lora_parameters:
+  rank: 16
+  scale: 20.0
+  dropout: 0.05
+
+steps_per_report: 20
+steps_per_eval: 200
+val_batches: 25
+save_every: 200

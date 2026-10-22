@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import settings
-from .providers import content_tokens
+from .providers import WORD_CHARS, content_tokens
 from .schema import Chunk, Document, Retrieved, Tier
 
 # Bump when the table definitions below change. `CREATE TABLE IF NOT EXISTS`
@@ -64,8 +64,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
 );
 """
 
-_ARABIC = r"؀-ۿ"
-_WORD_RE = re.compile(rf"[A-Za-z0-9{_ARABIC}]+")
+_WORD_RE = re.compile(rf"[{WORD_CHARS}]+")
 
 
 def _fts_query(question: str) -> str:
