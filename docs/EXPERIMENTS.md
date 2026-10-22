@@ -800,3 +800,92 @@ or declining, on a held-out final slice and the main set, with p50 ≤ 2.5 s.
 That is the same rule slice k selected by, fixed before slice m was run.
 Whether amin-3 becomes the app's default is the owner's decision, not this
 log's.
+
+## E32 — Malayalam: a tokenizer bug, a tokenizer limit, and a baseline
+
+**Goal.** Malayalam as Amin's third language, accurate enough for the owner's
+family to rely on. Before training anything, measure what breaks.
+
+**Bug 1: Malayalam questions were never gated.** `content_tokens` matched
+`[A-Za-z0-9؀-ۿ]`, so a Malayalam question had no tokens, and
+`Store.coverage()` returns 1.0 when there is nothing distinctive to ask about.
+Every Malayalam question passed the evidence gate on whatever was retrieved.
+That is the confident, wrongly-cited answer ADR-002 exists to prevent. Python's
+`\w` is no fix either: it treats Malayalam vowel signs as separators and splits
+`ഹാരപ്പൻ` into `ഹ`, `രപ`, `പൻ`. The fix adds the Malayalam block (U+0D00–0D7F)
+to `WORD_CHARS`, and uses it in the store, the conflict detector and the
+verifier's sentence splitter. It also folds atomic chillu letters and the older
+consonant + virama + ZWJ spelling to one form, so `അവൻ` and `അവന്‍` are one
+word. Test: `test_malayalam_words_are_tokens`.
+
+**Bug 2: OCR could not read Malayalam.** Tesseract ran with `eng+ara`. A
+rendered Malayalam bill came back as `COSWAACENS Mh 412 aI`; with
+`eng+ara+mal` it came back as the text, with one vowel-sign slip. The English
+output was unchanged.
+
+**The limit: Qwen3's tokenizer.** Characters per token on an IndicQA grounded
+prompt (higher is better):
+
+| tokenizer | Malayalam | English | Arabic |
+|---|---|---|---|
+| amin-3 (Qwen3) | **0.79** | 2.46 | 2.69 |
+| Qwen3.5 | 1.91 | 2.90 | 3.62 |
+| Gemma 4 E4B | **2.94** | 2.58 | 3.03 |
+| Sarvam-M | 2.19 | 2.76 | 3.61 |
+| Sarvam-30B | 3.16 | 2.57 | 3.02 |
+
+A Malayalam prompt costs amin-3 about 4.7× the tokens of the same length in
+English: six 900-character passages come to about 6,100 tokens. Fine-tuning
+cannot change a tokenizer, so Malayalam latency is fixed by the choice of base
+model.
+
+**Eval sets** (`scripts/ml_eval.py`, all public and human-written):
+
+- *IndicQA-ml* (ai4bharat, CC-BY-4.0): 1,589 questions on Wikipedia passages,
+  488 with no answer in the passage. Split by article: even articles are
+  *sel* (choosing checkpoints), odd articles are *test* (used once). Scored the
+  way the main bench is: answerable items must contain at least half of the
+  gold span's words; unanswerable ones must decline. F1 was tried first and
+  dropped, because it punishes Amin's full-sentence answers against two-word
+  gold spans. On a hand check, 4 of 5 answers it failed were correct.
+- *Aya-ml held-out* (CohereLabs, Apache-2.0): every 10th native-speaker
+  Malayalam row, 175 in all, never trained on. Scored on replying in Malayalam
+  and on chrF against the human reply. That is a weak signal, which is why this
+  set is also the one a fluent reviewer reads.
+
+**Baseline, amin-3** (sel, first 150 items in seeded order; aya, first 100):
+
+| | amin-3 |
+|---|---|
+| answerable correct | 86/103 (83.5%) |
+| answerable wrongly declined | 2/103 |
+| answerable cited | 101/101 |
+| unanswerable declined | **28/47 (59.6%)** |
+| replies in Malayalam | 120/120 grounded · 100/100 general |
+| aya chrF vs human reply | 29.0 |
+| p50 latency | 14.8 s grounded · 23.6 s general |
+
+**Reading it.** amin-3 reads Malayalam and cites what it reads. It declines
+far less often in Malayalam than in English (59.6% here against 81% on the
+main set's unanswerables). These are different question sets, so the gap is
+a direction, not a measured difference. It is also the adjacent-fact failure
+E25–E31 trained out in English, back in a language the training never saw.
+Latency is 7–12× the English p50, the tokenizer at work.
+
+**Training data, judged before use.**
+
+| source | Malayalam rows | verdict |
+|---|---|---|
+| Aya dataset, human-written | 1,749 (1,574 after hold-out) | the verified core |
+| IndicAlign Dolly, IndicTrans2-translated | 15,011 | usable, translated |
+| IndicAlign Anudesh | 86 | too few; mixed script and English |
+| Aya Collection, templated translations | ~270k | excluded: 79% of targets use legacy final-virama spelling, and some are garbled |
+
+Grounded Malayalam examples with exact ground truth have to be made. The plan
+is to translate `amin/train/corpus.py`'s synthetic documents and questions with
+IndicTrans2 (MIT). Sarvam-Translate is GPL-3.0, which is a poor fit for a
+model meant for public release.
+
+**In progress.** The same sets are running on qwen3.6:27b (teacher),
+Gemma 4 E4B (8-bit) and Qwen3.5-9B (8-bit), in `data/ml/runs/`. ADR-014 decides
+the base from those numbers.

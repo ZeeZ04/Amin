@@ -266,3 +266,29 @@ meaning: a fabricated document claim, or an invented personal detail.
 "labels out loud when it has no source". Model training targets change with
 it. amin-2 must keep general answering intact, and preference pairs must
 not teach "refuse" where the product now wants "answer generally".
+
+## ADR-014 — Public, on-device, and Malayalam decide the next base model
+**Status:** proposed · **Date:** 2026-10-22
+
+Amin is to be released to the public as a private assistant that runs fully on
+each person's own devices: iPhone, iPad, Mac, Apple Watch, Vision Pro, Apple
+TV, Apple's home hub, and Android phones and tablets. Malayalam joins English
+and Arabic, and has to be accurate. Each person's data, including their
+conversation history (`amin/history.py`, one SQLite file per person), stays in
+their own store.
+
+E32 showed that Qwen3, amin-3's base, spends 4.7× the tokens on Malayalam that
+it spends on English. On a phone, that cost is paid in seconds and battery.
+
+**Decision (proposed):** train the next student on the base that does best on
+E32's Malayalam sets, with tokenizer cost and on-device size weighed in.
+Gemma 4 E4B is the leading candidate (2.94 characters per token on Malayalam,
+designed for phones). It still has to pass the same comparative gate amin-3
+passed (E31): not significantly worse than the teacher on the main set, slice
+m and the Malayalam test slice, so English and Arabic cannot regress.
+
+**Rejected:** fine-tuning Malayalam into amin-3, which keeps the tokenizer
+cost; LangChain, which would replace the measured pipeline with an
+unmeasured one; and hosted classifiers such as Jev, which are API-only and so
+break "nothing leaves the device". The single-pass classification idea behind
+Jev can run locally on Amin's own model.

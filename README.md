@@ -188,11 +188,26 @@ amin/
   systems.py     the three comparable systems: bare, naive RAG, amin
   benchmark.py   multi-system runner, significance tests, markdown report
   hosted.py      OpenAI-compatible + Anthropic adapters with cost accounting
+  users.py       accounts, invites, sessions; spaces.py: projects and permissions
+  history.py     conversation history, one SQLite file per person
+  ocr.py         photos and scans, English + Arabic + Malayalam
+  web/           the app: index.html, app.css, app.js, bundled Malayalam font
+scripts/ml_eval.py  Malayalam eval (E32): IndicQA-ml and Aya held-out
 data/corpus/     14 synthetic source documents, exact ground truth
 data/eval/       237 items: 110 answerable, 99 unanswerable, 22 out-of-scope, 6 conflict
-docs/            ARCHITECTURE · EVAL · EXPERIMENTS · DECISIONS
+docs/            ARCHITECTURE · EVAL · EXPERIMENTS · DECISIONS · TRAINING · ROADMAP
 private/         gitignored. Real documents go here and never into a commit.
 ```
+
+## The app
+
+`make serve`, then open the address it prints on any phone, tablet or
+computer on the same Wi-Fi. It installs to the home screen. On a phone it has
+tabs. On an iPad or a Mac it has a sidebar with your conversation history, and
+the passage behind each citation opens beside the answer. It works in light
+and dark mode, and in English, Arabic (right to left) and Malayalam, with the
+Malayalam font bundled so nothing is fetched from the internet. Conversations
+are saved per person, and no one else can read them.
 
 ## The data wall
 
@@ -292,12 +307,19 @@ keeps the 27B.
 - Document titles are deliberately not indexed. Indexing them raises fact
   accuracy by 2.7pp and hallucination by 13.1pp, because every chunk inherits
   the document's name and the evidence gate stops working (EXPERIMENTS E12).
-- No real-model numbers exist yet. Every figure above is from the no-model
-  provider. The ablation's *shape* should survive attaching a model; the
-  absolute numbers will not.
+- The ablation table under "Measured behaviour" is from the no-model
+  provider. Real-model numbers are in "Amin's own model" and
+  `docs/EXPERIMENTS.md` E16 onward.
+- Malayalam works but is slow and declines too rarely on amin-3: 83.5%
+  answerable correct, 59.6% correct declines and a p50 of 14.8 s on IndicQA
+  (E32). Qwen3's tokenizer spends 4.7× the tokens on Malayalam, and no
+  fine-tune changes that. The next base model is chosen with it in mind
+  (ADR-014).
 - The verifier's LLM backend is one small-model call per sentence. That is the
   dominant latency cost and the obvious thing to batch.
-- No fine-tuning yet, by design. See `docs/DECISIONS.md` ADR-004.
+- Phones, watches and TVs cannot yet run the model themselves. Today
+  they reach Amin on a computer in the same household. Fully on-device is
+  the goal (ADR-014, `docs/ROADMAP.md`).
 
 ## License
 
