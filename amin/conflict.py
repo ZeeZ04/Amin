@@ -39,7 +39,7 @@ from .schema import Retrieved
 # "AED 1,000" into "1" and "000" -> "0", so every monetary figure in the corpus
 # was compared as nonsense and no conflict could ever be found.
 NUMBER = re.compile(r"\d[\d,.]*\d|\d")
-TOKEN = re.compile(r"\d[\d,.]*\d|\d|[A-Za-z؀-ۿ]+")
+TOKEN = re.compile(r"\d[\d,.]*\d|\d|[A-Za-z؀-ۿഀ-ൿ]+")
 
 # Numbers that identify a provision rather than answer a question. "Clause 11.1"
 # is not a competing value for "what is the deposit".

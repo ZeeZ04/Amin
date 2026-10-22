@@ -9,6 +9,8 @@ data/certs/
 data/train/
 data/models/
 data/adapters/
+# Malayalam datasets, eval runs and tokenizer probes (E32). Rebuild: scripts/ml_eval.py.
+data/ml/
 reports/*.json
 *.db
 *.sqlite3

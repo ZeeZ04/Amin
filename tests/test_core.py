@@ -254,3 +254,16 @@ def test_identifier_gate_can_be_turned_off(amin, monkeypatch):
     monkeypatch.setattr(settings, "identifier_gate", False)
     answer = amin.ask("What is the recommended freezer temperature on the ZX-9999?")
     assert "zx-9999" not in (answer.refusal_reason or "").lower()
+
+
+def test_malayalam_words_are_tokens():
+    # Python's \w splits Malayalam at every vowel sign; a question with no
+    # tokens scores full coverage and walks through the evidence gate.
+    from amin.providers import content_tokens
+    from amin.store import _fts_query
+
+    toks = content_tokens("ഹാരപ്പൻ കോട്ടക്ക്‌ കണ്ടെടുത്ത")
+    assert toks == {"ഹാരപ്പന്", "കോട്ടക്ക്", "കണ്ടെടുത്ത"}
+    # atomic chillu and the ZWJ spelling are one word
+    assert content_tokens("അവൻ") == content_tokens("അവന്‍")
+    assert '"കണ്ടെടുത്ത"' in _fts_query("കണ്ടെടുത്ത എവിടെ?")

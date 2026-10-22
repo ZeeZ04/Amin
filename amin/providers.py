@@ -273,7 +273,16 @@ class HashEmbedder:
 # ---------------------------------------------------------------------------
 
 _ARABIC = r"؀-ۿ"
-_TOKEN_RE = re.compile(rf"[A-Za-z0-9{_ARABIC}]+")
+_MALAYALAM = r"ഀ-ൿ"
+# Letters of every script Amin reads. Malayalam needs its own range: Python's
+# \w treats its vowel signs as separators and shreds every word.
+WORD_CHARS = rf"A-Za-z0-9{_ARABIC}{_MALAYALAM}"
+_TOKEN_RE = re.compile(rf"[{WORD_CHARS}]+")
+# Atomic chillu letters and the older consonant + virama + ZWJ spelling are the
+# same letter. Fold both to consonant + virama, then drop the joiners.
+_ML_FOLD = str.maketrans(
+    {"ൺ": "ണ്", "ൻ": "ന്", "ർ": "ര്", "ൽ": "ല്", "ൾ": "ള്", "ൿ": "ക്", "\u200c": None, "\u200d": None}
+)
 _DIACRITICS = re.compile(r"[ً-ْٰـ]")
 
 # Function words carry no evidence. Shared by the retriever's coverage gate and
@@ -294,7 +303,7 @@ def _tokens(text: str) -> list[str]:
     # Normalise alef/ya/ta-marbuta variants so Arabic retrieval does not miss
     # on orthographic noise. Cheap, and it measurably helps.
     text = text.translate(str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ة": "ه"}))
-    return _TOKEN_RE.findall(text)
+    return _TOKEN_RE.findall(text.translate(_ML_FOLD))
 
 
 def _l2(m: np.ndarray) -> np.ndarray:

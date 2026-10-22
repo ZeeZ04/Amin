@@ -2,7 +2,7 @@
 
     brew install tesseract tesseract-lang poppler
 
-English and Arabic are read together ("eng+ara"), so a bilingual bill is one
+English, Arabic and Malayalam are read together ("eng+ara+mal"), so a bilingual bill is one
 pass. HEIC (iPhone photos) is converted with macOS `sips` first.
 """
 
@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff", ".webp"}
-LANGS = "eng+ara"
+LANGS = "eng+ara+mal"
 
 
 class OCRUnavailable(RuntimeError):

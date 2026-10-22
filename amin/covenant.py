@@ -21,7 +21,6 @@ import yaml
 from .config import settings
 from .schema import Retrieved
 
-
 # A token with both a letter and a digit (FR-550, PHY-205, V16, 5G), or a
 # capitalised word followed by a number (Freedom 300, Unit 1024).
 _ID = re.compile(r"\b(?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\b")
