@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__, spaces, users
+from . import __version__, history, spaces, users
 from .answer import Amin
 from .config import settings
 from .ingest import SUPPORTED, chunk_document, make_document
@@ -136,6 +136,7 @@ class Credentials(BaseModel):
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     project: str | None = None  # None: general chat
+    conversation_id: str | None = None  # None: start a new conversation
 
 
 class ProjectCreate(BaseModel):
@@ -277,6 +278,8 @@ def update_project(pid: str, body: ProjectUpdate, name: str = Depends(current_us
             raise HTTPException(400, f"not household members: {', '.join(bad)}")
         p.members = sorted(set(body.members))
     spaces.save_project(p)
+    for gone in before - set(p.members) - {p.owner}:
+        history.forget_project(gone, p.id)
     # Everyone who could open it before or can now: their chat may gain or lose it.
     people = before | set(p.members) | {p.owner}
     resync([spaces.project_index(p.id)] + [spaces.chat_index(n) for n in people])
@@ -291,6 +294,8 @@ def delete_project(pid: str, name: str = Depends(current_user)) -> dict:
     with _locks[index]:
         _engines.pop(index, None)
         shutil.rmtree(spaces.project_dir(p.id))
+    for person in people:
+        history.forget_project(person, p.id)
     resync([spaces.chat_index(n) for n in people])
     return {"deleted": p.id}
 
@@ -373,7 +378,9 @@ def ask(req: AskRequest, name: str = Depends(current_user)) -> dict:
     eng = engine(index)
     with _locks[index]:
         answer = eng.ask(req.question)
-    return {
+        cited = {cid for c in answer.claims for cid in c.cited_chunk_ids}
+        found = {cid: eng.store.get_chunk(cid) for cid in cited}
+    result = {
         "question": answer.question,
         "outcome": answer.outcome.value,
         "basis": "general" if answer.outcome.value == "general" else "documents",
@@ -383,8 +390,35 @@ def ask(req: AskRequest, name: str = Depends(current_user)) -> dict:
             {"text": c.text, "citations": c.cited_chunk_ids, "verdict": c.verdict.value}
             for c in answer.claims
         ],
+        # What each citation chip shows without another round trip.
+        "sources": {cid: {"doc_id": ch.doc_id, "heading": ch.heading} for cid, ch in found.items() if ch},
         "latency_ms": answer.latency_ms,
     }
+    result["conversation_id"] = history.record(name, req.conversation_id, req.project, req.question, result)
+    return result
+
+
+# -- history -----------------------------------------------------------------
+
+
+@api.get("/conversations")
+def list_conversations(name: str = Depends(current_user)) -> list[dict]:
+    return history.conversations(name)
+
+
+@api.get("/conversations/{cid}")
+def get_conversation(cid: str, name: str = Depends(current_user)) -> dict:
+    conv = history.messages(name, cid)
+    if conv is None:
+        raise HTTPException(404, "no such conversation")
+    return conv
+
+
+@api.delete("/conversations/{cid}")
+def delete_conversation(cid: str, name: str = Depends(current_user)) -> dict:
+    if not history.delete(name, cid):
+        raise HTTPException(404, "no such conversation")
+    return {"deleted": cid}
 
 
 @api.get("/chunks/{chunk_id}")

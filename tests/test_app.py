@@ -103,8 +103,39 @@ def test_upload_strips_directories_and_rejects_unknown_types(users_dir):
 def test_photo_is_read_with_ocr(users_dir, tmp_path):
     import subprocess
 
+    if not shutil.which("convert"):
+        pytest.skip("ImageMagick's convert renders the test image: brew install imagemagick")
+
     from amin.ocr import ocr_image
     img = tmp_path / "bill.png"
     subprocess.run(["convert", "-size", "900x120", "xc:white", "-pointsize", "48",
                     "-annotate", "+20+80", "Amount due AED 412", str(img)], check=True)
     assert "412" in ocr_image(img)
+
+
+def test_history_is_per_person_and_follows_project_access(users_dir):
+    abdul = signup(client(), "abdul")
+    sara = signup(client(), "sara", invite_from(abdul))
+    first = abdul.post("/ask", json=RENT_Q).json()
+    cid = first["conversation_id"]
+    again = abdul.post("/ask", json={**LOCKER_Q, "conversation_id": cid}).json()
+    assert again["conversation_id"] == cid
+    conv = abdul.get(f"/conversations/{cid}").json()
+    assert [m["question"] for m in conv["messages"]] == [RENT_Q["question"], LOCKER_Q["question"]]
+    assert [c["id"] for c in abdul.get("/conversations").json()] == [cid]
+
+    # another person can neither read nor continue it
+    assert sara.get(f"/conversations/{cid}").status_code == 404
+    assert sara.post("/ask", json={**RENT_Q, "conversation_id": cid}).json()["conversation_id"] != cid
+    assert len(abdul.get(f"/conversations/{cid}").json()["messages"]) == 2
+
+    # losing a project takes its conversations with it
+    pid = abdul.post("/projects", json={"name": "Flat"}).json()["id"]
+    abdul.patch(f"/projects/{pid}", json={"members": ["sara"]})
+    sara.post("/ask", json={**RENT_Q, "project": pid})
+    assert len(sara.get("/conversations").json()) == 2
+    abdul.patch(f"/projects/{pid}", json={"members": []})
+    assert len(sara.get("/conversations").json()) == 1
+
+    assert abdul.delete(f"/conversations/{cid}").status_code == 200
+    assert abdul.get(f"/conversations/{cid}").status_code == 404
