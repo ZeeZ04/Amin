@@ -12,6 +12,7 @@ Run on the home network (HTTPS once certs exist, see scripts/make_cert.sh):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import threading
@@ -19,6 +20,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -170,7 +172,13 @@ def _sign_in(request: Request, response: Response, name: str) -> dict:
 
 @api.get("/", response_class=HTMLResponse)
 def app_page() -> str:
-    return WEB.read_text(encoding="utf-8")
+    # Version the stylesheet and script by content, so an update reaches every
+    # browser at once instead of after its cache expires.
+    html = WEB.read_text(encoding="utf-8")
+    for asset in ("app.css", "app.js"):
+        stamp = hashlib.sha256((WEB.parent / asset).read_bytes()).hexdigest()[:10]
+        html = html.replace(f"/static/{asset}", f"/static/{asset}?v={stamp}")
+    return html
 
 
 @api.get("/setup")
@@ -376,12 +384,14 @@ def delete_document(
 def ask(req: AskRequest, name: str = Depends(current_user)) -> dict:
     index = _space(name, req.project)
     eng = engine(index)
+    context = history.recent(name, req.conversation_id)
     with _locks[index]:
-        answer = eng.ask(req.question)
+        answer = eng.ask(req.question, context)
         cited = {cid for c in answer.claims for cid in c.cited_chunk_ids}
         found = {cid: eng.store.get_chunk(cid) for cid in cited}
     result = {
         "question": answer.question,
+        "asked_as": answer.asked_as,
         "outcome": answer.outcome.value,
         "basis": "general" if answer.outcome.value == "general" else "documents",
         "routed_to": answer.routed_to,
@@ -396,6 +406,46 @@ def ask(req: AskRequest, name: str = Depends(current_user)) -> dict:
     }
     result["conversation_id"] = history.record(name, req.conversation_id, req.project, req.question, result)
     return result
+
+
+# -- voice -------------------------------------------------------------------
+
+MAX_AUDIO = 15 * 1024 * 1024
+
+
+@api.post("/transcribe")
+async def transcribe(request: Request, lang: str | None = None, name: str = Depends(current_user)) -> dict:
+    """Raw-body audio from the voice mode; transcribed on this machine."""
+    from .voice import VoiceUnavailable
+    from .voice import transcribe as stt
+
+    body = await request.body()
+    if not body or len(body) > MAX_AUDIO:
+        raise HTTPException(400, "no audio, or more than 15 MB")
+    hint = lang if lang in ("en", "ar", "ml") else None
+    try:
+        return await run_in_threadpool(stt, body, request.headers.get("content-type", "audio/webm"), hint)
+    except VoiceUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except Exception as exc:  # undecodable audio
+        raise HTTPException(400, f"could not read that recording: {exc}") from exc
+
+
+@api.post("/wake")
+async def wake(request: Request, name: str = Depends(current_user)) -> dict:
+    """A short burst of speech: does it start with "Hey Amin"? (amin/voice.py)"""
+    from .voice import VoiceUnavailable
+    from .voice import wake as hears_wake
+
+    body = await request.body()
+    if not body or len(body) > 2 * 1024 * 1024:
+        raise HTTPException(400, "no audio, or more than 2 MB")
+    try:
+        return await run_in_threadpool(hears_wake, body, request.headers.get("content-type", "audio/webm"))
+    except VoiceUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except Exception:
+        return {"wake": False, "rest": "", "text": ""}  # an undecodable burst is not a wake
 
 
 # -- history -----------------------------------------------------------------

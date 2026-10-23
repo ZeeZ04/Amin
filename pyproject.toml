@@ -26,6 +26,8 @@ dependencies = [
 pdf = ["pypdf>=4.2"]
 st = ["sentence-transformers>=3.0"]
 dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
+# Voice mode: on-device speech recognition with Whisper on Apple silicon.
+voice = ["mlx-whisper>=0.4; sys_platform == 'darwin'"]
 # Post-training Amin's own model on Apple silicon. Not needed to run Amin.
 train = [
   "mlx-lm>=0.32; python_version >= '3.11' and sys_platform == 'darwin'",

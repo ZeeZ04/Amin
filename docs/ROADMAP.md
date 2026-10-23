@@ -16,6 +16,9 @@ English, Arabic and Malayalam.
 - Conversation history, one database per person (`amin/history.py`).
 - Malayalam in the tokenizer, verifier, conflict detector and OCR, plus a
   Malayalam eval with a baseline (E32).
+- Multilingual safety router: crisis caught 14/14 against 0/14 before (E34).
+- On-device base chosen: Gemma 4 E4B (E33); edge student training (E35).
+- Follow-up questions (E36), and voice mode with "Hey Amin" in the web app (E37).
 
 ## Next: design
 
@@ -32,7 +35,9 @@ English, Arabic and Malayalam.
 6. **Status page.** Which model is answering, how fast, and storage used.
 7. **Quality passes.** Accessibility (VoiceOver, keyboard, contrast), a
    worst-case data stress test (`break-ui`), and a maskable app icon.
-8. **Voice.** Speak a question, with on-device speech recognition.
+8. **Voice, next steps.** Malayalam speech output (AI4Bharat Indic voices).
+   Real-speaker tests of the wake word and of Malayalam recognition. Siri
+   Shortcuts ("Hey Siri, ask Amin") in the native app.
 
 ## Next: model
 

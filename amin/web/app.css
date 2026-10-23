@@ -477,6 +477,43 @@ button.item { width: 100%; border: 0; background: transparent; text-align: start
 .about p { margin: 0 0 .7em; }
 .about p:last-child { margin: 0; }
 
+/* -- voice mode ------------------------------------------------------------------
+   One orb, four states. Its size follows the microphone level while listening,
+   so the person can see they are being heard. */
+.voice {
+  position: fixed; inset: 0; z-index: 85; display: grid; justify-items: center; align-content: center; gap: 18px;
+  padding: calc(env(safe-area-inset-top) + 72px) 24px calc(env(safe-area-inset-bottom) + 28px); text-align: center;
+  background: radial-gradient(120% 80% at 50% 35%, #0F5A56 0%, var(--teal-deep) 55%, #062E2C 100%); color: var(--sand);
+  animation: fade .25s var(--ease-out);
+}
+.voice-top { position: absolute; top: calc(env(safe-area-inset-top) + 14px); inset-inline: 16px; display: flex; justify-content: space-between; align-items: center; }
+.voice .segmented { background: rgba(243, 239, 228, .12); }
+.voice .segmented button { color: #BFD6D2; min-width: 44px; }
+.voice .segmented button[aria-pressed="true"] { background: rgba(243, 239, 228, .92); color: var(--teal-deep); }
+.voice .icon-btn { color: var(--sand); }
+@media (hover: hover) { .voice .icon-btn:hover { background: rgba(243, 239, 228, .12); color: #fff; } }
+.orb { --level: 0; position: relative; width: 168px; height: 168px; border: 0; border-radius: 50%; padding: 0; background: none; margin: 8px 0; }
+.orb span { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #FFE7AE 0%, #E3A72F 45%, #9A6A12 100%);
+  box-shadow: 0 0 calc(30px + var(--level) * 70px) rgba(227, 167, 47, calc(.35 + var(--level) * .45));
+  transform: scale(calc(.82 + var(--level) * .3)); transition: transform .08s linear, box-shadow .08s linear; }
+.voice[data-state="thinking"] .orb span, .voice[data-state="transcribing"] .orb span { animation: breathe 1.4s var(--ease-io) infinite; }
+.voice[data-state="speaking"] .orb span { background: radial-gradient(circle at 40% 35%, #E9F6F3 0%, #8FD3C9 45%, #2A8C84 100%);
+  box-shadow: 0 0 60px rgba(108, 197, 186, .55); animation: breathe 2.2s var(--ease-io) infinite; }
+.voice[data-state="idle"] .orb span { filter: saturate(.4) brightness(.8); transform: scale(.8); }
+@keyframes breathe { 50% { transform: scale(.92); } }
+.voice-state { margin: 0; font-size: 19px; font-weight: 600; }
+.voice-said { margin: 0; max-width: 34rem; min-height: 1.5em; font-size: 17px; color: #E5EFEC; }
+.voice-reply { margin: 0; max-width: 34rem; max-height: 30dvh; overflow-y: auto; font-size: 15.5px; line-height: 1.6; color: #BFD6D2; }
+.voice .btn.voice-end { margin-top: 8px; background: rgba(243, 239, 228, .1); color: var(--sand); border-color: rgba(243, 239, 228, .25); box-shadow: none; }
+@media (hover: hover) { .voice .btn.voice-end:hover:not(:disabled) { background: rgba(243, 239, 228, .18); } }
+.voice-note { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 18px); display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; color: #9FC1BB; }
+.voice-note svg.i { width: 15px; height: 15px; }
+.wake-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: var(--teal-ink); background: var(--teal-wash); white-space: nowrap; }
+.wake-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); animation: pulse 1.6s infinite ease-in-out; }
+.asked-as { font-size: 12.5px; color: var(--muted); margin: -2px 0 6px; }
+
 /* -- dialogs & toasts --------------------------------------------------------- */
 dialog.modal {
   width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: var(--r-xl);
