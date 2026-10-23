@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     # (3 refusals, 2 answers stripped to a fragment) to stop 1 hallucination.
     # Citations stay 100% precise without it. Re-test on a smaller model.
     verifier: str = "off"  # llm | lexical | off
+    # Single-pass router over the covenant routes (amin/classify.py, E34).
+    # Needs Amin's own model server; with any other provider it stays off.
+    router: str = "model"  # model | off
     lexical_overlap_floor: float = 0.28
     # Refuse rather than return an answer whose claims mostly failed the check.
     min_citation_precision: float = 0.5

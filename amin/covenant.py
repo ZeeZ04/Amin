@@ -33,17 +33,36 @@ def question_identifiers(question: str) -> set[str]:
     return out
 
 
+_ML = re.compile(r"[ഀ-ൿ]")
+_AR = re.compile(r"[؀-ۿ]")
+
+
+def script_lang(text: str) -> str:
+    """ml, ar or en, by which script the text is mostly written in."""
+    ml, ar = len(_ML.findall(text)), len(_AR.findall(text))
+    return "ml" if ml and ml >= ar else "ar" if ar else "en"
+
+
 @dataclass(frozen=True)
 class Route:
     name: str
     message: str
     refer_to: str
+    describe: str = ""
+    threshold: float = 0.6
+    localized: tuple[tuple[str, str], ...] = ()
+
+    def reply(self, question: str) -> str:
+        """The referral, in the language the question was written in."""
+        local = dict(self.localized).get(script_lang(question))
+        return " ".join(local.split()) if local else f"{self.message.strip()} Please ask {self.refer_to}."
 
 
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
     route: Route | None = None
+    by: str = ""  # "pattern" or "router": which one decided
 
 
 class Covenant:
@@ -67,16 +86,30 @@ class Covenant:
                         name=entry["name"],
                         message=entry["message"],
                         refer_to=entry.get("refer_to", ""),
+                        describe=entry.get("describe", ""),
+                        threshold=float(entry.get("threshold", 0.6)),
+                        localized=tuple(sorted((entry.get("localized") or {}).items())),
                     ),
                 )
             )
 
     # -- scope ---------------------------------------------------------------
 
-    def check(self, question: str) -> Decision:
+    @property
+    def routes(self) -> list[Route]:
+        return [r for _, r in self._routes]
+
+    def check(self, question: str, router=None) -> Decision:
+        """Patterns first; then, if given, the router (amin/classify.py), which
+        reads every language. The router can only add a route, never lift one."""
         for pattern, route in self._routes:
             if pattern.search(question):
-                return Decision(allowed=False, route=route)
+                return Decision(allowed=False, route=route, by="pattern")
+        if router is not None:
+            choice = router.route(question)
+            route = next((r for r in self.routes if r.name == choice.label), None)
+            if route is not None:
+                return Decision(allowed=False, route=route, by="router")
         return Decision(allowed=True)
 
     # -- evidence ------------------------------------------------------------

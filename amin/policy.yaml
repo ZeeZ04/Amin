@@ -11,6 +11,13 @@ refusal_template: >-
 # it must always name who to actually ask. Rationale: the people using this
 # trust it more than they trust a search engine precisely because it is
 # home-built, which makes confident synthesis here the highest-harm failure.
+#
+# `patterns` are checked first: instant, and measured on the main eval set.
+# When none match, the router (amin/classify.py) reads every `describe` as one
+# option and scores them all in one forward pass, in any language. A route
+# fires when its probability reaches `threshold`. self_harm sits lowest: a
+# missed crisis costs far more than a referral nobody needed.
+# `localized` is what the person reads when they wrote in that language.
 routes:
   - name: medical
     patterns:
@@ -23,6 +30,13 @@ routes:
       I can quote what a document says, but I won't give medical advice or
       interpret symptoms — the cost of being subtly wrong is too high.
     refer_to: a pharmacist or doctor
+    describe: asks for personal medical advice - a diagnosis, symptoms, a treatment, a medicine or a dose
+    threshold: 0.6
+    localized:
+      ar: >-
+        يمكنني أن أقتبس ما يقوله المستند، لكنني لا أقدّم نصيحة طبية ولا أفسّر الأعراض. يُرجى سؤال صيدلي أو طبيب.
+      ml: >-
+        രേഖയിൽ പറയുന്നത് ഉദ്ധരിക്കാം, പക്ഷേ ഞാൻ വൈദ്യോപദേശം നൽകുകയോ ലക്ഷണങ്ങൾ വ്യാഖ്യാനിക്കുകയോ ചെയ്യില്ല. ദയവായി ഒരു ഫാർമസിസ്റ്റിനോടോ ഡോക്ടറോടോ ചോദിക്കുക.
 
   - name: legal
     patterns:
@@ -33,6 +47,13 @@ routes:
       I'll show you the clause or regulation and quote it exactly, but I won't
       tell you what it means for your situation.
     refer_to: a lawyer or the issuing authority
+    describe: asks for legal advice about their own situation - rights, liability, suing, or whether something is legal
+    threshold: 0.6
+    localized:
+      ar: >-
+        سأعرض لك البند أو اللائحة وأقتبسها كما هي، لكنني لن أقول ما تعنيه لحالتك. يُرجى سؤال محامٍ أو الجهة المصدرة.
+      ml: >-
+        ബന്ധപ്പെട്ട വ്യവസ്ഥ അതേപടി ഉദ്ധരിച്ച് കാണിക്കാം, പക്ഷേ അത് നിങ്ങളുടെ കാര്യത്തിൽ എന്താണ് അർത്ഥമാക്കുന്നതെന്ന് ഞാൻ പറയില്ല. ദയവായി ഒരു അഭിഭാഷകനോടോ ബന്ധപ്പെട്ട അധികാരികളോടോ ചോദിക്കുക.
 
   - name: financial
     patterns:
@@ -42,6 +63,13 @@ routes:
       I don't make investment calls. I can pull up the figures in your
       documents and leave the decision with you.
     refer_to: a licensed financial adviser
+    describe: asks whether to buy, sell or invest in something, or where a price or market will go
+    threshold: 0.6
+    localized:
+      ar: >-
+        لا أتخذ قرارات استثمارية. يمكنني عرض الأرقام الواردة في مستنداتك وترك القرار لك. يُرجى سؤال مستشار مالي مرخّص.
+      ml: >-
+        നിക്ഷേപ തീരുമാനങ്ങൾ ഞാൻ എടുക്കില്ല. നിങ്ങളുടെ രേഖകളിലെ കണക്കുകൾ കാണിച്ചുതരാം, തീരുമാനം നിങ്ങളുടേതാണ്. ദയവായി ലൈസൻസുള്ള ഒരു സാമ്പത്തിക ഉപദേഷ്ടാവിനോട് ചോദിക്കുക.
 
   - name: self_harm
     patterns:
@@ -52,3 +80,10 @@ routes:
     refer_to: >-
       someone you trust, or a local crisis line — in the UAE, the Estijaba
       helpline on 800 1717
+    describe: talks about suicide, wanting to die, self-harm, or being in crisis or danger
+    threshold: 0.3
+    localized:
+      ar: >-
+        أنا لست الأداة المناسبة لهذا، ولا أريد أن أجيب عنه من مستندات. يُرجى التحدث إلى شخص تثق به، أو الاتصال بخط المساعدة: في الإمارات، خط استجابة على 800 1717.
+      ml: >-
+        ഇതിന് ഞാൻ ശരിയായ സഹായമല്ല. ദയവായി നിങ്ങൾ വിശ്വസിക്കുന്ന ഒരാളോട് സംസാരിക്കുക, അല്ലെങ്കിൽ ഒരു ഹെൽപ്‌ലൈനിൽ വിളിക്കുക: ഇന്ത്യയിൽ ടെലി-മനസ് 14416 (മലയാളത്തിലും ലഭ്യം), യുഎഇയിൽ എസ്തിജാബ 800 1717.
