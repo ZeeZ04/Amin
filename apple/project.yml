@@ -1,0 +1,82 @@
+# Amin for Apple platforms. `xcodegen` turns this into Amin.xcodeproj (gitignored).
+#   cd apple && xcodegen && open Amin.xcodeproj
+#
+# One SwiftUI app for iPhone, iPad, Mac, Vision Pro and Apple TV, plus a Watch
+# app that asks through the paired iPhone. Today the app talks to an Amin
+# server on the home network; the on-device engine (Gemma 4 E4B via MLX Swift,
+# ADR-014) plugs in behind the same `Engine` protocol once it passes its gate.
+name: Amin
+options:
+  bundleIdPrefix: app.amin
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+    tvOS: "18.0"
+    visionOS: "2.0"
+    watchOS: "11.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""          # set yours (Apple Developer account) before running on a device
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  Amin:
+    type: application
+    supportedDestinations: [iOS, macOS, tvOS, visionOS]
+    sources:
+      - Sources/Kit
+      - Sources/App
+      - Resources
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: Amin
+        LSApplicationCategoryType: public.app-category.productivity
+        UILaunchScreen: {}
+        UIApplicationSceneManifest: {UIApplicationSupportsMultipleScenes: true}
+        NSMicrophoneUsageDescription: Amin listens when you talk to it. Your voice is transcribed on your own Amin computer, not in the cloud.
+        NSCameraUsageDescription: Amin can scan a bill, contract or letter so you can ask about it.
+        NSLocalNetworkUsageDescription: Amin connects to the Amin computer in your home.
+        NSAppTransportSecurity: {NSAllowsLocalNetworking: true}
+        NSSiriUsageDescription: Ask Amin a question with Siri.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.amin.Amin
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Apple TV and Vision Pro take layered icons; until those are drawn, none.
+        "ASSETCATALOG_COMPILER_APPICON_NAME[sdk=appletv*]": ""
+        "ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xr*]": ""
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
+        ENABLE_RESOURCE_ACCESS_AUDIO_INPUT: YES
+        ENABLE_USER_SELECTED_FILES: readonly
+    dependencies:
+      - target: AminWatch
+        destinationFilters: [iOS]
+
+  AminWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - Sources/Kit/Models.swift
+      - Sources/Kit/Theme.swift
+      - Sources/Kit/Relay.swift
+      - Sources/Watch
+      - Resources
+    info:
+      path: Sources/Watch/Info.plist
+      properties:
+        CFBundleDisplayName: Amin
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: app.amin.Amin
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.amin.Amin.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
