@@ -65,3 +65,61 @@ def test_the_referral_is_in_the_question_language(tmp_path):
 
 def test_router_stays_off_without_amins_own_model(tmp_path):
     assert Amin(store=Store(tmp_path / "i.db"), provider=get_provider("echo")).router is None
+
+
+class Rewriter:
+    """An echo-like provider that records what it was asked to rewrite."""
+
+    name = "fake"
+
+    def __init__(self, reply):
+        self.reply, self.calls = reply, []
+
+    def complete(self, prompt, *, model=None, system=""):
+        self.calls.append(prompt)
+        return self.reply
+
+    def embed(self, texts):
+        raise RuntimeError("no dense arm in this test")
+
+
+HISTORY = [("When does my tenancy start?", "It starts on 1 March 2026.")]
+
+
+def _amin(tmp_path, provider, router=None):
+    return Amin(store=Store(tmp_path / "i.db"), provider=provider, router=router, fallback=True)
+
+
+def test_a_follow_up_is_rewritten_with_its_history(tmp_path):
+    p = Rewriter("When does my tenancy end?")
+    amin = _amin(tmp_path, p, Router(ROUTES, Fixed({"followup": 0.9, "standalone": 0.1})))
+    assert amin.standalone("and when does it end?", HISTORY) == "When does my tenancy end?"
+    assert "When does my tenancy start?" in p.calls[0] and "and when does it end?" in p.calls[0]
+
+
+def test_a_standalone_question_skips_the_rewrite(tmp_path):
+    p = Rewriter("should not be used")
+    amin = _amin(tmp_path, p, Router(ROUTES, Fixed({"followup": 0.1, "standalone": 0.9})))
+    assert amin.standalone("Why is the sky blue?", HISTORY) == "Why is the sky blue?"
+    assert p.calls == []
+
+
+def test_no_history_no_rewrite_and_a_broken_rewrite_is_ignored(tmp_path):
+    assert _amin(tmp_path, Rewriter("x")).standalone("and that?", []) == "and that?"
+    assert _amin(tmp_path, Rewriter("")).standalone("and that?", HISTORY) == "and that?"
+    assert _amin(tmp_path, Rewriter("y" * 500)).standalone("and that?", HISTORY) == "and that?"
+
+
+def test_the_answer_keeps_the_question_as_asked(tmp_path):
+    amin = _amin(tmp_path, Rewriter("When does my tenancy end?"), Router(ROUTES, Fixed({"followup": 0.9})))
+    ans = amin.ask("and when does it end?", HISTORY)
+    assert ans.question == "and when does it end?" and ans.asked_as == "When does my tenancy end?"
+
+
+def test_a_rewrite_that_answers_or_invents_a_number_is_rejected(tmp_path):
+    fu = Router(ROUTES, Fixed({"followup": 0.9}))
+    # E36's real failure: the model answered instead of rewriting, with a made-up figure
+    assert _amin(tmp_path, Rewriter("The rent is £1,200 per month."), fu).standalone(
+        "and how much is the rent?", HISTORY) == "and how much is the rent?"
+    assert _amin(tmp_path, Rewriter("How much is the rent from 1 March 2026?"), fu).standalone(
+        "and how much is the rent?", HISTORY) == "How much is the rent from 1 March 2026?"
