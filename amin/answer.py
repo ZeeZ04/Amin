@@ -47,6 +47,7 @@ class Amin:
         covenant: Covenant | None = None,
         verifier: Verifier | None = None,
         fallback: bool | None = None,
+        router=None,
     ):
         self.store = store or Store()
         self.provider = provider or get_provider()
@@ -56,6 +57,12 @@ class Amin:
         # before ADR-013 measured. Fallback (True): no source, so answer from
         # general knowledge, labelled as such and never cited.
         self.fallback = settings.general_fallback if fallback is None else fallback
+        if router is None and settings.router == "model" and settings.provider in ("mlx", "auto") \
+                and self.provider.name != "echo":
+            from .classify import Router
+
+            router = Router([(r.name, r.describe, r.threshold) for r in self.covenant.routes if r.describe])
+        self.router = router
 
     # -- retrieval -----------------------------------------------------------
 
@@ -83,14 +90,14 @@ class Amin:
 
         # Gate 1 — scope. Checked before retrieval so an out-of-scope question
         # never produces a synthesised answer even if the corpus has material.
-        decision = self.covenant.check(question)
+        decision = self.covenant.check(question, self.router)
         if not decision.allowed and decision.route:
             route = decision.route
             return finish(
                 Answer(
                     question=question,
                     outcome=Outcome.REFUSED_OUT_OF_SCOPE,
-                    refusal_reason=f"{route.message.strip()} Please ask {route.refer_to}.",
+                    refusal_reason=route.reply(question),
                     routed_to=route.name,
                     retrieved=self.retrieve(question),
                 )

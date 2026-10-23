@@ -295,3 +295,22 @@ def test_general_bank_stays_clear_of_the_main_eval_set():
     hits = overlaps(bank(), [settings.eval_set])
     # The run drops these; this pins how many the bank collides with today.
     assert len(hits) <= 6, hits
+
+
+def test_malayalam_households_are_appended_without_moving_anything():
+    from amin.train.corpus import ML_FAMILIES, build, inr
+
+    docs, items = build()
+    ml = [d for d in docs if d.lang == "ml"]
+    assert len(ml) == sum(c for _, c in ML_FAMILIES)
+    assert docs[-len(ml):] == ml, "Malayalam documents come after every earlier one"
+    assert all(i["id"].startswith("t4-") for i in items if i["lang"] == "ml")
+    assert min(d.household for d in ml) > max(d.household for d in docs if d.lang != "ml")
+    assert inr(125000) == "1,25,000" and inr(8500) == "8,500" and inr(12345678) == "1,23,45,678"
+
+
+def test_grader_folds_malayalam_spellings():
+    from amin.evaluate import _normalise
+
+    # atomic chillu (ൻ) and the older ZWJ spelling are the same letter
+    assert _normalise("1,25,000 രൂപ അവൻ") == _normalise("125000 രൂപ അവന്‍")

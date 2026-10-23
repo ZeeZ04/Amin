@@ -144,12 +144,21 @@ ENDPOINTS = {"mlx": "http://127.0.0.1:8080/v1", "ollama": "http://127.0.0.1:1143
 
 def chat(base: str, model: str, system: str, user: str) -> tuple[str, float]:
     t = time.perf_counter()
+    if "11434" in base:
+        # Ollama's OpenAI endpoint ignores "think": false, so Qwen3 spends the whole
+        # token budget thinking and returns nothing. The native API honours it, and
+        # it is what Amin's own OllamaProvider calls.
+        r = httpx.post(f"{base.removesuffix('/v1')}/api/generate", timeout=600, json={
+            "model": model, "system": system, "prompt": user, "stream": False, "think": False,
+            "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 600},
+        })
+        r.raise_for_status()
+        return r.json().get("response", "").strip(), time.perf_counter() - t
     r = httpx.post(f"{base}/chat/completions", timeout=300, json={
         # mlx_lm.server serves one model whatever is asked; "default_model" means that one.
-        "model": model if "11434" in base else "default_model", "temperature": 0, "max_tokens": 600,
+        "model": "default_model", "temperature": 0, "max_tokens": 600,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        # ollama's qwen3 honours this; mlx_lm.server is started with thinking off.
-        "think": False, "chat_template_kwargs": {"enable_thinking": False},
+        "chat_template_kwargs": {"enable_thinking": False},
     })
     r.raise_for_status()
     text = r.json()["choices"][0]["message"]["content"] or ""
