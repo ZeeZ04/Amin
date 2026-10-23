@@ -25,6 +25,7 @@ from pathlib import Path
 
 from .config import settings
 from .prompts import looks_like_refusal
+from .providers import _ML_FOLD
 from .schema import Answer, Outcome
 from .stats import Interval, wilson
 
@@ -110,7 +111,8 @@ def load_items(path: Path | None = None) -> list[Item]:
 
 
 def _normalise(s: str) -> str:
-    return " ".join(s.lower().replace(",", "").split())
+    # Malayalam: atomic chillu and the ZWJ spelling are one letter (providers._ML_FOLD).
+    return " ".join(s.lower().replace(",", "").translate(_ML_FOLD).split())
 
 
 def grade(item: Item, answer: Answer, cites: bool = True) -> Result:

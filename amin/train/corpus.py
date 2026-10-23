@@ -36,6 +36,7 @@ VALID_EVERY = 10  # every 10th document, and all its questions, is held out
 _EASTERN = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 _MONTHS = "January February March April May June July August September October November December".split()
 _MONTHS_AR = "يناير فبراير مارس أبريل مايو يونيو يوليو أغسطس سبتمبر أكتوبر نوفمبر ديسمبر".split()
+_MONTHS_ML = "ജനുവരി ഫെബ്രുവരി മാർച്ച് ഏപ്രിൽ മേയ് ജൂൺ ജൂലൈ ഓഗസ്റ്റ് സെപ്റ്റംബർ ഒക്ടോബർ നവംബർ ഡിസംബർ".split()
 
 
 @dataclass
@@ -117,7 +118,28 @@ def ar_date_expect(d: date) -> list[str]:
     return [f"{m} {d.year}", f"{m} {str(d.year).translate(_EASTERN)}"]
 
 
+def inr(n: int) -> str:
+    """Indian digit grouping, as a Kerala bill or contract writes it: 1,25,000."""
+    head, tail = str(n)[:-3], str(n)[-3:]
+    groups = []
+    while len(head) > 2:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return ",".join(([head] if head else []) + groups + [tail])
+
+
+def ml_date(d: date) -> str:
+    return f"{d.day} {_MONTHS_ML[d.month - 1]} {d.year}"
+
+
+def ml_date_expect(d: date) -> list[str]:
+    m = _MONTHS_ML[d.month - 1]
+    return [f"{m} {d.year}", f"{d.year} {m}"]  # "1 സെപ്റ്റംബർ 2025" or "2025 സെപ്റ്റംബർ 1-ന്"
+
+
 def days_expect(n: int, lang: str = "en") -> list[str]:
+    if lang == "ml":
+        return [f"{n} ദിവസ"]  # a stem: ദിവസം, ദിവസത്തെ, ദിവസത്തിനകം all contain it
     if lang == "ar":
         return [f"{n} يوم", f"{str(n).translate(_EASTERN)} يوم"]
     return [f"{n} days", f"{n}-day"]
@@ -143,6 +165,12 @@ UTILITIES_AR = ["شركة الساحل للكهرباء والماء", "طاقة
 SCHOOLS = ["Greenfield International School", "Bayside British Academy", "Crescent Primary School",
            "Horizon American School", "Al Rawda Bilingual School", "Silver Palm Academy"]
 SCHOOLS_AR = ["مدرسة الروضة ثنائية اللغة", "أكاديمية الأفق", "مدرسة الهلال الابتدائية", "مدرسة النخلة الفضية"]
+# Malayalam (E32). Fictional names; amounts in rupees with Indian grouping.
+BUILDINGS_ML = ["പ്രശാന്തി റെസിഡൻസി", "സാഗര ഫ്ലാറ്റ്സ്", "കായൽ വ്യൂ അപ്പാർട്ട്മെന്റ്സ്", "നീലഗിരി ഹൈറ്റ്സ്",
+                "പമ്പ ടവേഴ്സ്", "ചന്ദ്രിക ഗാർഡൻസ്"]
+PEOPLE_ML = ["അനിൽ കുമാർ", "ഫാത്തിമ ബീവി", "ജോസഫ് മാത്യു", "ലക്ഷ്മി നായർ", "മുഹമ്മദ് ഷാഫി", "സുധ രാജൻ"]
+UTILITIES_ML = ["മലനാട് ഇലക്ട്രിസിറ്റി സർവീസസ്", "തീരദേശ വൈദ്യുതി സേവനം", "സഹ്യ പവർ കമ്പനി"]
+SCHOOLS_ML = ["പുലരി ഇംഗ്ലീഷ് മീഡിയം സ്കൂൾ", "ചന്ദ്രഗിരി പബ്ലിക് സ്കൂൾ", "കൈരളി വിദ്യാലയം", "തേജസ് സെൻട്രൽ സ്കൂൾ"]
 GYMS = ["IronPeak Fitness", "Pulse Gym", "Oasis Wellness Club", "CoreFit Studio", "Summit Athletics"]
 TELCOS = ["Skyline Telecom", "Wavelink", "Mirage Mobile", "FalconNet"]
 BRANDS = [("Kelvora", "WM"), ("Brisa", "AC"), ("Torvik", "DW"), ("Halvo", "OV"), ("Zentra", "TV")]
@@ -636,6 +664,113 @@ def ac_service(rng: random.Random, n: int) -> Doc:
     return d
 
 
+# -- Malayalam (E32) -----------------------------------------------------------
+# Written for review by a fluent reader: every sentence a model learns from is
+# one of these templates, so checking them checks the whole Malayalam corpus.
+
+
+def tenancy_ml(rng: random.Random, n: int) -> Doc:
+    b, unit = rng.choice(BUILDINGS_ML), rng.randint(101, 1204)
+    flat = f"{b}-ലെ {unit}-ാം നമ്പർ ഫ്ലാറ്റ്"
+    of = f"{b}-ലെ {unit}-ാം നമ്പർ ഫ്ലാറ്റിന്റെ"
+    at = f"{b}-ലെ {unit}-ാം നമ്പർ ഫ്ലാറ്റിൽ"
+    landlord, tenant = rng.sample(PEOPLE_ML, 2)
+    start = _start_date(rng)
+    y, m = divmod(start.month - 1 + 11, 12)  # eleven months on; start is always the 1st
+    end = date(start.year + y, m + 1, 1) - timedelta(days=1)
+    rent = rng.randrange(8_000, 45_000, 500)
+    deposit = rent * rng.choice([3, 6, 10])
+    notice = rng.choice([60, 90])  # never 30: the deposit clause already says 30 days
+    sections = [
+        ("കക്ഷികളും വസ്തുവും",
+         f"ഈ വാടക കരാർ {landlord} (ഉടമ), {tenant} (വാടകക്കാരൻ) എന്നിവർ തമ്മിൽ {b}-ലെ {unit}-ാം നമ്പർ ഫ്ലാറ്റിനെ സംബന്ധിച്ചുള്ളതാണ്."),
+        ("കാലാവധിയും വാടകയും",
+         f"കരാറിന്റെ കാലാവധി {ml_date(start)} മുതൽ {ml_date(end)} വരെ പതിനൊന്ന് മാസമാണ്. "
+         f"പ്രതിമാസ വാടക {inr(rent)} രൂപ."),
+        ("സെക്യൂരിറ്റി ഡെപ്പോസിറ്റ്",
+         f"വാടകക്കാരൻ {inr(deposit)} രൂപ സെക്യൂരിറ്റി ഡെപ്പോസിറ്റായി നൽകണം. "
+         "ഫ്ലാറ്റ് ഒഴിഞ്ഞ് 30 ദിവസത്തിനകം ഈ തുക തിരികെ നൽകും."),
+        ("പുതുക്കലും അറിയിപ്പും",
+         f"കരാർ പുതുക്കാൻ താൽപര്യമില്ലാത്ത കക്ഷി കാലാവധി തീരുന്നതിന് {notice} ദിവസം മുമ്പ് രേഖാമൂലം അറിയിക്കണം."),
+    ]
+    facts = [
+        Fact([f"{of} വാടക കരാർ എന്നാണ് തുടങ്ങുന്നത്?"], ml_date_expect(start), "dates"),
+        Fact([f"{of} വാടക കരാർ എന്നാണ് അവസാനിക്കുന്നത്?"], ml_date_expect(end), "dates"),
+        Fact([f"{of} പ്രതിമാസ വാടക എത്രയാണ്?", f"{of} മാസവാടക എത്ര രൂപയാണ്?"], [inr(rent)], "money"),
+        Fact([f"{of} സെക്യൂരിറ്റി ഡെപ്പോസിറ്റ് എത്രയാണ്?"], [inr(deposit)], "money"),
+        Fact([f"{of} കരാർ പുതുക്കുന്നില്ലെങ്കിൽ എത്ര ദിവസം മുമ്പ് അറിയിക്കണം?"], days_expect(notice, "ml"), "notice"),
+        Fact([f"{of} ഉടമ ആരാണ്?"], [landlord], "parties"),
+    ]
+    absent = [
+        (f"{of} വാടകയിൽ മെയിന്റനൻസ് ചാർജ് ഉൾപ്പെടുന്നുണ്ടോ?", "കരാറിൽ മെയിന്റനൻസ് ചാർജിനെക്കുറിച്ച് പറയുന്നില്ല."),
+        (f"{of} കൂടെ എത്ര കാർ പാർക്കിംഗ് ലഭിക്കും?", "കരാറിൽ പാർക്കിംഗിനെക്കുറിച്ച് പറയുന്നില്ല."),
+        (f"{at} വളർത്തുമൃഗങ്ങളെ അനുവദിക്കുമോ?", "കരാറിൽ വളർത്തുമൃഗങ്ങളെക്കുറിച്ച് പറയുന്നില്ല."),
+    ]
+    d = Doc(f"tr-tenancy-ml-{n:03d}", f"വാടക കരാർ — {b}, ഫ്ലാറ്റ് {unit}", "ml",
+            f"tr-tenancy-ml-{n:03d}", sections, facts, absent, key=flat)
+    d.premises = [(f"{of} കരാറിൽ അറിയിപ്പ് കാലാവധി {notice + 30} ദിവസം മാത്രമായത് എന്തുകൊണ്ട്?",
+                   f"False premise: the agreement requires {notice} days.")]
+    d.traps = [(f"കരാർ പുതുക്കിയ ശേഷം {of} മാസവാടക എത്രയാകും?",
+                "Only the current rent is stated; renewal rent is not.",
+                f"{of} ഇപ്പോഴത്തെ മാസവാടക എത്രയാണ്?", [inr(rent)])]
+    return d
+
+
+def utility_bill_ml(rng: random.Random, n: int) -> Doc:
+    co = rng.choice(UTILITIES_ML)
+    acct = f"{rng.randint(1000, 9999)}{rng.randint(100000, 999999)}"
+    month = _start_date(rng)
+    mon = f"{_MONTHS_ML[month.month - 1]} {month.year}"
+    bill = f"{co}-ന്റെ {mon}-ലെ വൈദ്യുതി ബിൽ"
+    in_bill = f"{co}-ന്റെ {mon}-ലെ വൈദ്യുതി ബില്ലിൽ"
+    kwh = rng.randint(80, 900)
+    total = rng.randrange(300, 6_000, 5)
+    due = month + timedelta(days=15)
+    sections = [
+        ("കൺസ്യൂമർ വിവരങ്ങൾ", f"{co} — കൺസ്യൂമർ നമ്പർ {acct}, {mon} മാസത്തെ ബിൽ."),
+        ("ഉപഭോഗവും തുകയും",
+         f"ഈ മാസത്തെ വൈദ്യുതി ഉപഭോഗം {kwh} യൂണിറ്റ്. അടയ്ക്കേണ്ട ആകെ തുക {inr(total)} രൂപ. "
+         f"{ml_date(due)}-നകം പണം അടയ്ക്കണം."),
+    ]
+    facts = [
+        Fact([f"{in_bill} അടയ്ക്കേണ്ട തുക എത്രയാണ്?", f"{bill} ആകെ എത്ര രൂപയാണ്?"], [inr(total)], "money"),
+        Fact([f"{bill} അടയ്ക്കേണ്ട അവസാന തീയതി എന്നാണ്?"], ml_date_expect(due), "dates"),
+        Fact([f"{in_bill} എത്ര യൂണിറ്റ് വൈദ്യുതി ഉപയോഗിച്ചതായി കാണിക്കുന്നു?"], [str(kwh)], "usage"),
+    ]
+    absent = [(f"{in_bill} മീറ്റർ വാടക എത്രയാണ്?", "ബില്ലിൽ മീറ്റർ വാടക പറയുന്നില്ല.")]
+    d = Doc(f"tr-bill-ml-{n:03d}", f"{co} — കൺസ്യൂമർ നമ്പർ {acct}", "ml", f"tr-bill-ml-{n:03d}",
+            sections, facts, absent, key=bill)
+    d.traps = [(f"{bill} വൈകി അടച്ചാൽ എത്ര രൂപ പിഴ ഈടാക്കും?", "The bill states no late fee.",
+                f"{bill} അടയ്ക്കേണ്ട അവസാന തീയതി എന്നാണ്?", ml_date_expect(due))]
+    return d
+
+
+def school_fees_ml(rng: random.Random, n: int) -> Doc:
+    school = rng.choice(SCHOOLS_ML)
+    grade = rng.randint(1, 12)
+    tuition = rng.randrange(15_000, 120_000, 500)
+    sibling = rng.choice([5, 10, 15])
+    sections = [
+        ("ഫീസ്", f"{school}-ൽ {grade}-ാം ക്ലാസിലെ വാർഷിക ഫീസ് {inr(tuition)} രൂപയാണ്. ഇത് മൂന്ന് ഗഡുക്കളായി അടയ്ക്കാം."),
+        ("ഇളവുകൾ", f"രണ്ടാമത്തെയും തുടർന്നുള്ളതുമായ കുട്ടികൾക്ക് {sibling} ശതമാനം സഹോദര ഇളവ് ലഭിക്കും."),
+    ]
+    facts = [
+        Fact([f"{school}-ൽ {grade}-ാം ക്ലാസിലെ വാർഷിക ഫീസ് എത്രയാണ്?"], [inr(tuition)], "money"),
+        Fact([f"{school}-ൽ {grade}-ാം ക്ലാസിന് സഹോദര ഇളവ് എത്ര ശതമാനമാണ്?"],
+             [f"{sibling} ശതമാന", f"{sibling}%"], "discounts"),
+    ]
+    absent = [(f"{school}-ൽ {grade}-ാം ക്ലാസിലെ സ്കൂൾ ബസ് ഫീസ് എത്രയാണ്?", "പട്ടികയിൽ ബസ് ഫീസ് പറയുന്നില്ല.")]
+    d = Doc(f"tr-fees-ml-{n:03d}", f"{school} — {grade}-ാം ക്ലാസ് ഫീസ് പട്ടിക", "ml", f"tr-fees-ml-{n:03d}",
+            sections, facts, absent, key=f"{school}|{grade}")
+    other = grade + 1 if grade < 12 else grade - 1
+    d.traps = [(f"{school}-ൽ {other}-ാം ക്ലാസിലെ വാർഷിക ഫീസ് എത്രയാണ്?", f"The schedule covers class {grade} only.",
+                f"{school}-ൽ {grade}-ാം ക്ലാസിലെ വാർഷിക ഫീസ് എത്രയാണ്?", [inr(tuition)])]
+    return d
+
+
+ML_FAMILIES = [(tenancy_ml, 30), (utility_bill_ml, 25), (school_fees_ml, 30)]
+
+
 # Counts are bounded by how many distinct keys each family's name pool allows.
 FAMILIES = [
     (tenancy_en, 60), (tenancy_ar, 30), (utility_bill_en, 50), (utility_bill_ar, 25),
@@ -708,7 +843,48 @@ def build(seed: int = 7) -> tuple[list[Doc], list[dict]]:
             if probe and any(probe[0] in t for t in texts[d.household]):
                 continue  # the near-miss identifier exists after all
             add("unanswerable", q, d, note=why, tags=["near_miss" if probe else "absent"])
-    return docs, items + round_two(docs, seed) + round_three(docs)
+    ml_docs, ml_items = malayalam(seed, first_household=max(d.household for d in docs) + 1)
+    return docs + ml_docs, items + round_two(docs, seed) + round_three(docs) + ml_items
+
+
+def malayalam(seed: int, first_household: int) -> tuple[list[Doc], list[dict]]:
+    """Malayalam households (E32), built on their own random stream and appended
+    after everything else, so every earlier document and item id is unchanged
+    and the teacher's answers to them stay valid."""
+    rng = random.Random(seed + 2)
+    docs: list[Doc] = []
+    for family, count in ML_FAMILIES:
+        seen: set[str] = set()
+        n = 0
+        for _ in range(count * 20):
+            if n == count:
+                break
+            d = family(rng, n + 1)
+            if d.key in seen:
+                continue
+            seen.add(d.key)
+            d.household = first_household + n
+            d.split = "valid" if n % VALID_EVERY == VALID_EVERY - 1 else "train"
+            n += 1
+            docs.append(d)
+    items: list[dict] = []
+
+    def add(kind: str, question: str, d: Doc, tag: str, **kw) -> None:
+        items.append({"id": f"t4-{len(items) + 1:05d}", "kind": kind, "question": question, "lang": "ml",
+                      "split": d.split, "household": d.household, "tags": [tag], **kw})
+
+    for d in docs:
+        for f in d.facts:
+            for q in f.questions:
+                add("answerable", q, d, f.tag, expect_any=f.expect, expect_doc=d.doc_id)
+        for q, why, *_ in d.absent:
+            add("unanswerable", q, d, "absent", note=why)
+        for q, why in d.premises:
+            add("unanswerable", q, d, "false_premise", note=why)
+        for trap, why, sibling, expect in d.traps:
+            add("unanswerable", trap, d, "adjacent", note=why)
+            add("answerable", sibling, d, "adjacent_sibling", expect_any=expect, expect_doc=d.doc_id)
+    return docs, items
 
 
 # ---------------------------------------------------------------------------
@@ -755,7 +931,7 @@ MISSING_KIND = {
 
 
 def _kind(doc_id: str) -> str:
-    return doc_id.removesuffix("-old").rsplit("-", 1)[0].removesuffix("-ar")
+    return doc_id.removesuffix("-old").rsplit("-", 1)[0].removesuffix("-ar").removesuffix("-ml")
 
 
 def round_two(docs: list[Doc], seed: int) -> list[dict]:
