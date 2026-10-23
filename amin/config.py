@@ -100,6 +100,10 @@ class Settings(BaseSettings):
     # Single-pass router over the covenant routes (amin/classify.py, E34).
     # Needs Amin's own model server; with any other provider it stays off.
     router: str = "model"  # model | off
+    # Voice mode (amin/voice.py): local Whisper, general + Malayalam specialist.
+    whisper_model: Path = Path("data/models/whisper-large-v3-turbo")
+    whisper_ml_model: Path = Path("data/models/whisper-medium-malayalam")
+    whisper_wake_model: Path = Path("data/models/whisper-base")
     lexical_overlap_floor: float = 0.28
     # Refuse rather than return an answer whose claims mostly failed the check.
     min_citation_precision: float = 0.5

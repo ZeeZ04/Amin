@@ -118,6 +118,7 @@ async function showApp(me) {
   $("prefPrivate").checked = me.prefs.chat_private; $("prefHousehold").checked = me.prefs.chat_household;
   greet(); renderSpace(); renderTargets(); renderLibrary(); renderProjects();
   await loadHistory();
+  if (W.want) startWake();
 }
 function greet() {
   const h = new Date().getHours();
@@ -259,7 +260,14 @@ function addAnswer() {
 let busy = false;
 async function ask() {
   const text = q.value.trim(); if (!text || busy) return;
-  busy = true; q.value = ""; fit(); $("welcome").hidden = true;
+  q.value = ""; fit();
+  await send(text);
+  if (wide()) q.focus();
+}
+/* One path for typed and spoken questions. Returns the /ask response, or null. */
+async function send(text) {
+  if (busy) return null;
+  busy = true; $("welcome").hidden = true;
   addQuestion(text);
   const a = addAnswer();
   a.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -269,24 +277,27 @@ async function ask() {
     CONV = r.conversation_id;
     renderAnswer(a, r, true);
     if (isNew) loadHistory(); else { const c = CONVS.find(c => c.id === CONV); if (c) { c.updated = Date.now() / 1000; CONVS.sort((x, y) => y.updated - x.updated); renderHistory(); } }
+    return r;
   } catch (err) {
     a.querySelector(".body").innerHTML = `<div class="basis clash"><svg class="i"><use href="#i-alert"/></svg>Something went wrong</div><div class="prose refused" dir="auto">${esc(err.message)}</div>`;
-  } finally { busy = false; if (wide()) q.focus(); }
+    return null;
+  } finally { busy = false; }
 }
 
 /* Answers are a list of checked claims. Each claim keeps its own citations;
    a source is numbered by first appearance so the numbers read 1, 2, 3. */
 function renderAnswer(a, r, live) {
   const body = a.querySelector(".body");
+  const asked = r.asked_as ? `<div class="asked-as" dir="auto">Understood as: ${esc(r.asked_as)}</div>` : "";
   const secs = `${(r.latency_ms / 1000).toFixed(1)} s`;
   if (!r.claims.length) {
-    body.innerHTML = `<div class="basis"><svg class="i"><use href="#i-shield"/></svg>No answer</div><div class="prose refused" dir="auto">${esc(r.refusal_reason || "Your documents don't cover this.")}</div>`;
+    body.innerHTML = `${asked}<div class="basis"><svg class="i"><use href="#i-shield"/></svg>${r.routed_to ? "Better asked elsewhere" : "No answer"}</div><div class="prose refused" dir="auto">${esc(r.refusal_reason || "Your documents don't cover this.")}</div>`;
     return;
   }
   const text = r.claims.map(c => c.text).join(" ");
   const tools = `<div class="a-tools"><button class="icon-btn" data-copy aria-label="Copy answer" title="Copy"><svg class="i"><use href="#i-copy"/></svg></button><span class="time">${secs}</span></div>`;
   if (r.basis === "general") {
-    body.innerHTML = `<div class="basis"><svg class="i"><use href="#i-globe"/></svg>General knowledge · not from your documents</div><div class="prose" dir="auto">${paras(r.claims.map(c => esc(c.text)).join(" "))}</div>${tools}`;
+    body.innerHTML = `${asked}<div class="basis"><svg class="i"><use href="#i-globe"/></svg>General knowledge · not from your documents</div><div class="prose" dir="auto">${paras(r.claims.map(c => esc(c.text)).join(" "))}</div>${tools}`;
   } else {
     const num = new Map();
     const html = r.claims.map(c => esc(c.text) + c.citations.map(id => {
@@ -301,7 +312,7 @@ function renderAnswer(a, r, live) {
       const s = r.sources?.[id], head = s?.heading ? ` · ${s.heading}` : "";
       return `<button class="source-chip" data-id="${esc(id)}"><b>${k}</b><span dir="auto">${esc(docLabel(id) + head)}</span></button>`;
     }).join("");
-    body.innerHTML = `${label}<div class="prose" dir="auto">${paras(html)}</div><div class="sources">${chips}</div>${tools}`;
+    body.innerHTML = `${asked}${label}<div class="prose" dir="auto">${paras(html)}</div><div class="sources">${chips}</div>${tools}`;
     body.querySelectorAll("[data-id]").forEach(b => b.onclick = () => openSource(b.dataset.id, b));
   }
   body.querySelector("[data-copy]").onclick = async () => {
@@ -532,11 +543,210 @@ $("newInvite").onclick = async () => {
 $("copyInvite").onclick = async () => {
   try { await navigator.clipboard.writeText($("inviteCode").textContent); toast("Invite code copied."); } catch { toast("Couldn't copy on this device.", true); }
 };
-function signedOut() { CONV = null; SPACE = ""; $("thread").innerHTML = ""; $("welcome").hidden = false; go("chat"); showAuth(); }
+function signedOut() {
+  stopWake(); if (V.on) stopVoice(); CONV = null; SPACE = ""; $("thread").innerHTML = ""; $("welcome").hidden = false; go("chat"); showAuth(); }
 $("signOut").onclick = async () => { await post("/logout").catch(() => {}); signedOut(); };
 $("signOutAll").onclick = async () => {
   if (!await dialog({ title: "Sign out everywhere?", text: "Every phone, tablet and computer signed in to your account is signed out, including this one.", ok: "Sign out", danger: true })) return;
   await post("/logout-all").catch(() => {}); signedOut();
 };
+
+/* -- voice mode -------------------------------------------------------------------
+   A conversation loop: listen → (pause detected) → transcribe on this computer →
+   ask → read the answer aloud → listen again. Tap the orb to interrupt or to
+   talk; it ends after two quiet turns or with "End conversation".
+   iPhone note: only Siri may listen for a wake word in the background, so
+   "Hey Amin" works while the app is open; on iOS, "Hey Siri, ask Amin" comes
+   with the native app. */
+const V = { on: false, state: "idle", stream: null, ctx: null, analyser: null, rec: null, raf: 0,
+  quiet: 0, mute: false, lang: "auto" };
+try { V.lang = localStorage.getItem("amin.voice.lang") || "auto"; V.mute = localStorage.getItem("amin.voice.mute") === "1"; } catch {}
+const SPEECH_RMS = 0.035, END_SILENCE_MS = 1300, NO_SPEECH_MS = 7000, MAX_TURN_MS = 30000;
+
+function vstate(state, label) {
+  V.state = state; $("voice").dataset.state = state; $("voiceState").textContent = label;
+}
+function vlangUI() {
+  $$("[data-vlang]").forEach(b => b.setAttribute("aria-pressed", b.dataset.vlang === V.lang));
+  $("voiceMute").setAttribute("aria-pressed", V.mute);
+  $("voiceMute").querySelector("use").setAttribute("href", V.mute ? "#i-speaker-off" : "#i-speaker");
+  $("voiceMute").setAttribute("aria-label", V.mute ? "Read answers aloud" : "Don't read answers aloud");
+}
+$$("[data-vlang]").forEach(b => b.onclick = () => { V.lang = b.dataset.vlang; try { localStorage.setItem("amin.voice.lang", V.lang); } catch {} vlangUI(); });
+$("voiceMute").onclick = () => { V.mute = !V.mute; try { localStorage.setItem("amin.voice.mute", V.mute ? "1" : "0"); } catch {} if (V.mute) speechSynthesis.cancel(); vlangUI(); };
+
+async function startVoice(opening = null) {
+  stopWake();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast(location.protocol === "https:" || location.hostname === "localhost" ? "This browser can't record audio." : "Voice needs a secure connection. Open Amin over https (run make certs).", true);
+    return;
+  }
+  try { V.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch { toast("Amin needs microphone permission for voice mode.", true); return; }
+  // iOS only lets speech play after a tap; an empty utterance now unlocks it for the whole session.
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch {}
+  V.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  V.analyser = V.ctx.createAnalyser(); V.analyser.fftSize = 1024;
+  V.ctx.createMediaStreamSource(V.stream).connect(V.analyser);
+  V.on = true; V.quiet = 0; $("voiceSaid").textContent = ""; $("voiceReply").textContent = "";
+  $("voice").hidden = false; vlangUI(); go("chat");
+  if (opening === null) return listen();
+  if (opening) return askSpoken(opening);  // "Hey Amin, when does my lease end?"
+  speak("How can I help?", () => V.on && listen());  // just "Hey Amin"
+}
+function stopVoice() {
+  V.on = false; cancelAnimationFrame(V.raf);
+  try { V.rec?.state === "recording" && V.rec.stop(); } catch {}
+  speechSynthesis.cancel();
+  V.stream?.getTracks().forEach(t => t.stop()); V.ctx?.close().catch(() => {});
+  V.stream = V.ctx = V.rec = null;
+  $("voice").hidden = true; $("orb").style.setProperty("--level", 0);
+  if (W.want) setTimeout(startWake, 400);
+}
+function level() {
+  const buf = new Float32Array(V.analyser.fftSize);
+  V.analyser.getFloatTimeDomainData(buf);
+  let sum = 0; for (const x of buf) sum += x * x;
+  return Math.sqrt(sum / buf.length);
+}
+function pickType() {
+  for (const t of ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"])
+    if (window.MediaRecorder?.isTypeSupported?.(t)) return t;
+  return "";
+}
+function listen() {
+  if (!V.on) return;
+  vstate("listening", "Listening…");
+  const type = pickType(), chunks = [];
+  V.rec = new MediaRecorder(V.stream, type ? { mimeType: type } : undefined);
+  V.rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  let spoke = false, lastVoice = 0;
+  const started = performance.now();
+  V.rec.onstop = () => {
+    cancelAnimationFrame(V.raf); $("orb").style.setProperty("--level", 0);
+    if (!V.on) return;
+    if (!spoke) {
+      if (++V.quiet >= 2) { vstate("idle", "Tap the orb to talk"); return; }
+      return listen();
+    }
+    V.quiet = 0;
+    heard(new Blob(chunks, { type: V.rec.mimeType || type || "audio/webm" }));
+  };
+  V.rec.start(250);
+  const tick = () => {
+    if (!V.on || V.rec?.state !== "recording") return;
+    const l = level(), now = performance.now();
+    $("orb").style.setProperty("--level", Math.min(1, l * 9).toFixed(3));
+    if (l > SPEECH_RMS) { spoke = true; lastVoice = now; }
+    if ((spoke && now - lastVoice > END_SILENCE_MS) || (!spoke && now - started > NO_SPEECH_MS) || now - started > MAX_TURN_MS) {
+      V.rec.stop(); return;
+    }
+    V.raf = requestAnimationFrame(tick);
+  };
+  V.raf = requestAnimationFrame(tick);
+}
+async function heard(blob) {
+  vstate("transcribing", "Transcribing…");
+  let said;
+  try {
+    const hint = V.lang === "auto" ? "" : `?lang=${V.lang}`;
+    said = await call(`/transcribe${hint}`, { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob });
+  } catch (err) { toast(err.message, true); return V.on && listen(); }
+  if (!V.on) return;
+  if (!said.text) return listen();
+  askSpoken(said.text);
+}
+async function askSpoken(text) {
+  $("voiceSaid").textContent = text; $("voiceReply").textContent = "";
+  vstate("thinking", "Thinking…");
+  const r = await send(text);
+  if (!V.on) return;
+  if (!r) return listen();
+  const reply = r.claims.length ? r.claims.map(c => c.text).join(" ") : (r.refusal_reason || "");
+  $("voiceReply").textContent = reply;
+  speak(reply, () => V.on && listen());
+}
+const scriptLang = t => /[ഀ-ൿ]/.test(t) ? "ml" : /[؀-ۿ]/.test(t) ? "ar" : "en";
+function speak(text, done) {
+  if (V.mute || !text || !("speechSynthesis" in window)) return done();
+  const lang = scriptLang(text);
+  const voice = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(lang));
+  if (!voice) {
+    vstate("speaking", lang === "ml" ? "No Malayalam voice on this device yet — reading is on screen" : "No voice for this language on this device");
+    return setTimeout(done, 2500);
+  }
+  const u = new SpeechSynthesisUtterance(text.replace(/\s*\[S\d+\]/g, ""));
+  u.voice = voice; u.lang = voice.lang; u.rate = 1;
+  u.onend = u.onerror = () => done();
+  vstate("speaking", "Speaking…");
+  speechSynthesis.speak(u);
+}
+$("orb").onclick = () => {
+  if (V.state === "speaking") { speechSynthesis.cancel(); return; }  // interrupt; onend → listen
+  if (V.state === "idle") { V.quiet = 0; listen(); }
+  else if (V.state === "listening") { V.rec?.stop(); }  // done talking
+};
+$("voiceEnd").onclick = stopVoice;
+$("micBtn").onclick = () => startVoice();
+
+/* -- "Hey Amin" -------------------------------------------------------------------
+   Only bursts of speech leave the page, each to this computer's /wake, which
+   checks whether it starts with Amin's name. Silence sends nothing. */
+const W = { want: false, on: false, stream: null, ctx: null, analyser: null, raf: 0, rec: null, busy: false };
+try { W.want = localStorage.getItem("amin.wake") === "1"; } catch {}
+$("prefWake").checked = W.want;
+$("prefWake").onchange = () => {
+  W.want = $("prefWake").checked;
+  try { localStorage.setItem("amin.wake", W.want ? "1" : "0"); } catch {}
+  W.want ? startWake() : stopWake();
+};
+async function startWake() {
+  if (W.on || V.on || !W.want || !ME) return;
+  try { W.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch { W.want = false; $("prefWake").checked = false; toast("“Hey Amin” needs microphone permission.", true); return; }
+  W.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  W.analyser = W.ctx.createAnalyser(); W.analyser.fftSize = 1024;
+  W.ctx.createMediaStreamSource(W.stream).connect(W.analyser);
+  W.on = true; $("wakePill").hidden = false;
+  const buf = new Float32Array(W.analyser.fftSize), type = pickType();
+  let chunks = [], since = 0, lastVoice = 0;
+  const tick = () => {
+    if (!W.on) return;
+    W.analyser.getFloatTimeDomainData(buf);
+    let sum = 0; for (const x of buf) sum += x * x;
+    const loud = Math.sqrt(sum / buf.length) > SPEECH_RMS, now = performance.now();
+    if (loud && !W.rec && !W.busy) {  // a burst starts
+      chunks = []; since = now;
+      W.rec = new MediaRecorder(W.stream, type ? { mimeType: type } : undefined);
+      W.rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+      W.rec.onstop = () => check(new Blob(chunks, { type: W.rec?.mimeType || type || "audio/webm" }));
+      W.rec.start(200);
+    }
+    if (loud) lastVoice = now;
+    // a burst ends at a 0.7 s pause, or at 5 s: a wake phrase plus a short question
+    if (W.rec && W.rec.state === "recording" && (now - lastVoice > 700 || now - since > 5000)) W.rec.stop();
+    W.raf = requestAnimationFrame(tick);
+  };
+  W.raf = requestAnimationFrame(tick);
+}
+async function check(blob) {
+  W.rec = null;
+  if (!W.on || blob.size < 2000) return;
+  W.busy = true;
+  try {
+    const r = await call("/wake", { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob });
+    if (r.wake && W.on) startVoice(r.rest || "");
+  } catch {} finally { W.busy = false; }
+}
+function stopWake() {
+  W.on = false; cancelAnimationFrame(W.raf);
+  try { W.rec?.state === "recording" && W.rec.stop(); } catch {}
+  W.stream?.getTracks().forEach(t => t.stop()); W.ctx?.close().catch(() => {});
+  W.stream = W.ctx = W.rec = null; $("wakePill").hidden = true;
+}
+$("wakePill").onclick = () => go("settings");
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopWake(); else if (W.want && !V.on) startWake(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && V.on) stopVoice(); });
+speechSynthesis?.getVoices();  // voices load asynchronously; ask early
 
 boot();

@@ -26,8 +26,10 @@ from .conflict import detect as detect_conflict
 from .covenant import Covenant
 from .prompts import (
     ANSWER_SYSTEM,
+    CONDENSE_SYSTEM,
     GENERAL_SYSTEM,
     answer_prompt,
+    condense_prompt,
     general_prompt,
     looks_like_refusal,
 )
@@ -37,6 +39,22 @@ from .store import Store
 from .verifier import Verifier
 
 _TAG_RE = re.compile(r"\s*\[S\d+\]")
+
+
+_DIGITS = re.compile(r"\d[\d,.]*")
+
+
+def _good_rewrite(out: str, question: str, history: list[tuple[str, str]]) -> bool:
+    """Reject a rewrite that is empty, ballooned, not a question, or carries a
+    number found nowhere in the conversation: E36's first run "rewrote" a
+    follow-up into an invented answer, "The rent is £1,200 per month."."""
+    if not 0 < len(out) <= 3 * len(question) + 200:
+        return False
+    if question.rstrip().endswith(("?", "؟")) and not out.rstrip().endswith(("?", "؟")):
+        return False
+    seen = " ".join([question] + [f"{q} {a}" for q, a in history])
+    known = {n.rstrip(".,") for n in _DIGITS.findall(seen)}
+    return all(n.rstrip(".,") in known for n in _DIGITS.findall(out))
 
 
 class Amin:
@@ -79,11 +97,44 @@ class Amin:
 
     # -- answering -----------------------------------------------------------
 
-    def ask(self, question: str) -> Answer:
+    # -- follow-ups ------------------------------------------------------------
+
+    FOLLOWUP_OPTIONS = [
+        ("standalone", "the new message makes sense on its own"),
+        ("followup", "the new message depends on the earlier one: it says it, that, there or the "
+                     "same, or leaves out what it is about"),
+    ]
+
+    def standalone(self, question: str, history: list[tuple[str, str]] | None) -> str:
+        """The question as it would be asked with no conversation before it.
+
+        One rewrite call, and only when needed: with Amin's own model the
+        router's classifier first decides, in one pass, whether the message
+        leans on the previous turn at all (E36)."""
+        if not history or self.provider.name == "echo":
+            return question
+        if self.router is not None:
+            probs = self.router.classifier.scores(
+                f"Earlier message: {history[-1][0]}\nNew message: {question}", self.FOLLOWUP_OPTIONS)
+            if probs is not None and probs.get("followup", 0.0) < 0.5:
+                return question
+        try:
+            out = self.provider.complete(condense_prompt(history[-3:], question), system=CONDENSE_SYSTEM)
+        except Exception:
+            return question
+        out = " ".join(out.strip().strip('"').split())
+        return out if _good_rewrite(out, question, history) else question
+
+    # -- answering ---------------------------------------------------------------
+
+    def ask(self, question: str, history: list[tuple[str, str]] | None = None) -> Answer:
         started = time.perf_counter()
-        question = question.strip()
+        original = question.strip()
+        question = self.standalone(original, history)
 
         def finish(ans: Answer) -> Answer:
+            ans.question = original
+            ans.asked_as = question if question != original else ""
             ans.latency_ms = int((time.perf_counter() - started) * 1000)
             ans.model = f"{self.provider.name}:{getattr(self.provider, 'model_label', settings.answer_model)}"
             return ans

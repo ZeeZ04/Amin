@@ -994,3 +994,72 @@ is about 8 h.
 slice m and IndicQA-ml test, with every checkpoint chosen on slice k and
 IndicQA-ml sel only. Then a 4-bit copy runs the same gate, because the phone
 ships 4-bit.
+
+## E36 — Follow-up questions
+
+**Problem.** Every question was answered on its own. "And when does it end?"
+after a tenancy question had nothing to resolve "it" against, and a voice
+conversation is mostly follow-ups.
+
+**Method.** `/ask` passes the conversation's last three exchanges to
+`Amin.ask(question, history)`. `Amin.standalone()` asks the router's
+classifier, in one pass, whether the message leans on the previous one.
+Only then is it rewritten (CONDENSE_SYSTEM) into a standalone question, and
+the whole pipeline runs on the rewrite. The answer keeps the words the person
+used, and `asked_as` records the rewrite, which the app shows as
+"Understood as …".
+
+**A failure, caught before it shipped.** The first prompt let amin-3 *answer*
+instead of rewriting. "And how much is the rent?" became "The rent is £1,200
+per month.", an invented figure, which then went into the pipeline as the
+question. `_good_rewrite()` now rejects a rewrite that is not a question when
+the original was, or that contains any number that appears nowhere in the
+conversation. The prompt says "do not answer it". Test:
+`test_a_rewrite_that_answers_or_invents_a_number_is_rejected`.
+
+**Live check (amin-3, hand-read, not a rate).** English: "and how much is the
+rent?" became "What is the rent amount?", answered AED 85,000 with a
+citation. "And when does it end?" was resolved to the tenancy. "what about at
+sunset?" after a sky question was resolved too. The Arabic rewrite was
+correct. The Malayalam rewrite swapped "when" (എന്നാണ്) for "what"
+(എന്താണ്). Both then declined, because the document was English and the
+embeddings are English-only. That is a cross-language retrieval gap, not a
+memory one: bge-m3 is the fix (ROADMAP).
+
+## E37 — Voice mode and "Hey Amin"
+
+**Pieces, all on this machine** (`amin/voice.py`, `make voice-models`):
+- *Speech to text*: whisper-large-v3-turbo. Speech detected as Malayalam is
+  re-run through whisper-medium-malayalam (VRC-LC, Apache-2.0). Chrome's
+  built-in recognition was rejected because it uploads audio.
+- *Speaking*: the device's own voices. macOS has English and Arabic voices,
+  not Malayalam. Android usually has Malayalam. Indic voice models (AI4Bharat)
+  are the follow-up. Meta's MMS voices were rejected: their licence is
+  non-commercial.
+- *The loop* (app.js): listen; stop at a 1.3 s pause; transcribe; `/ask`
+  with the conversation; speak; listen again. Tapping the orb interrupts.
+  Two quiet turns end the loop.
+
+**Wake word without a wake-word model.** openWakeWord's ready-made models are
+licensed non-commercial. Instead, while "Listen for 'Hey Amin'" is on, the
+page sends only bursts of speech (up to 5 s, ended by a 0.7 s pause) to
+`/wake`. There whisper-base (MIT, 144 MB) checks that the clip *starts* with
+the name, alone or after a greeting, in any of the three languages.
+
+| whisper-base on 11 synthetic clips | woke on 6 wake phrases | false wakes on 5 near misses |
+|---|---|---|
+| unprimed | 1/6 (hears "Hey, I'm in") | 0/5 |
+| primed with the name in three scripts | **6/6** | 1/5 ("Amina called earlier") |
+
+About 0.4 s per burst. When a question follows the name ("Hey Amin, when
+does my lease end?"), the clip is re-transcribed by the full models before it
+is answered. base had garbled the Arabic question, and the full model got it
+exactly. That pass is primed with the name in the detected language's script
+only: the three-script prompt tipped an Arabic clip into the Malayalam
+model.
+
+**Limits.** The clips are macOS synthetic voices, so the numbers above show
+the method works; they are not accuracy figures. Real speakers, accents,
+noise and Malayalam speech are untested. iPhone and Apple Watch allow no
+third-party background wake word: there it is "Hey Siri, ask Amin" (native
+app) or "Hey Amin" with the app open.

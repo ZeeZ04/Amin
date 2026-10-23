@@ -1,6 +1,6 @@
 NO_THINK = --chat-template-args '{"enable_thinking": false}'
 
-.PHONY: install ingest eval ask test lint serve doctor clean sweep certs train-setup train-corpus distill train-sft serve-student preferences train-dpo bench-student
+.PHONY: voice-models install ingest eval ask test lint serve doctor clean sweep certs train-setup train-corpus distill train-sft serve-student preferences train-dpo bench-student
 
 install:
 	uv venv && uv pip install -e ".[dev]"
@@ -109,3 +109,13 @@ bench-student:
 	# The ship gate: same 237 items, same retriever, student vs teacher.
 	uv run amin ingest --reset
 	AMIN_PROVIDER=mlx uv run amin bench --systems amin
+
+# ---------------------------------------------------------------------------
+# Voice mode (E37): local Whisper. General, Malayalam specialist, wake-word.
+# ---------------------------------------------------------------------------
+voice-models:
+	uv sync --extra dev --extra voice
+	uv run python -c "from huggingface_hub import snapshot_download as d; \
+	  d('mlx-community/whisper-large-v3-turbo', local_dir='data/models/whisper-large-v3-turbo'); \
+	  d('mlx-community/whisper-medium-malayalam-mlx', local_dir='data/models/whisper-medium-malayalam'); \
+	  d('mlx-community/whisper-base-mlx', local_dir='data/models/whisper-base')"

@@ -105,6 +105,22 @@ def general_prompt(question: str, searched: bool = False) -> str:
     )
 
 
+CONDENSE_SYSTEM = """You turn a follow-up message into a standalone question. You never answer it.
+Replace words like it, that, there and the same with what they refer to in the
+conversation. Keep the user's language. Output only the question."""
+
+
+def condense_prompt(history: list[tuple[str, str]], question: str) -> str:
+    """`history`: the last few (question, answer) pairs, oldest first."""
+    turns = "\n".join(f"User: {q.strip()}\nAmin: {' '.join(a.split())[:300]}" for q, a in history)
+    return (
+        f"<conversation>\n{turns}\n</conversation>\n\n"
+        f"<follow_up>{question.strip()}</follow_up>\n\n"
+        "Do not answer it. Rewrite the follow-up as one standalone question, "
+        "in the same language, and output only that question."
+    )
+
+
 def rewrite_prompt(question: str) -> str:
     return (
         "Rewrite the question below as a keyword search query for a document index. "

@@ -114,6 +114,9 @@ class Answer(BaseModel):
     conflicts: list[str] = Field(default_factory=list)
     latency_ms: int = 0
     model: str = ""
+    # A follow-up rewritten to stand on its own ("and when does it end?" ->
+    # "When does the tenancy agreement end?"). Empty when asked as written.
+    asked_as: str = ""
 
     # -- derived views -------------------------------------------------------
 

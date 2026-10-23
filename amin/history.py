@@ -95,3 +95,17 @@ def forget_project(name: str, project: str) -> None:
     """A project this person can no longer open takes its conversations with it."""
     with closing(_db(name)) as db, db:
         db.execute("DELETE FROM conversations WHERE project=?", (project,))
+
+
+def recent(name: str, conv_id: str | None, turns: int = 3) -> list[tuple[str, str]]:
+    """The last `turns` exchanges of one conversation, oldest first, as
+    (question, answer text): the context a follow-up is rewritten against."""
+    conv = messages(name, conv_id) if conv_id else None
+    if conv is None:
+        return []
+    out = []
+    for m in conv["messages"][-turns:]:
+        a = m["answer"]
+        text = " ".join(c["text"] for c in a.get("claims", [])) or a.get("refusal_reason", "")
+        out.append((m["question"], text))
+    return out

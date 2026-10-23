@@ -55,6 +55,9 @@
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.6 3 5.2"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speaker-off" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
   <symbol id="i-quote" viewBox="0 0 24 24"><path d="M5 17h4l1-5V6H4v6h3zM14 17h4l1-5V6h-6v6h3z"/></symbol>
 </svg>
 
@@ -137,6 +140,7 @@
       <header class="topbar">
         <button class="icon-btn only-phone" id="openDrawer" aria-label="Conversations"><svg class="i"><use href="#i-menu"/></svg></button>
         <div class="title"><button class="space-btn" id="spaceBtn" type="button" aria-haspopup="menu"><svg class="i"><use href="#i-globe"/></svg><span id="spaceName">General chat</span><svg class="i"><use href="#i-down"/></svg></button></div>
+        <span class="wake-pill" id="wakePill" hidden title="Listening for “Hey Amin”"><i></i>Hey Amin</span>
         <button class="icon-btn only-phone" id="newChatPhone" aria-label="New chat"><svg class="i"><use href="#i-edit"/></svg></button>
       </header>
       <div class="chat-scroll" id="chatScroll">
@@ -158,6 +162,7 @@
           <button class="icon-btn" type="button" id="attach" aria-label="Add a document"><svg class="i"><use href="#i-plus"/></svg></button>
           <label class="sr" for="question">Message Amin</label>
           <textarea id="question" rows="1" dir="auto" placeholder="Message Amin"></textarea>
+          <button class="icon-btn" type="button" id="micBtn" aria-label="Talk to Amin" title="Voice mode"><svg class="i"><use href="#i-mic"/></svg></button>
           <button class="send" id="send" aria-label="Send" disabled><svg class="i"><use href="#i-up"/></svg></button>
         </form>
       </div>
@@ -262,6 +267,11 @@
           <label class="toggle-row"><span class="text"><span class="title">Household library</span><span class="sub">Documents everyone in the household shares</span></span><span class="switch"><input type="checkbox" id="prefHousehold"><span></span></span></label>
         </div>
 
+        <h2 class="section-title">Voice</h2>
+        <div class="list">
+          <label class="toggle-row"><span class="text"><span class="title">Listen for “Hey Amin”</span><span class="sub">While Amin is open on this device. Speech is checked on this computer and nowhere else.</span></span><span class="switch"><input type="checkbox" id="prefWake"><span></span></span></label>
+        </div>
+
         <h2 class="section-title">Appearance</h2>
         <div class="list"><div class="item"><span class="text"><span class="title">Theme</span></span>
           <div class="segmented" role="group" aria-label="Theme">
@@ -307,6 +317,25 @@
     </div>
   </aside>
 </div>
+
+<!-- voice mode: listen, transcribe here, answer, speak, listen again -->
+<section class="voice" id="voice" role="dialog" aria-modal="true" aria-labelledby="voiceState" hidden>
+  <header class="voice-top">
+    <div class="segmented voice-lang" role="group" aria-label="Spoken language">
+      <button type="button" data-vlang="auto" aria-pressed="true">Auto</button>
+      <button type="button" data-vlang="en" aria-pressed="false">EN</button>
+      <button type="button" data-vlang="ar" aria-pressed="false" lang="ar">ع</button>
+      <button type="button" data-vlang="ml" aria-pressed="false" lang="ml">മ</button>
+    </div>
+    <button class="icon-btn" id="voiceMute" type="button" aria-label="Don't read answers aloud" aria-pressed="false"><svg class="i"><use href="#i-speaker"/></svg></button>
+  </header>
+  <button class="orb" id="orb" type="button" aria-label="Tap to talk or interrupt"><span></span></button>
+  <p class="voice-state" id="voiceState" aria-live="polite">Listening…</p>
+  <p class="voice-said" id="voiceSaid" dir="auto"></p>
+  <p class="voice-reply" id="voiceReply" dir="auto"></p>
+  <button class="btn secondary voice-end" id="voiceEnd" type="button"><svg class="i"><use href="#i-close"/></svg>End conversation</button>
+  <p class="voice-note"><svg class="i"><use href="#i-lock"/></svg>Your voice is transcribed on this computer, not in the cloud.</p>
+</section>
 
 <dialog class="modal" id="dialog">
   <form method="dialog">

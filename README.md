@@ -191,6 +191,8 @@ amin/
   users.py       accounts, invites, sessions; spaces.py: projects and permissions
   history.py     conversation history, one SQLite file per person
   ocr.py         photos and scans, English + Arabic + Malayalam
+  classify.py    single-pass router: one forward pass, a probability per option (E34)
+  voice.py       speech to text and the "Hey Amin" wake check, local Whisper (E37)
   web/           the app: index.html, app.css, app.js, bundled Malayalam font
 scripts/ml_eval.py  Malayalam eval (E32): IndicQA-ml and Aya held-out
 data/corpus/     14 synthetic source documents, exact ground truth
@@ -208,6 +210,13 @@ the passage behind each citation opens beside the answer. It works in light
 and dark mode, and in English, Arabic (right to left) and Malayalam, with the
 Malayalam font bundled so nothing is fetched from the internet. Conversations
 are saved per person, and no one else can read them.
+
+**Voice.** Tap the microphone, or turn on "Listen for 'Hey Amin'" in
+Settings, and talk. Amin transcribes on this computer with Whisper (a
+Malayalam-tuned model for Malayalam), answers, reads the answer aloud and
+listens again, so follow-ups like "and when does it end?" work. Setup:
+`make voice-models`. On an iPhone or Apple Watch, only Siri may listen in the
+background, so there it is "Hey Amin" with the app open (E37).
 
 ## The data wall
 
