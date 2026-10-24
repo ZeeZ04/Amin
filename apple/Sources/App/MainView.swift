@@ -8,6 +8,43 @@ enum Destination: Hashable {
 /// Sidebar + detail. On iPad, Mac and Vision Pro both show; on iPhone and
 /// Apple TV the split view collapses to a stack automatically.
 struct MainView: View {
+  #if os(tvOS)
+  var body: some View { PhoneTabs() }
+  #else
+  @Environment(\.horizontalSizeClass) private var size
+
+  var body: some View {
+    // iPhone: tabs, like the web app's phone layout. Wider screens: a sidebar.
+    if size == .compact { PhoneTabs() } else { SplitLayout() }
+  }
+  #endif
+}
+
+/// Tabs for iPhone and Apple TV; each tab owns its navigation stack.
+struct PhoneTabs: View {
+  @Environment(AppModel.self) private var model
+  @State private var tab = "chat"
+
+  var body: some View {
+    TabView(selection: $tab) {
+      Tab("Chat", systemImage: "bubble.left.and.text.bubble.right", value: "chat") {
+        NavigationStack { ChatView(showsHistory: true) }
+      }
+      Tab("Documents", systemImage: "doc.badge.plus", value: "documents") {
+        NavigationStack { DocumentsView() }
+      }
+      Tab("Projects", systemImage: "folder", value: "projects") {
+        NavigationStack { ProjectsView(onAsk: { pid in model.newChat(in: pid); tab = "chat" }) }
+      }
+      Tab("Settings", systemImage: "gearshape", value: "settings") {
+        NavigationStack { SettingsView() }
+      }
+    }
+    .errorAlert()
+  }
+}
+
+struct SplitLayout: View {
   @Environment(AppModel.self) private var model
   @State private var selection: Destination? = .chat
 
@@ -30,7 +67,51 @@ struct MainView: View {
     .onChange(of: selection) { _, new in
       if case .conversation(let id) = new { Task { await model.open(id) } }
     }
-    .alert("Something went wrong", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
+    .errorAlert()
+  }
+}
+
+/// Recent conversations as a sheet: the iPhone's way into history.
+struct HistorySheet: View {
+  @Environment(AppModel.self) private var model
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      List {
+        if model.conversations.isEmpty {
+          ContentUnavailableView("No conversations yet", systemImage: "clock",
+                                 description: Text("Your conversations will appear here."))
+        }
+        ForEach(model.conversations) { c in
+          Button {
+            Task { await model.open(c.id); dismiss() }
+          } label: {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(c.title).lineLimit(1).foregroundStyle(.primary)
+              Text(Date(timeIntervalSince1970: c.updated), format: .relative(presentation: .named))
+                .font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          #if !os(tvOS)
+          .swipeActions { Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.delete(c.id) } } }
+          #endif
+        }
+      }
+      .navigationTitle("History")
+      .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
+    }
+  }
+}
+
+extension View {
+  func errorAlert() -> some View { modifier(ErrorAlert()) }
+}
+
+private struct ErrorAlert: ViewModifier {
+  @Environment(AppModel.self) private var model
+  func body(content: Content) -> some View {
+    content.alert("Something went wrong", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
       Button("OK", role: .cancel) {}
     } message: { Text(model.error ?? "") }
   }
