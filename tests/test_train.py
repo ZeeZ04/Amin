@@ -322,3 +322,14 @@ def test_grader_folds_malayalam_spellings():
 
     # atomic chillu (ൻ) and the older ZWJ spelling are the same letter
     assert _normalise("1,25,000 രൂപ അവൻ") == _normalise("125000 രൂപ അവന്‍")
+
+
+def test_malayalam_declines_are_recognised():
+    from amin.prompts import looks_like_refusal
+
+    # the teacher's own Malayalam declines (E38); before, every one graded as an answer
+    assert looks_like_refusal("നിങ്ങളുടെ ഡോക്യുമെന്റുകൾ ഇതിനെക്കുറിച്ച് വിവരങ്ങൾ നൽകുന്നില്ല.")
+    assert looks_like_refusal("നിങ്ങളുടെ കരാർ എനിക്ക് കാണാൻ കഴിയില്ല.")
+    # a real answer is not a decline
+    assert not looks_like_refusal("ഈ ഫ്ലാറ്റിന് 2 കാർ പാർക്കിംഗ് ലഭിക്കും.")
+    assert not looks_like_refusal("കേരളത്തിലെ ഏറ്റവും നീളം കൂടിയ നദി പെരിയാർ ആണ്.")

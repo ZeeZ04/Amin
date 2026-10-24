@@ -164,6 +164,19 @@ REFUSAL_MARKERS = (
     "لا أستطيع الاطلاع",
     "لا تتوفر لدي",
     "لا تغطي مستنداتك",
+    # E38: Malayalam declines, from the teacher's own replies. Until these were
+    # here every Malayalam decline was graded as an answer.
+    "ഉത്തരം നൽകുന്നില്ല",     # (the documents) don't answer
+    "വിവരങ്ങൾ നൽകുന്നില്ല",   # don't give information
+    "എനിക്ക് ലഭ്യമല്ല",        # not available to me
+    "ഇവിടെ ലഭ്യമല്ല",          # not available here
+    "എനിക്ക് അറിയില്ല",        # I don't know
+    "കാണാൻ കഴിയില്ല",          # can't see
+    "കാണാൻ സാധിക്കില്ല",
+    "പറയാൻ കഴിയില്ല",          # can't say
+    "പറയാൻ സാധിക്കില്ല",
+    "ഉത്തരം നൽകാൻ കഴിയില്ല",   # can't answer
+    "രേഖകളിൽ ഇതിനെക്കുറിച്ച് ഒന്നും പറയുന്നില്ല",
 )
 
 

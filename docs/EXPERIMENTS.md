@@ -1251,3 +1251,26 @@ not taken place").
 - **Training.** DPO (`amin/train/edge_dpo.yaml`) on fused edge-1 with itself as
   the reference: beta 0.1, lr 5e-6, checkpoints every 25 steps. Selection on
   slice k and IndicQA-ml sel, then the E35 gate again.
+
+**First run: zero pairs, and why.** edge-1 missed 267 of 1,760 declines, and
+the 27B was graded right on 0 of the 267. The 27B was in fact right: it
+declined in Malayalam ("നിങ്ങളുടെ ഡോക്യുമെന്റുകൾ ഇതിനെക്കുറിച്ച് വിവരങ്ങൾ
+നൽകുന്നില്ല", *your documents don't give information about this*). But
+`looks_like_refusal()` had no Malayalam markers, so every Malayalam decline
+was graded as an answer. Eleven markers were added, taken from the teacher's
+own declines. Test: `test_malayalam_declines_are_recognised`. Grounded
+Malayalam scores (E32–E35) do not move, because those declines are
+`NO_EVIDENCE`. Only free-text declines were affected.
+
+**What it uncovered.** After regrading, edge-1's misses are real, and 247 of
+254 are Malayalam. Asked about details its documents lack, it **invents
+them**: "this flat gets 2 car parking spaces", "after renewal the rent is
+₹12,000". In English and Arabic it declines almost always. The SFT fallback
+set (E31) predates Malayalam, and the Malayalam general data (Aya) teaches
+only answering. The English-heavy main bench cannot see this, so
+`edge_prefs probe` now checks held-out fallback rows per language.
+
+**Second run.** 234 mistake pairs (the teacher's real decline over edge-1's
+invention) and 247 answer-side anchors (118 Malayalam, 105 English, 24
+Arabic: a right general answer over a refusal). Pairs are split by the
+item's own train/valid split.
