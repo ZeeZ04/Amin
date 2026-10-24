@@ -67,6 +67,18 @@ def rows() -> list[dict]:
     out += [{"id": r["id"] + "-e", "question": r["question"], "lang": r.get("lang", "en"), "split": "train",
              "want": "answer" if r["kind"] == "general" else "decline"}
             for r in bank() if r["id"] + "-s" not in used]
+    # Answer-side anchors for balance pairs: general questions asked inside a
+    # document space must still be answered, in every language. The bank was
+    # all used by round-1 SFT, so it is reused here as anchors only, with
+    # Malayalam native-speaker questions (amin.train.malayalam) alongside.
+    out += [{"id": r["id"] + "-b", "question": r["question"], "lang": r.get("lang", "en"), "split": "train",
+             "want": "answer"} for r in bank() if r["kind"] == "general"]
+    ml = settings.train_path / "ml_general.jsonl"
+    if ml.exists():
+        qs = [json.loads(x)["messages"][1]["content"] for x in ml.read_text(encoding="utf-8").splitlines()
+              if '"source": "aya"' in x]
+        out += [{"id": f"aya-b{k}", "question": q, "lang": "ml", "split": "valid" if k % 10 == 9 else "train",
+                 "want": "answer"} for k, q in enumerate(qs[:150]) if len(q) < 400]
     return out
 
 
@@ -105,9 +117,10 @@ def sample() -> None:
 
 @app.command()
 def teacher() -> None:
-    """The 27B on every prompt the student got wrong, plus the general ones (for balance pairs)."""
+    """The 27B on every prompt the student got wrong."""
     p = _paths()
-    todo = [r for r in _read(p["student"]) if not r["right"] or r["want"] == "answer"]
+    # Only the student's mistakes need the teacher; its right general answers anchor the balance pairs.
+    todo = [r for r in _read(p["student"]) if not _right(r["reply"], r["want"])]
     n = _run(OllamaProvider(), p["teacher"], todo)
     got = _read(p["teacher"])
     typer.echo(f"teacher: {n} new · right on {sum(r['right'] for r in got)}/{len(got)}")
@@ -123,8 +136,10 @@ REFUSAL = {
 @app.command()
 def export(seed: int = 0) -> None:
     p = _paths()
-    student = {r["id"]: r for r in _read(p["student"])}
-    teach = {r["id"]: r for r in _read(p["teacher"]) if r["right"]}
+    # Re-grade from the replies, not the stored flag: the refusal markers
+    # change (E38 added Malayalam), and a stale flag would mislabel pairs.
+    student = {r["id"]: {**r, "right": _right(r["reply"], r["want"])} for r in _read(p["student"])}
+    teach = {r["id"]: r for r in _read(p["teacher"]) if _right(r["reply"], r["want"])}
     pairs, balance = [], []
     for i, s in student.items():
         t = teach.get(i)
@@ -142,7 +157,7 @@ def export(seed: int = 0) -> None:
     d = p["dpo"]
     d.mkdir(parents=True, exist_ok=True)
     for split in ("train", "valid"):
-        part = [r for k, r in enumerate(rows_) if (k % 10 == 9) == (split == "valid")]
+        part = [r for r in rows_ if (r["split"] == "valid") == (split == "valid")]
         (d / f"{split}.jsonl").write_text("".join(json.dumps({k: r[k] for k in ("system", "prompt", "chosen", "rejected")},
                                                              ensure_ascii=False) + "\n" for r in part), encoding="utf-8")
         typer.echo(f"{split}: {len(part)} pairs → {d / f'{split}.jsonl'}")
@@ -151,3 +166,23 @@ def export(seed: int = 0) -> None:
 
 if __name__ == "__main__":
     app()
+
+
+@app.command()
+def probe(label: str = typer.Option(..., help="Name for this run, e.g. edge-2-100")) -> None:
+    """Held-out fallback check (valid-split rows) on the model at settings.mlx_host, per language.
+
+    The main bench is English-heavy and cannot see E38's failure: Malayalam
+    questions about the user's own documents answered with invented details."""
+    out = settings.train_path / f"edge_probe-{label}.jsonl"
+    held = [r for r in rows() if r["split"] == "valid"]
+    _run(MLXProvider(), out, held)
+    got = _read(out)
+    from collections import defaultdict
+
+    tally: dict = defaultdict(lambda: [0, 0])
+    for r in got:
+        key = (r["want"], r["lang"])
+        tally[key][0] += _right(r["reply"], r["want"])
+        tally[key][1] += 1
+    typer.echo(f"{label}: " + " · ".join(f"{w} {lang} {a}/{n}" for (w, lang), (a, n) in sorted(tally.items())))
