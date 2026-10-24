@@ -1,0 +1,32 @@
+# Edge round 2 (E38): preference tuning on the fallback decline.
+# `uv run mlx_lm_lora.train -c amin/train/edge_dpo.yaml`. The reference is the
+# round-1 student itself (edge-1, step 1000, fused), as for amin-1 (E24).
+model: data/models/edge-1-bf16
+reference_model_path: data/models/edge-1-bf16
+train: true
+train_mode: dpo
+data: data/train/dpo-edge
+fine_tune_type: lora
+adapter_path: data/adapters/edge-2-dpo
+seed: 0
+
+beta: 0.1
+dpo_cpo_loss_type: sigmoid
+max_seq_length: 2048
+grad_checkpoint: true
+
+batch_size: 2
+# E24: pair accuracy saturates early and later steps over-refuse; checkpoint
+# every 25 steps and choose on slice k, never on the DPO metric.
+iters: 200
+learning_rate: 5.0e-6
+num_layers: -1
+lora_parameters:
+  rank: 16
+  scale: 20.0
+  dropout: 0.05
+
+steps_per_report: 10
+steps_per_eval: 25
+val_batches: 20
+save_every: 25

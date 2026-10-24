@@ -1100,7 +1100,7 @@ does.
 
 **Decision.** Gemma 4 E4B is the on-device base (ADR-014 → E35).
 
-## E35 — Edge student, round 1 (in progress)
+## E35 — Edge student, round 1: strong answers, fails the gate on declining
 
 **Data.** amin-3's SFT set: the grounded English and Arabic examples, general
 chat and the fallback examples, reused unchanged. Added to it:
@@ -1187,3 +1187,67 @@ the method works; they are not accuracy figures. Real speakers, accents,
 noise and Malayalam speech are untested. iPhone and Apple Watch allow no
 third-party background wake word: there it is "Hey Siri, ask Amin" (native
 app) or "Hey Amin" with the app open.
+
+### E35 results
+
+**Selection** (slice k, hybrid; IndicQA-ml sel). Checkpoints were chosen
+where the noisy val loss dipped, plus the final weights:
+
+| | step 1000 | 1600 | 2000 | final |
+|---|---|---|---|---|
+| slice k fact accuracy | **91.2%** | 81.2% | 80.0% | 80.0% |
+| slice k correct refusal | 92.5% | 92.5% | 93.8% | 93.8% |
+| slice k Arabic | 100% | 85.7% | 100% | 100% |
+| ml answerable | **85.4%** | 80.6% | 81.6% | 81.6% |
+| ml declined | 74.5% | 76.6% | 76.6% | 76.6% |
+
+Step 1000 was chosen. Later steps over-refuse, the pattern amin-2 and amin-3
+showed. Against the untrained base, Malayalam rose on both sides
+(84.5→85.4%, 70.2→74.5%) and Arabic went from 61% to 100%. It was fused as
+**edge-1**: 7.4 GB at 8-bit, 3.9 GB at 4-bit.
+
+**Gate** (`scripts/gate_compare.py`, paired McNemar on identical items,
+hybrid; the teacher rows are E29's main-set run and E31's slice m run):
+
+| | edge-1 q8 | qwen3.6:27b | p |
+|---|---|---|---|
+| main answerable | 109/110 | 108/110 | 1.0 |
+| **main unanswerable** | **73/99** | **85/99** | **0.017** |
+| main out-of-scope / conflict / Arabic | 22/22 · 5/6 · 17/18 | 21/22 · 5/6 · 17/18 | 1.0 |
+| slice m answerable | 59/65 | 59/65 | 1.0 |
+| slice m unanswerable | 63/75 | 67/75 | 0.39 |
+| IndicQA-ml test answerable | **94/108** | 86/108 | — |
+| IndicQA-ml test declined | 34/42 | 37/42 | — |
+| routing set (E34) | 73/76, crisis 14/14, 0 false alarms, p50 91 ms | — | — |
+| main p50 | ~1.2 s | 6.7 s | |
+
+Against amin-3 on the main set, nothing differs significantly (unanswerable
+73 vs 80, p=0.12). Hallucination is 2.0% vs amin-3's 4.0%. Trust is +0.930
+vs +0.870.
+
+**4-bit costs too much:** main unanswerable 66/99 (p=0.001), slice m 58/75
+(p=0.035), IndicQA-ml answerable 79.6%, and 8 routing false alarms.
+
+**Verdict: edge-1 does not ship.** It fails ADR-012's comparative gate on
+main-set declining, as amin-2 did. 24 of its 26 unanswerable failures are
+the same behaviour: a general answer to a question about the user's own
+documents after the search found nothing ("What VAT rate applies to the
+electricity bill?"), some with invented specifics ("three slabs above 5,000
+kWh"). Two are prior-knowledge errors from Gemma's cutoff ("Euro 2024 has
+not taken place").
+
+## E38 — Edge round 2: preference pairs on the fallback decline (in progress)
+
+`amin/train/edge_prefs.py`:
+- **Sample.** edge-1 answers every training unanswerable the SFT fallback set
+  never used (1,564, of which 235 are Malayalam), plus the general bank, under
+  `general_prompt(searched=True)`.
+- **Teacher.** The 27B answers each prompt edge-1 got wrong. Only its right
+  replies become `chosen`.
+- **Pairs.** Each mistake pair puts the teacher's reply over edge-1's own.
+  Every general question adds an answer-side pair, a right answer chosen over
+  a refusal, so the model learns the line rather than a lean towards
+  declining.
+- **Training.** DPO (`amin/train/edge_dpo.yaml`) on fused edge-1 with itself as
+  the reference: beta 0.1, lr 5e-6, checkpoints every 25 steps. Selection on
+  slice k and IndicQA-ml sel, then the E35 gate again.
