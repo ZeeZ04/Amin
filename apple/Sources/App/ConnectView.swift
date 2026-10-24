@@ -25,6 +25,14 @@ struct ConnectView: View {
     }
     .background(Color.aminTealDeep.opacity(0.04))
     .onAppear { address = model.serverURL?.absoluteString ?? "" }
+    .task(id: address) {
+      // Ask the server early whether this is its first account, which needs
+      // no invite and becomes the admin: then the form can say so.
+      try? await Task.sleep(for: .milliseconds(500))
+      guard let client = try? model.connect(to: address), let s = try? await client.setup() else { return }
+      firstAccount = s.firstAccount
+      if firstAccount { creating = true }
+    }
   }
 
   private var header: some View {
@@ -38,7 +46,7 @@ struct ConnectView: View {
 
   private var form: some View {
     VStack(alignment: .leading, spacing: 16) {
-      field("Amin computer", text: $address, prompt: "192.168.1.20:8000", hint: "The address `make serve` printed on your Mac.")
+      field("Amin computer", text: $address, prompt: "192.168.1.20:8000", hint: "The address make serve printed on your Mac.")
         #if os(iOS)
         .keyboardType(.URL)
         #endif
@@ -57,6 +65,11 @@ struct ConnectView: View {
         SecureField("6 or more characters", text: $password)
           .textContentType(creating ? .newPassword : .password)
           .boxedField()
+      }
+      if firstAccount {
+        Label("This is the first account on this Amin computer. It becomes the admin, who invites everyone else.",
+              systemImage: "person.badge.key")
+          .font(.callout).foregroundStyle(.secondary)
       }
       if creating && !firstAccount {
         field("Invite code", text: $invite, prompt: "From the person who runs Amin", hint: nil)

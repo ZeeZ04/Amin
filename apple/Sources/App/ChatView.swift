@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ChatView: View {
   @Environment(AppModel.self) private var model
+  /// iPhone and Apple TV have no sidebar: history opens from the toolbar.
+  var showsHistory = false
+  @State private var history = false
   @State private var draft = ""
   @State private var shownSource: SourceRequest?
   @State private var voice = false
@@ -40,12 +43,18 @@ struct ChatView: View {
     #endif
     .toolbar { toolbar }
     .sourceInspector(item: $shownSource)
+    .sheet(isPresented: $history) { HistorySheet() }
     #if os(iOS) || os(macOS) || os(visionOS)
     .fullScreenCoverCompat(isPresented: $voice) { VoiceView() }
     #endif
   }
 
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+    if showsHistory {
+      ToolbarItem(placement: .navigation) {
+        Button("History", systemImage: "clock.arrow.circlepath") { history = true }
+      }
+    }
     ToolbarItem(placement: .principal) { SpaceMenu() }
     ToolbarItem(placement: .primaryAction) {
       Button("New chat", systemImage: "square.and.pencil") { model.newChat() }
@@ -104,8 +113,13 @@ struct SpaceMenu: View {
         }
       }
     } label: {
-      Label(model.project?.name ?? "General chat", systemImage: model.project == nil ? "globe" : "folder")
-        .font(.subheadline.weight(.medium))
+      HStack(spacing: 5) {
+        Image(systemName: model.project == nil ? "globe" : "folder")
+        Text(model.project?.name ?? "General chat").lineLimit(1)
+        Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+      }
+      .font(.subheadline.weight(.medium))
+      .fixedSize()
     }
   }
 }
@@ -154,6 +168,7 @@ struct Welcome: View {
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
         .padding(14)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .environment(\.layoutDirection, question.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) } ? .rightToLeft : .leftToRight)
       }
       .buttonStyle(.plain)
     }

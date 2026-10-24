@@ -49,7 +49,7 @@ struct DoorMark: View {
 // apply each one where the platform has it.
 extension View {
   @ViewBuilder func selectable() -> some View {
-    #if os(tvOS)
+    #if os(tvOS) || os(watchOS)
     self
     #else
     self.textSelection(.enabled)
