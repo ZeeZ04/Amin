@@ -594,6 +594,67 @@ stage that trains against failure rather than copying success. Watch correct
 refusal on *answerable* items: a DPO run that buys lower hallucination with
 more refusals of answerable questions is the ADR-011 trade, and gets rejected.
 
+## E25 — fresh held-out slice: does amin-1's low hallucination generalise?
+
+**No, not as an established result.** The hallucination gap closes to noise,
+and what does transfer is the over-refusal, which here becomes a significant
+loss of accuracy.
+
+The slice is `data/eval/eval_slice_j.jsonl`, 100 items built by
+`scripts/build_eval_set.py`. It was written before looking at any model's
+output on the main set. It has 40 adjacent-fact unanswerables over the eval
+corpus (`ju`), such as the V14 power adapter's warranty where only the
+laptop's is stated, or a townhouse deposit where only apartment and villa
+deposits are. Each one is paired with an answerable sibling on the stated fact
+(`js`), and there are 20 fresh answerables (`ja`). It is a separate file, so
+the 237-item set is unchanged. No slice question appears in the training
+items (exact match, or any shared 6-gram), and a test enforces that.
+
+Same retriever and pipeline for both models, paired per kind (ADR-006/008):
+
+| slice | qwen3.6:27b | amin-1 (8-bit) | discordant, McNemar |
+|---|---|---|---|
+| fact accuracy, all answerable | 56/60 93.3% ±6.7% | 46/60 **76.7%** ±10.5% | 11 vs 1, **p=0.006** |
+|   siblings (js) | 37/40 92.5% | 32/40 80.0% | 6 vs 1, p=0.13 |
+|   fresh (ja) | 19/20 95.0% | 14/20 70.0% | 5 vs 0, p=0.06 |
+| hallucination, adjacent-fact (ju) | 3/40 7.5% ±8.6% | 2/40 5.0% ±7.6% | 2 vs 1, p=1.00 |
+| pair fully right (ju refused, js answered) | 34/40 85.0% | 31/40 77.5% | 6 vs 3, p=0.51 |
+| p50 latency | 5.1 s | 2.2 s | |
+
+Reports: `bench-20261020T074201` (teacher), `bench-20261020T074555` (amin-1).
+
+What this shows:
+1. **Hallucination: no detectable difference.** 2 vs 3 out of 40 has p=1.0.
+   The main set's 1.0% vs 6.1% does not reappear on traps that the training
+   never targeted. The two models share one failure (ju027, roaming data past
+   the pass's 1 GB, where both quote the no-pass rate). amin-1's other
+   failure carries E7's unplug instruction over to E4 (ju003). The teacher's
+   other two failures assert the V14 adapter's and the extended battery's
+   cover.
+2. **Accuracy: amin-1 is significantly worse, by refusal.** All 14 of its
+   answerable misses are `refused_no_evidence`. In 11 of them the teacher
+   answered from the same retrieval. Examples are "Is the UFP application fee
+   refundable?" and "Does using a third-party water filter affect the FR-440
+   warranty?". This is the ADR-011 trade that E24 rejected at steps 200 and
+   1433. It also explains E24 caveat 2 (4 of 6 misses were refusals): step
+   100 was already leaning that way, and the main set hid how far.
+3. It is the 20 fresh items, phrased unlike anything in the main set, that
+   lose most (70% vs 95%). That is consistent with the DPO having learnt "refuse
+   when unsure" more than "spot the adjacent fact".
+
+Caveats: n=40 per side cannot resolve a 2–3 point hallucination difference,
+since ±8pp intervals overlap almost entirely. The slice is English only.
+Labels were checked against the failing answers after the run and none
+changed.
+
+Consequence: the ADR-012 gate passed on a benchmark that the DPO stage was
+tuned to. On held-out items amin-1 fails the "accuracy not significantly
+below the teacher" condition. Before amin-1 ships as the default, the next
+DPO run needs a stopping check that includes answerable items it was not
+trained on. Candidates are an earlier checkpoint than step 100, or more
+answer-side balance pairs. Picking a checkpoint on this slice would spend
+it, so any such check needs a new slice of its own.
+
 ## Still open, in priority order
 
 1. **E16 — attach a real local model.** `./scripts/setup_mac.sh` once Ollama is
@@ -695,6 +756,36 @@ The 9-item gap to strict is the price of answering generally. It is reported,
 not rounded away. Note that items 1 and 2 above changed the instrument after
 seeing results, and are written down here for that reason.
 
+## E28 — slice k, the amin-2 checkpoint-selection slice
+
+`data/eval/eval_slice_k.jsonl`, 160 items, built by `scripts/build_eval_set.py`
+alongside the main set:
+
+| ids | n | kind |
+|---|---|---|
+| ku001–040 | 40 | adjacent-fact traps over `data/corpus`, unanswerable |
+| ks001–040 | 40 | the answerable sibling of each trap (pair n = ku n + ks n) |
+| ka001–040 | 40 | fresh answerables (4 Arabic) |
+| kg001–020 | 20 | general-knowledge unanswerables with `expect_general` facts |
+| kp001–020 | 20 | personal-detail unanswerables a general answer must decline |
+
+**What it is for.** Choosing amin-2's checkpoint in hybrid mode (TRAINING.md,
+Round 2, step 4), and nothing else. No benchmark is run on it and no number
+from it is reported as a result; slice j stays the final one-time test.
+
+**Written blind.** The items were written from the corpus documents alone,
+without looking at any model's output on any set. Facts the two tenancy
+documents or the two handbooks disagree on are kept out of the answerables.
+
+**Independent by test.** `tests/test_slice_k.py` fails if any slice k question
+repeats, or shares a 6-gram with, a training item (regenerated at seed 7, plus
+`data/train/items.jsonl` when present), the main set, or slice j (read from its
+branch until merged). Writing it found real collisions: six of the first
+general-knowledge questions repeated or shared a 6-gram with training items, so the general
+questions were replaced with ones the training set doesn't ask, even in other
+words. When step 2 adds general questions to SFT, the same test will catch any
+that land in slice k, as long as they go through `items.jsonl`.
+
 ## E29 — amin-2: accuracy fixed, the gate still fails on declining
 
 **Recipe.** The round-1 grounded SFT set now carries the round-3 trap items as
@@ -753,6 +844,39 @@ unanswerable training items through `general_prompt(searched=True)` under
 `GENERAL_SYSTEM`, keep the teacher's declines, and add them to SFT; today
 there are 21 such examples. Then select on k and test on a *new* final
 slice, because j has now been spent on two rounds.
+
+## E30 — slice m, the amin-3 final test
+
+`data/eval/eval_slice_m.jsonl`, 140 items, built by `scripts/build_eval_set.py`
+alongside the main set:
+
+| ids | n | kind |
+|---|---|---|
+| mu001–032 | 32 | adjacent-fact traps over `data/corpus`, unanswerable (2 Arabic) |
+| ms001–032 | 32 | the answerable sibling of each trap (pair n = mu n + ms n; 2 Arabic) |
+| ma001–033 | 33 | fresh answerables (3 Arabic) |
+| md001–027 | 27 | document-shaped unanswerables a general fallback must decline (2 Arabic) |
+| mg001–016 | 16 | general-knowledge unanswerables with `expect_general` facts (1 Arabic) |
+
+**What it is for.** The final, one-time test of amin-3 in hybrid mode: slice j
+was spent on two rounds and slice k chooses the checkpoint. It is aimed at the
+two places amin-2 fell short of the teacher (E29): fresh adjacent-fact traps,
+and the `md` items, where the documents are silent on a question about them
+("Can I add a second line to my Freedom 150 plan?") and the right answer is
+"your documents don't cover this", not hedged general guidance. Not trained
+on, not used for selection, and not run until amin-3 is final.
+
+**Written blind.** The items were written from the corpus documents alone,
+without opening any report or any model's output. Facts the two tenancy
+documents or the two handbooks disagree on are kept out of the answerables.
+
+**Independent by test.** `tests/test_slice_m.py` fails if any slice m question
+repeats, or shares a 6-gram with, a training item (regenerated at seed 7, plus
+`data/train/items.jsonl` and `general.jsonl` when present), the main set,
+slice j or slice k (each read from its branch until merged). Writing it found
+21 collisions, all rephrased or replaced: seven of the first general questions
+were already training items, and the rest shared stock phrasings ("how long do
+I have to", "what does Metro Utilities charge per") with the main set, j or k.
 
 ## E31 — amin-3: indistinguishable from the 27B on held-out slices, about 4× faster
 

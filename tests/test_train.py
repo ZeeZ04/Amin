@@ -58,6 +58,14 @@ def test_no_training_question_appears_in_the_eval_set(built):
     assert not eval_qs & {_norm(i["question"]) for i in items}
 
 
+def test_no_training_question_appears_in_the_fresh_slice(built):
+    # E25: the held-out slice exists to test what training did not target.
+    _, items = built
+    slice_qs = {_norm(i.question) for i in load_items(REPO / "data" / "eval" / "eval_slice_j.jsonl")}
+    assert len(slice_qs) == 100
+    assert not slice_qs & {_norm(i["question"]) for i in items}
+
+
 def test_no_training_document_copies_eval_text(built):
     docs, _ = built
     eval_grams = set().union(*(_ngrams(split_front_matter(p.read_text()).body) for p in EVAL_CORPUS.glob("*.md")))
