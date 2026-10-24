@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__, history, spaces, users
+from . import __version__, history, memory, spaces, users
 from .answer import Amin
 from .config import settings
 from .ingest import SUPPORTED, chunk_document, make_document
@@ -228,7 +228,8 @@ def me(name: str = Depends(current_user)) -> dict:
         "admin": users.is_admin(name),
         "people": users.names(),
         "prefs": spaces.prefs(name),
-        "private": sorted(p.name for p in users.docs_dir(name).iterdir()),
+        # memory.md is managed through /memory, not as a document
+        "private": sorted(p.name for p in users.docs_dir(name).iterdir() if p.name != memory.FILE),
         "household": sorted(p.name for p in users.docs_dir(users.HOUSEHOLD).iterdir()),
         "projects": [_project_view(p, name) for p in spaces.projects_for(name)],
     }
@@ -358,7 +359,9 @@ async def upload(
 
     readers = spaces.indexes_reading(src)
     for index in readers:
-        engine(index)  # make sure each reader exists, then bring them all up to date
+        eng = engine(index)  # make sure each reader exists, then bring them all up to date
+        with _locks[index]:
+            eng.store.delete_doc(src.doc_id(safe))  # a re-upload replaces the old version
     resync(readers)
     return {"document": safe, "library": library, "project": project, "chunks": len(chunks)}
 
@@ -368,6 +371,8 @@ def delete_document(
     filename: str, library: str = "private", project: str | None = None, name: str = Depends(current_user)
 ) -> dict:
     src = _source(library, name, project, "delete")
+    if library == "private" and Path(filename).name == memory.FILE:
+        raise HTTPException(400, "manage what you told Amin under Memory")
     path = src.folder / Path(filename).name
     if not path.exists():
         raise HTTPException(404, "no such document")
@@ -380,9 +385,27 @@ def delete_document(
 # -- asking ------------------------------------------------------------------
 
 
+def _reindex_private(name: str) -> None:
+    """After a memory edit: re-index memory.md everywhere it is read.
+
+    sync() only adds documents an index lacks, and memory.md keeps its name as
+    it changes, so the old copy is dropped first. Otherwise a newly taught fact
+    would be missing and a forgotten one would still answer."""
+    src = spaces.private(name)
+    readers = spaces.indexes_reading(src)
+    stale = src.doc_id(memory.FILE)
+    for index in readers:
+        eng = engine(index)
+        with _locks[index]:
+            eng.store.delete_doc(stale)
+    resync(readers)
+
+
 @api.post("/ask")
 def ask(req: AskRequest, name: str = Depends(current_user)) -> dict:
     index = _space(name, req.project)
+    if (fact := memory.taught(req.question)) is not None:
+        return _remember(name, req, fact)
     eng = engine(index)
     context = history.recent(name, req.conversation_id)
     with _locks[index]:
@@ -446,6 +469,52 @@ async def wake(request: Request, name: str = Depends(current_user)) -> dict:
         raise HTTPException(503, str(exc)) from exc
     except Exception:
         return {"wake": False, "rest": "", "text": ""}  # an undecodable burst is not a wake
+
+
+# -- memory (Teach Amin, ADR-015) -------------------------------------------
+
+
+class Fact(BaseModel):
+    text: str = Field(min_length=1, max_length=memory.MAX_FACT)
+
+
+def _remember(name: str, req: AskRequest, fact: str) -> dict:
+    """ "Remember that …" saves the fact rather than answering it, and says so."""
+    try:
+        item = memory.add(name, fact)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    _reindex_private(name)
+    result = {
+        "question": req.question, "asked_as": "", "outcome": "remembered", "basis": "memory",
+        "routed_to": "", "refusal_reason": f"Saved to your memory: “{item['text']}”",
+        "claims": [], "sources": {}, "latency_ms": 0, "fact_id": item["id"],
+    }
+    result["conversation_id"] = history.record(name, req.conversation_id, req.project, req.question, result)
+    return result
+
+
+@api.get("/memory")
+def list_memory(name: str = Depends(current_user)) -> list[dict]:
+    return memory.facts(name)
+
+
+@api.post("/memory")
+def add_memory(fact: Fact, name: str = Depends(current_user)) -> dict:
+    try:
+        item = memory.add(name, fact.text)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    _reindex_private(name)
+    return item
+
+
+@api.delete("/memory/{fact_id}")
+def delete_memory(fact_id: str, name: str = Depends(current_user)) -> dict:
+    if not memory.remove(name, fact_id):
+        raise HTTPException(404, "no such fact")
+    _reindex_private(name)
+    return {"deleted": fact_id}
 
 
 # -- history -----------------------------------------------------------------

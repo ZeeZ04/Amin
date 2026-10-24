@@ -241,7 +241,10 @@ struct AnswerView: View {
   }
 
   @ViewBuilder private var basis: some View {
-    if answer.claims.isEmpty {
+    if answer.isRemembered {
+      Label("Saved to your memory", systemImage: "brain")
+        .font(.caption.weight(.semibold)).foregroundStyle(Color.aminTeal)
+    } else if answer.claims.isEmpty {
       Label(answer.routedTo != nil ? "Better asked elsewhere" : "No answer", systemImage: "shield")
         .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
     } else if answer.isConflict {
@@ -259,6 +262,7 @@ struct AnswerView: View {
 
   /// Claims with their citation numbers inline, in saffron.
   private func body(_ a: Answer) -> AttributedString {
+    if a.isRemembered { return AttributedString((a.refusalReason ?? "").replacingOccurrences(of: "Saved to your memory: ", with: "")) }
     guard !a.claims.isEmpty else { return AttributedString(a.refusalReason ?? "") }
     let order = a.citationOrder
     var out = AttributedString()
@@ -304,7 +308,7 @@ struct FlowChips: View {
 
   private func label(_ id: String) -> String {
     let doc = String(id.split(separator: "#").first ?? Substring(id))
-    let file = Chunk(docId: doc, heading: "", text: "").library.file
+    let file = doc == "p.memory.md" ? "Your memory" : Chunk(docId: doc, heading: "", text: "").library.file
     guard let h = sources[id]?.heading, !h.isEmpty else { return file }
     return "\(file) · \(h)"
   }

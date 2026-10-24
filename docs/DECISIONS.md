@@ -292,3 +292,32 @@ cost; LangChain, which would replace the measured pipeline with an
 unmeasured one; and hosted classifiers such as Jev, which are API-only and so
 break "nothing leaves the device". The single-pass classification idea behind
 Jev can run locally on Amin's own model.
+
+## ADR-015 — Owners teach Amin through memory, not through its weights
+**Status:** accepted · **Date:** 2026-10-24 · extends ADR-012
+
+The owner's goal is an assistant people can trust *and teach*. "Teach" could
+mean fine-tuning each person's facts into the model on their device. It does
+not, for the same reasons ADR-012 kept household documents out of the
+weights:
+
+- **Trust needs a source.** A fact in the weights cannot be cited. A fact in
+  memory is cited like any document ("Your memory · Told on 24 October 2026").
+- **Forgetting must be real.** Deleting a memory removes it from every index
+  at once (`tests/test_app.py::test_memory_edits_reach_the_index_not_just_the_file`).
+  Getting a fact out of weights needs retraining, and even then nothing proves it is gone.
+- **Private data stays out of model files.** A weights file is easy to copy,
+  share or ship in a backup. Memory is a JSON file in the person's own folder.
+- **It works immediately.** No training run, no GPU, no gate.
+
+**Decision.** "Remember that …", and the Arabic and Malayalam equivalents
+(`amin/memory.py`), or Settings › Memory, saves a fact to
+`data/users/<name>/memory.json`. It is rendered as `memory.md` in the
+person's private library, with one section per fact, so each fact is its own
+citation. Only an explicit request saves anything. The private-library
+permissions (ADR-013) decide where memory is read.
+
+**What training is for.** Behaviour across everyone: citing, declining,
+languages, routing. It never carries one person's facts. Accuracy and
+hallucination are improved by training on the model's own graded failures
+(E24, E35 onward), not by memorising answers.
