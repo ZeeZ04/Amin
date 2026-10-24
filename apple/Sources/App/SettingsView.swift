@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
   @Environment(AppModel.self) private var model
   @State private var invite: String?
+  @State private var facts: [Fact] = []
+  @State private var newFact = ""
   @State private var confirmSignOut = false
 
   var body: some View {
@@ -31,6 +33,27 @@ struct SettingsView: View {
           } header: { Text("Invite someone") } footer: { Text("One use, valid for 7 days.") }
         }
 
+        Section {
+          HStack {
+            TextField("Teach Amin something", text: $newFact)
+              .onSubmit(teach)
+            Button("Remember", action: teach).disabled(newFact.trimmingCharacters(in: .whitespaces).isEmpty)
+          }
+          ForEach(facts.reversed()) { f in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(f.text)
+              Text(Date(timeIntervalSince1970: f.created), format: .dateTime.day().month().year())
+                .font(.caption).foregroundStyle(.secondary)
+            }
+            .contextMenu { Button("Forget", systemImage: "trash", role: .destructive) { forget(f) } }
+            #if !os(tvOS)
+            .swipeActions { Button("Forget", systemImage: "trash", role: .destructive) { forget(f) } }
+            #endif
+          }
+        } header: { Text("Memory") } footer: {
+          Text("You can also say “Remember that …” in chat. Facts stay on your Amin computer and are cited like documents. Forget one and Amin stops using it at once.")
+        }
+
         Section("General chat may use") {
           Toggle("My library", isOn: prefBinding(\.chatPrivate))
           Toggle("Household library", isOn: prefBinding(\.chatHousehold))
@@ -48,8 +71,26 @@ struct SettingsView: View {
       } header: { Text("About") }
     }
     .navigationTitle("Settings")
+    .task { facts = (try? await model.client?.memory()) ?? [] }
     .confirmationDialog("Sign out of Amin on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
       Button("Sign out", role: .destructive) { Task { await model.signOut() } }
+    }
+  }
+
+  private func teach() {
+    let text = newFact.trimmingCharacters(in: .whitespaces)
+    guard !text.isEmpty else { return }
+    newFact = ""
+    Task {
+      do { _ = try await model.client?.remember(text); facts = (try? await model.client?.memory()) ?? facts }
+      catch { model.error = error.localizedDescription }
+    }
+  }
+
+  private func forget(_ f: Fact) {
+    Task {
+      try? await model.client?.forget(f.id)
+      facts.removeAll { $0.id == f.id }
     }
   }
 

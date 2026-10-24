@@ -131,6 +131,7 @@ function go(view) {
   $$("[data-go][aria-current]").forEach(b => b.setAttribute("aria-current", "page"));
   closeDrawer(); closeSource();
   if (view !== "chat") refreshMe();
+  if (view === "settings") renderMemory();
   if (view === "chat" && wide()) $("question").focus({ preventScroll: true });
 }
 $$("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
@@ -290,6 +291,17 @@ function renderAnswer(a, r, live) {
   const body = a.querySelector(".body");
   const asked = r.asked_as ? `<div class="asked-as" dir="auto">Understood as: ${esc(r.asked_as)}</div>` : "";
   const secs = `${(r.latency_ms / 1000).toFixed(1)} s`;
+  if (r.outcome === "remembered") {
+    body.innerHTML = `<div class="basis docs"><svg class="i"><use href="#i-brain"/></svg>Saved to your memory</div>
+      <div class="prose" dir="auto">${esc(r.refusal_reason.replace(/^Saved to your memory: /, ""))}</div>
+      <div class="a-tools"><button class="btn sm ghost" type="button" data-undo>Undo</button><span class="time">Ask about it any time. Delete it under Settings › Memory.</span></div>`;
+    body.querySelector("[data-undo]").onclick = async e => {
+      try { await call(`/memory/${encodeURIComponent(r.fact_id)}`, { method: "DELETE" }); e.target.closest(".a-tools").innerHTML = `<span class="time">Forgotten.</span>`; renderMemory(); }
+      catch (err) { toast(err.message, true); }
+    };
+    renderMemory();
+    return;
+  }
   if (!r.claims.length) {
     body.innerHTML = `${asked}<div class="basis"><svg class="i"><use href="#i-shield"/></svg>${r.routed_to ? "Better asked elsewhere" : "No answer"}</div><div class="prose refused" dir="auto">${esc(r.refusal_reason || "Your documents don't cover this.")}</div>`;
     return;
@@ -324,6 +336,7 @@ const paras = html => html.split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, "<br>
 
 /* chunk ids look like "<doc_id>#<n>"; doc ids carry their library prefix */
 function docParts(docId) {
+  if (docId === "p.memory.md") return ["Only me", "Your memory"];
   if (docId.startsWith("h.")) return ["Household", docId.slice(2)];
   if (docId.startsWith("p.")) return ["Only me", docId.slice(2)];
   const m = /^j\.([a-z0-9]+)\.(.*)$/.exec(docId);
@@ -529,6 +542,28 @@ $("projDelete").onclick = async () => {
     if (SPACE === p.id) { SPACE = ""; newChat(); go("projects"); }
     showProjectList(); await refreshMe(); loadHistory(); toast(`Deleted “${p.name}”.`);
   } catch (err) { toast(err.message, true); }
+};
+
+/* -- memory (Teach Amin) --------------------------------------------------------- */
+async function renderMemory() {
+  let facts = [];
+  try { facts = await call("/memory"); } catch { return; }
+  $("memoryList").innerHTML = facts.length ? facts.slice().reverse().map(f => `
+    <div class="item"><svg class="i" style="color:var(--teal-ink)"><use href="#i-brain"/></svg>
+      <span class="text"><span class="title wrap" dir="auto" style="white-space:normal">${esc(f.text)}</span>
+      <span class="sub">${new Date(f.created * 1000).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })}</span></span>
+      <button class="icon-btn" data-forget="${esc(f.id)}" aria-label="Forget this" title="Forget"><svg class="i"><use href="#i-trash"/></svg></button></div>`).join("")
+    : `<div class="empty">Nothing yet. Tell Amin something worth remembering.</div>`;
+  $("memoryList").querySelectorAll("[data-forget]").forEach(b => b.onclick = async () => {
+    try { await call(`/memory/${encodeURIComponent(b.dataset.forget)}`, { method: "DELETE" }); toast("Forgotten."); renderMemory(); }
+    catch (err) { toast(err.message, true); }
+  });
+}
+$("teachForm").onsubmit = async e => {
+  e.preventDefault();
+  const text = $("teachText").value.trim(); if (!text) return;
+  try { await post("/memory", { text }); $("teachText").value = ""; toast("Amin will remember that."); renderMemory(); }
+  catch (err) { toast(err.message, true); }
 };
 
 /* -- settings ------------------------------------------------------------------ */

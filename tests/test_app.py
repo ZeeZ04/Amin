@@ -139,3 +139,48 @@ def test_history_is_per_person_and_follows_project_access(users_dir):
 
     assert abdul.delete(f"/conversations/{cid}").status_code == 200
     assert abdul.get(f"/conversations/{cid}").status_code == 404
+
+
+def test_teach_amin_remembers_cites_and_forgets(users_dir):
+    from amin import memory
+
+    abdul = signup(client(), "abdul")
+    sara = signup(client(), "sara", invite_from(abdul))
+    r = abdul.post("/ask", json={"question": "Remember that my car's plate number is Dubai A 12345"}).json()
+    assert r["outcome"] == "remembered" and "Dubai A 12345" in r["refusal_reason"]
+    assert [f["text"] for f in abdul.get("/memory").json()] == ["my car's plate number is Dubai A 12345"]
+    assert "memory.md" not in abdul.get("/me").json()["private"], "managed under Memory, not Documents"
+
+    q = {"question": "What is my car's plate number?"}
+    a = abdul.post("/ask", json=q).json()
+    assert a["basis"] == "documents" and "12345" in " ".join(c["text"] for c in a["claims"])
+    assert not answered(sara, q), "a taught fact is private to the person who taught it"
+
+    fid = abdul.get("/memory").json()[0]["id"]
+    assert abdul.delete(f"/memory/{fid}").status_code == 200
+    assert not answered(abdul, q), "a deleted fact stops answering at once"
+    assert memory.taught("تذكر أن موعد طبيب الأسنان يوم الخميس") == "موعد طبيب الأسنان يوم الخميس"
+    assert memory.taught("ഓർക്കുക: എന്റെ രക്തഗ്രൂപ്പ് ഒ പോസിറ്റീവ് ആണ്") == "എന്റെ രക്തഗ്രൂപ്പ് ഒ പോസിറ്റീവ് ആണ്"
+    assert memory.taught("Do you remember the Berlin Wall?") is None
+
+
+def test_memory_edits_reach_the_index_not_just_the_file(users_dir):
+    abdul = signup(client(), "abdul")
+    abdul.post("/memory", json={"text": "The locker code at the gym is 4417."})
+    abdul.post("/memory", json={"text": "The Wi-Fi password at home is falcon-river-22."})
+    gym, wifi = {"question": "What is the locker code at the gym?"}, {"question": "What is the Wi-Fi password at home?"}
+    assert answered(abdul, gym) and answered(abdul, wifi), "a second fact must be indexed too"
+    first = abdul.get("/memory").json()[0]["id"]
+    abdul.delete(f"/memory/{first}")
+    assert not answered(abdul, gym), "a forgotten fact must stop answering while others remain"
+    assert answered(abdul, wifi)
+
+
+def test_re_uploading_a_document_replaces_the_old_version(users_dir):
+    abdul = signup(client(), "abdul")
+    abdul.post("/upload?filename=lease.md&library=private", content=LEASE)
+    abdul.post("/upload?filename=lease.md&library=private",
+               content=b"# Tenancy\nThe annual rent is AED 92,000, payable in two cheques.\n")
+    r = abdul.post("/ask", json=RENT_Q).json()
+    text = " ".join(c["text"] for c in r["claims"])
+    assert "92,000" in text and "85,000" not in text

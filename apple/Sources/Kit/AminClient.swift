@@ -121,6 +121,13 @@ nonisolated final class AminClient: Engine {
   func createProject(_ name: String) async throws -> Project { try await send("POST", "projects", json: NewProject(name: name)) }
   func deleteProject(_ id: String) async throws { _ = try await send("DELETE", "projects/\(id)", as: OK.self) }
 
+  // MARK: memory
+
+  private struct FactBody: Encodable { let text: String }
+  func memory() async throws -> [Fact] { try await send("GET", "memory") }
+  func remember(_ text: String) async throws -> Fact { try await send("POST", "memory", json: FactBody(text: text)) }
+  func forget(_ id: String) async throws { _ = try await send("DELETE", "memory/\(id)", as: OK.self) }
+
   // MARK: voice
 
   func transcribe(_ audio: Data, contentType: String, lang: String?) async throws -> Transcript {

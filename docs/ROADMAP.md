@@ -19,6 +19,8 @@ English, Arabic and Malayalam.
 - Multilingual safety router: crisis caught 14/14 against 0/14 before (E34).
 - On-device base chosen: Gemma 4 E4B (E33); edge student training (E35).
 - Follow-up questions (E36), and voice mode with "Hey Amin" in the web app (E37).
+- Teach Amin: personal memory, cited and deletable, on web and Apple apps (ADR-015).
+- Native apps for iPhone, iPad, Mac, Vision Pro, Apple TV and Apple Watch, with Siri.
 
 ## Next: design
 

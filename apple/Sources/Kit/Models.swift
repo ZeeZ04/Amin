@@ -56,6 +56,9 @@ nonisolated struct Answer: Codable, Hashable, Sendable {
   var sources: [String: SourceRef]? = nil
   let latencyMs: Int
   var conversationId: String? = nil
+  var factId: String? = nil
+
+  var isRemembered: Bool { outcome == "remembered" }
 
   var text: String {
     let t = claims.map(\.text).joined(separator: " ")
@@ -105,6 +108,13 @@ nonisolated struct Chunk: Codable, Hashable, Sendable {
     }
     return ("Library", docId)
   }
+}
+
+/// Something the person taught Amin ("remember that …"): their memory (ADR-015).
+nonisolated struct Fact: Codable, Hashable, Identifiable, Sendable {
+  let id: String
+  let text: String
+  let created: Double
 }
 
 nonisolated struct Transcript: Codable, Hashable, Sendable {

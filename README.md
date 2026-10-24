@@ -193,6 +193,7 @@ amin/
   ocr.py         photos and scans, English + Arabic + Malayalam
   classify.py    single-pass router: one forward pass, a probability per option (E34)
   voice.py       speech to text and the "Hey Amin" wake check, local Whisper (E37)
+  memory.py      Teach Amin: facts a person tells it, cited and deletable (ADR-015)
   web/           the app: index.html, app.css, app.js, bundled Malayalam font
 scripts/ml_eval.py  Malayalam eval (E32): IndicQA-ml and Aya held-out
 data/corpus/     14 synthetic source documents, exact ground truth
@@ -210,6 +211,11 @@ the passage behind each citation opens beside the answer. It works in light
 and dark mode, and in English, Arabic (right to left) and Malayalam, with the
 Malayalam font bundled so nothing is fetched from the internet. Conversations
 are saved per person, and no one else can read them.
+
+**Teach Amin.** Say "Remember that my car's plate is Dubai A 12345", or add
+it under Settings › Memory. The fact goes into your private library, not
+into the model, so answers cite it ("Your memory") and forgetting it takes
+effect at once (ADR-015).
 
 **Voice.** Tap the microphone, or turn on "Listen for 'Hey Amin'" in
 Settings, and talk. Amin transcribes on this computer with Whisper (a
