@@ -164,9 +164,6 @@ def export(seed: int = 0) -> None:
     typer.echo(f"mistake pairs {len(pairs)} (declines {declines}) · answer-side balance pairs {len(balance)}")
 
 
-if __name__ == "__main__":
-    app()
-
 
 @app.command()
 def probe(label: str = typer.Option(..., help="Name for this run, e.g. edge-2-100")) -> None:
@@ -186,3 +183,7 @@ def probe(label: str = typer.Option(..., help="Name for this run, e.g. edge-2-10
         tally[key][0] += _right(r["reply"], r["want"])
         tally[key][1] += 1
     typer.echo(f"{label}: " + " · ".join(f"{w} {lang} {a}/{n}" for (w, lang), (a, n) in sorted(tally.items())))
+
+
+if __name__ == "__main__":
+    app()
