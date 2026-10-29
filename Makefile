@@ -1,4 +1,6 @@
 NO_THINK = --chat-template-args '{"enable_thinking": false}'
+# Amin's own answer model (E38: edge-2). `make serve OWN_MODEL=amin-3` runs the previous one.
+OWN_MODEL ?= $(if $(wildcard data/models/edge-2-q8),edge-2-q8,amin-3)
 
 .PHONY: voice-models install ingest eval ask test lint serve doctor clean sweep certs train-setup train-corpus distill train-sft serve-student preferences train-dpo bench-student
 
@@ -28,9 +30,9 @@ lint:
 serve:
 	# Reachable from phones on the home Wi-Fi. HTTPS once `make certs` has run.
 	# Starts Amin's own model too (E31); without it, auto mode uses Ollama.
-	@if [ -d data/models/amin-3 ] && ! curl -s localhost:8080/v1/models >/dev/null; then \
-	  echo "starting amin-3 on :8080 (log: data/mlx-server.log)"; \
-	  nohup uv run mlx_lm.server --model data/models/amin-3 --port 8080 $(NO_THINK) > data/mlx-server.log 2>&1 & \
+	@if [ -d data/models/$(OWN_MODEL) ] && ! curl -s localhost:8080/v1/models >/dev/null; then \
+	  echo "starting $(OWN_MODEL) on :8080 (log: data/mlx-server.log)"; \
+	  nohup uv run mlx_lm.server --model data/models/$(OWN_MODEL) --port 8080 $(NO_THINK) > data/mlx-server.log 2>&1 & \
 	fi
 	@if [ -f data/certs/amin.pem ]; then \
 	  uv run uvicorn amin.api:api --host 0.0.0.0 --port 8443 \
@@ -92,7 +94,7 @@ train-sft:
 	  -q --q-bits $(Q_BITS)
 
 serve-student:
-	uv run mlx_lm.server --model $${MODEL:-data/models/amin-3} --port 8080 $(NO_THINK)
+	uv run mlx_lm.server --model $${MODEL:-data/models/$(OWN_MODEL)} --port 8080 $(NO_THINK)
 
 preferences:
 	# Needs `make serve-student` running in another terminal.
