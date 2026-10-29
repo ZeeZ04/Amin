@@ -15,6 +15,14 @@ options:
     visionOS: "2.0"
     watchOS: "11.0"
   createIntermediateGroups: true
+packages:
+  # On-device model (ADR-014): Apple's MLX Swift; Gemma 4 is supported (Gemma4Text).
+  MLXSwiftLM:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    from: 3.32.3
+  SwiftTransformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: 1.3.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -57,9 +65,17 @@ targets:
         ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
         ENABLE_RESOURCE_ACCESS_AUDIO_INPUT: YES
         ENABLE_USER_SELECTED_FILES: readonly
+        # A 4-bit edge-2 needs about 4 GB: ask iOS for the larger memory budget.
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": Sources/App/Amin.entitlements
     dependencies:
       - target: AminWatch
         destinationFilters: [iOS]
+      - package: MLXSwiftLM
+        products: [MLXLLM, MLXLMCommon]
+        destinationFilters: [iOS, macOS, visionOS]
+      - package: SwiftTransformers
+        product: Tokenizers
+        destinationFilters: [iOS, macOS, visionOS]
 
   AminWatch:
     type: application
@@ -80,3 +96,23 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.amin.Amin.watchkitapp
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  AminTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - Sources/App/LocalEngine.swift
+      - Sources/Kit/Models.swift
+      - Sources/Kit/AminClient.swift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_APP_SANDBOX: NO
+        PRODUCT_BUNDLE_IDENTIFIER: app.amin.AminTests
+    dependencies:
+      - package: MLXSwiftLM
+        products: [MLXLLM, MLXLMCommon]
+      - package: SwiftTransformers
+        product: Tokenizers
+

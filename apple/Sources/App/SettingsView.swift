@@ -6,6 +6,8 @@ struct SettingsView: View {
   @State private var facts: [Fact] = []
   @State private var newFact = ""
   @State private var confirmSignOut = false
+  @State private var choosingModel = false
+  @State private var preferLocal = true
 
   var body: some View {
     Form {
@@ -59,6 +61,27 @@ struct SettingsView: View {
           Toggle("Household library", isOn: prefBinding(\.chatHousehold))
         }
       }
+
+      #if os(iOS) || os(macOS) || os(visionOS)
+      Section {
+        if let name = model.localModelName {
+          LabeledContent("Model", value: name)
+          if model.serverURL != nil {
+            Toggle("Answer on this device", isOn: $preferLocal)
+              .onChange(of: preferLocal) { _, v in model.preferLocal = v }
+          }
+          Button("Remove model", role: .destructive) { model.forgetLocalModel() }
+        } else {
+          Button("Choose model folder", systemImage: "cpu") { choosingModel = true }
+        }
+      } header: { Text("On this device") } footer: {
+        Text("Amin's own model (edge-2) runs here, so nothing you ask leaves this device. Answers from your documents still come from your Amin computer.")
+      }
+      .fileImporter(isPresented: $choosingModel, allowedContentTypes: [.folder]) { result in
+        do { try model.useLocalModel(at: result.get()) } catch { model.error = error.localizedDescription }
+      }
+      .onAppear { preferLocal = model.preferLocal }
+      #endif
 
       Section("Amin computer") {
         LabeledContent("Address", value: model.serverURL?.absoluteString ?? "—")

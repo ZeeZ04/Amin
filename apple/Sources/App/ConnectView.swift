@@ -11,6 +11,7 @@ struct ConnectView: View {
   @State private var firstAccount = false
   @State private var working = false
   @State private var error: String?
+  @State private var choosingModel = false
 
   var body: some View {
     ScrollView {
@@ -87,6 +88,20 @@ struct ConnectView: View {
 
       Label("Nothing you ask or upload leaves your Amin computer.", systemImage: "lock")
         .font(.footnote).foregroundStyle(.secondary)
+
+      #if os(iOS) || os(macOS) || os(visionOS)
+      Divider().padding(.vertical, 6)
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Or run Amin on this device only").font(.headline)
+        Text("Choose the edge-2 model folder. Answers come from the model on this device, with no account and no network.")
+          .font(.callout).foregroundStyle(.secondary)
+        Button("Choose model folder", systemImage: "cpu") { choosingModel = true }
+          .buttonStyle(.bordered)
+      }
+      .fileImporter(isPresented: $choosingModel, allowedContentTypes: [.folder]) { result in
+        do { try model.useLocalModel(at: result.get()) } catch { self.error = error.localizedDescription }
+      }
+      #endif
     }
   }
 

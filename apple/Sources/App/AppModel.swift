@@ -28,12 +28,69 @@ final class AppModel {
   }
 
   nonisolated static let serverKey = "amin.server"
+  nonisolated static let localModelKey = "amin.localModel"
+
+  /// The on-device model, when one is chosen (ADR-014). With it and no server,
+  /// Amin works fully offline: no account, nothing leaves the device.
+  private(set) var local: (any Engine)?
+  private(set) var localModelName: String?
+  var isLocalOnly: Bool { local != nil && client == nil }
 
   init() {
     if let saved = UserDefaults.standard.string(forKey: Self.serverKey), let url = URL(string: saved) {
       client = AminClient(base: url)
     }
+    restoreLocalModel()
   }
+
+  // MARK: on-device model
+
+  /// Use the model folder the person chose (security-scoped, remembered across launches).
+  func useLocalModel(at folder: URL) throws {
+    #if os(iOS) || os(macOS) || os(visionOS)
+    let ok = folder.startAccessingSecurityScopedResource()
+    defer { if ok { folder.stopAccessingSecurityScopedResource() } }
+    #if os(macOS)
+    let bookmark = try folder.bookmarkData(options: .withSecurityScope)
+    #else
+    let bookmark = try folder.bookmarkData()
+    #endif
+    UserDefaults.standard.set(bookmark, forKey: Self.localModelKey)
+    restoreLocalModel()
+    if phase == .connect, local != nil { phase = .ready }
+    #else
+    throw AminError.server("This device cannot run the model; connect to an Amin computer.")
+    #endif
+  }
+
+  func forgetLocalModel() {
+    UserDefaults.standard.removeObject(forKey: Self.localModelKey)
+    local = nil; localModelName = nil
+    if client == nil { phase = .connect }
+  }
+
+  private func restoreLocalModel() {
+    #if os(iOS) || os(macOS) || os(visionOS)
+    guard let data = UserDefaults.standard.data(forKey: Self.localModelKey) else { return }
+    var stale = false
+    #if os(macOS)
+    let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &stale)
+    #else
+    let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale)
+    #endif
+    guard let url else { return }
+    _ = url.startAccessingSecurityScopedResource()  // held for the app's lifetime while the model is in use
+    local = LocalEngine(directory: url)
+    localModelName = url.lastPathComponent
+    #endif
+  }
+
+  /// Local when chosen and preferred; otherwise the Amin computer.
+  var preferLocal: Bool {
+    get { UserDefaults.standard.object(forKey: "amin.preferLocal") as? Bool ?? true }
+    set { UserDefaults.standard.set(newValue, forKey: "amin.preferLocal") }
+  }
+  private var engine: (any Engine)? { (preferLocal ? local : nil) ?? client ?? local }
 
   var serverURL: URL? { client?.base }
   var project: Project? { me?.projects.first { $0.id == space } }
@@ -43,7 +100,10 @@ final class AppModel {
 
   /// On launch: a saved server with a live session goes straight in.
   func resume() async {
-    guard client != nil else { return }
+    guard client != nil else {
+      if local != nil { phase = .ready }  // on-device only
+      return
+    }
     do { try await refresh(); phase = .ready } catch { phase = .connect }
   }
 
@@ -104,15 +164,17 @@ final class AppModel {
   @discardableResult
   func ask(_ question: String) async -> Answer? {
     let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !q.isEmpty, !isBusy, let client else { return nil }
+    guard !q.isEmpty, !isBusy, let engine else { return nil }
     turns.append(Turn(question: q))
     let index = turns.count - 1
     do {
-      let a = try await client.ask(q, project: space.isEmpty ? nil : space, conversation: conversationID)
+      let a = try await engine.ask(q, project: space.isEmpty ? nil : space, conversation: conversationID)
       turns[index].answer = a
-      let isNew = conversationID != a.conversationId
-      conversationID = a.conversationId
-      if isNew { conversations = (try? await client.conversations()) ?? conversations }
+      if let client, a.conversationId != nil {
+        let isNew = conversationID != a.conversationId
+        conversationID = a.conversationId
+        if isNew { conversations = (try? await client.conversations()) ?? conversations }
+      }
       return a
     } catch {
       turns[index].failed = error.localizedDescription
