@@ -164,6 +164,11 @@ REFUSAL_MARKERS = (
     "لا أستطيع الاطلاع",
     "لا تتوفر لدي",
     "لا تغطي مستنداتك",
+    # E38: Arabic declines the edge student phrases this way, found graded as
+    # answers on the fallback probe.
+    "ليس لدي معلومات",       # I don't have information
+    "ليس لدي أي معلومات",    # I don't have any information
+    "لا يمكنني الوصول",      # I can't access (your documents)
     # E38: Malayalam declines, from the teacher's own replies. Until these were
     # here every Malayalam decline was graded as an answer.
     "ഉത്തരം നൽകുന്നില്ല",     # (the documents) don't answer

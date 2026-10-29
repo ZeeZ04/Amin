@@ -333,3 +333,11 @@ def test_malayalam_declines_are_recognised():
     # a real answer is not a decline
     assert not looks_like_refusal("ഈ ഫ്ലാറ്റിന് 2 കാർ പാർക്കിംഗ് ലഭിക്കും.")
     assert not looks_like_refusal("കേരളത്തിലെ ഏറ്റവും നീളം കൂടിയ നദി പെരിയാർ ആണ്.")
+
+
+def test_arabic_declines_in_the_edge_students_phrasing_are_recognised():
+    from amin.prompts import looks_like_refusal
+
+    assert looks_like_refusal("أنا آسف، ليس لدي أي معلومات حول تفاصيل عقدك.")
+    assert looks_like_refusal("هذه البيانات خاصة بك ولا يمكنني الوصول إليها.")
+    assert not looks_like_refusal("مدة العقد اثنا عشر شهراً من 1 مارس 2026.")

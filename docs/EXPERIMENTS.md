@@ -1274,3 +1274,71 @@ only answering. The English-heavy main bench cannot see this, so
 invention) and 247 answer-side anchors (118 Malayalam, 105 English, 24
 Arabic: a right general answer over a refusal). Pairs are split by the
 item's own train/valid split.
+
+**Training.** 448 train / 33 valid pairs. DPO on fused edge-1 with itself as
+the reference: beta 0.1, lr 5e-6, 200 steps, peak memory 52 GB. Val pair
+accuracy was 1.000 from step 25 on, so (E24 again) it says nothing about
+which checkpoint to keep.
+
+**Selection** (slice k hybrid; IndicQA-ml sel; the held-out fallback probe,
+which is valid-split rows, per language):
+
+| | edge-1 | step 50 | **step 100** | step 150 | step 200 |
+|---|---|---|---|---|---|
+| slice k fact accuracy | 91.2% | 92.5% | **92.5%** | 61.3% | 77.5% |
+| slice k correct refusal | 92.5% | 95.0% | **96.2%** | 96.2% | 83.8% |
+| slice k hallucination | 6.2% | 5.0% | **3.8%** | 2.5% | 5.0% |
+| slice k trust | +0.725 | +0.762 | **+0.788** | +0.512 | +0.588 |
+| ml answerable / declined (IndicQA sel) | 85.4 / 74.5% | 79.6 / 80.9% | 82.5 / 78.7% | 71.8 / 87.2% | 73.8 / 83.0% |
+| probe: ml decline | **2/25** | 24/25 | **25/25** | 21/25 | 19/25 |
+| probe: ml answer | 11/11 | 7/11 | 6/11 | 4/11 | 11/11 |
+| probe: ar decline | 21/23 | 19/23 | 16/23 | 19/23 | 20/23 |
+| probe: en decline | 127/127 | 127/127 | 127/127 | 127/127 | 125/127 |
+
+Step 100 is chosen by the standing rule: best slice-k trust with accuracy not
+lower. The Malayalam inventions are gone on the probe (2/25 → 25/25). The
+costs, on small slices: Malayalam general answering (11 → 6 of 11), Arabic
+probe declines (21 → 16 of 23), and IndicQA-ml answerable (−2.9 points). It
+was fused as **edge-2** and goes to the full gate at 8-bit and 6-bit. 6-bit
+because 4-bit lost too much in E35.
+
+### E38 gate: edge-2 passes, and becomes the default
+
+Paired McNemar against the 27B on the same items (`scripts/gate_compare.py`):
+
+| | edge-2 q8 | edge-2 q6 | qwen3.6:27b | edge-1 q8 |
+|---|---|---|---|---|
+| main answerable | 108/110 | 108/110 | 108/110 | 109/110 |
+| **main unanswerable** | **85/99** (p=1.0) | 85/99 | 85/99 | 73/99 |
+| main out-of-scope / conflict / Arabic | 22/22 · 5/6 · 17/18 | same | 21/22 · 5/6 · 17/18 | |
+| slice m answerable | 54/65 (p=0.062) | 57/65 (p=0.69) | 59/65 | 59/65 |
+| slice m unanswerable | 69/75 (p=0.75) | 67/75 | 67/75 | 63/75 |
+| IndicQA-ml test answerable / declined | 93/108 · 35/42 | 92/108 · 35/42 | 86/108 · 37/42 | 94/108 · 34/42 |
+| routing (E34 set) | 74/76, crisis 14/14, 2 false alarms | same | — | 73/76 |
+| fallback probe (en / ar / ml decline) | 127/127 · 23/23 · 25/25 | 127/127 · 22/23 · 23/25 | — | 127/127 · 21/23 · 2/25 |
+| main p50 | 0.92 s | 0.91 s | 6.7 s | 0.97 s |
+| size | 7.4 GB | 5.7 GB | 17 GB | 7.4 GB |
+
+Against edge-1, main unanswerable rises 73 → 85 (p<0.001), with answerable
+unchanged. Against amin-3, nothing differs significantly (85 vs 80, p=0.27),
+and edge-2 is 40% faster and far better in Malayalam.
+
+**A second detector gap, Arabic.** The probe first showed Arabic declines
+falling to 16/23. Every one of those was a correct decline: "أنا آسف، ليس لدي
+أي معلومات حول تفاصيل عقدك", phrasing missing from the refusal markers. Three
+markers were added (`test_arabic_declines_in_the_edge_students_phrasing_are_recognised`).
+Regraded, the probe is 23/23.
+
+**Known limit of the detector.** A hybrid answer that opens with "your
+documents don't cover this" and then answers is graded a decline. Three of
+the four Malayalam "answer" probe misses are that; the fourth (who produced
+*Chemmeen*) is an honest "I don't know".
+
+**Gate.** Both pass ADR-012's comparative form, the rule amin-3 passed in
+E31: on the main set, slice m and IndicQA-ml test, nothing is significantly
+worse than the teacher. The watch item is slice m answerable at 8-bit
+(p=0.062). The owner asked for the best judgement on shipping, and on that
+basis **edge-2-q8 is the default answer model** (`make serve`;
+`OWN_MODEL=amin-3` keeps the previous one). edge-2-q6 is the phone candidate.
+At 5.7 GB it is still heavy for an 8 GB iPhone. Fitting phones is the next
+problem: an E2B student, or mixed-precision quantisation.

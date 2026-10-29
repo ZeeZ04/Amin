@@ -302,7 +302,16 @@ app's hybrid mode, no difference from qwen3.6:27b is significant:
 | p50 latency | 1.6–2.0 s | 6.7–7.2 s |
 
 That is "no detectable difference" at these sample sizes, not "proven
-equal". `AMIN_PROVIDER=auto` (the default) uses amin-3 when `make serve` has
+equal".
+
+**edge-2 is the default since 2026-10-29 (E38).** It is Gemma 4 E4B, trained
+the same way plus a preference round aimed at its own mistakes, with
+Malayalam training data. It is built on a base that can run on phones. On the
+main set it matches the 27B on every kind of question (answerable 108/110,
+declined 85/99, against 108/110 and 85/99). On Malayalam reading
+comprehension it beats the 27B (93/108 against 86/108). It no longer invents
+details a document lacks, in any of the three languages. p50 is 0.9 s.
+`make serve OWN_MODEL=amin-3` runs the previous model. `AMIN_PROVIDER=auto` (the default) uses amin-3 when `make serve` has
 started it and falls back to the 27B when it is down. `AMIN_PROVIDER=ollama`
 keeps the 27B.
 

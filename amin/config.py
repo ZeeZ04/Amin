@@ -14,7 +14,8 @@ class Settings(BaseSettings):
 
     # -- provider ------------------------------------------------------------
     # auto: Amin's own model (mlx_lm.server) when it is up, else Ollama.
-    # E31 made amin-3 the default; AMIN_PROVIDER=ollama keeps the 27B.
+    # E38 made edge-2 (Gemma 4 E4B, SFT + DPO, 8-bit) the default, after amin-3
+    # (E31). AMIN_MLX_MODEL=amin-3 or AMIN_PROVIDER=ollama keeps the older ones.
     provider: str = "auto"  # auto | ollama | mlx | echo
     ollama_host: str = "http://127.0.0.1:11434"
     answer_model: str = "qwen3.6:27b"
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
     # mlx_lm.server, which serves Amin's own post-trained model (ADR-012).
     mlx_host: str = "http://127.0.0.1:8080"
     # Label only: shown in answers and /health. The server decides what it loads.
-    mlx_model: str = "amin-3"
+    mlx_model: str = "edge-2-q8"
 
     # -- post-training (amin/train, ADR-012) ---------------------------------
     # The teacher is whatever answer_model is; the student is what gets tuned.
