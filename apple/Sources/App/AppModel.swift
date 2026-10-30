@@ -63,7 +63,18 @@ final class AppModel {
     #endif
   }
 
+  /// A model downloaded into the app's own storage needs no bookmark.
+  func useDownloadedModel(at folder: URL) {
+    #if os(iOS) || os(macOS) || os(visionOS)
+    UserDefaults.standard.removeObject(forKey: Self.localModelKey)
+    UserDefaults.standard.set(folder.lastPathComponent, forKey: "amin.downloadedModel")
+    local = LocalEngine(directory: folder)
+    localModelName = folder.lastPathComponent
+    #endif
+  }
+
   func forgetLocalModel() {
+    UserDefaults.standard.removeObject(forKey: "amin.downloadedModel")
     UserDefaults.standard.removeObject(forKey: Self.localModelKey)
     local = nil; localModelName = nil
     if client == nil { phase = .connect }
@@ -71,6 +82,13 @@ final class AppModel {
 
   private func restoreLocalModel() {
     #if os(iOS) || os(macOS) || os(visionOS)
+    if let name = UserDefaults.standard.string(forKey: "amin.downloadedModel") {
+      let dir = ModelDownloader.root.appending(path: name, directoryHint: .isDirectory)
+      if FileManager.default.fileExists(atPath: dir.appending(path: "config.json").path()) {
+        local = LocalEngine(directory: dir); localModelName = name
+        return
+      }
+    }
     guard let data = UserDefaults.standard.data(forKey: Self.localModelKey) else { return }
     var stale = false
     #if os(macOS)

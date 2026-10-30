@@ -56,11 +56,13 @@ struct AmbientCommand: View {
 
 struct RootView: View {
   @Environment(AppModel.self) private var model
+  @AppStorage("amin.onboarded") private var onboarded = false
 
   var body: some View {
     switch model.phase {
     case .connect: ConnectView()
-    case .ready: MainView()
+    case .ready:
+      if onboarded { MainView() } else { OnboardingView(done: $onboarded) }
     }
   }
 }

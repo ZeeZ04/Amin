@@ -184,3 +184,23 @@ def test_re_uploading_a_document_replaces_the_old_version(users_dir):
     r = abdul.post("/ask", json=RENT_Q).json()
     text = " ".join(c["text"] for c in r["claims"])
     assert "92,000" in text and "85,000" not in text
+
+
+def test_model_files_are_served_only_to_members_and_only_listed_models(users_dir, tmp_path, monkeypatch):
+    from amin.config import settings
+
+    models = tmp_path / "models"
+    (models / "edge-2-m46").mkdir(parents=True)
+    (models / "edge-2-m46" / "config.json").write_text("{}")
+    (models / "edge-2-m46" / "model.safetensors").write_bytes(b"\0" * 64)
+    (models / "secret").mkdir()
+    (models / "secret" / "config.json").write_text("{}")
+    monkeypatch.setattr(settings, "models_path", models)
+
+    assert client().get("/models").status_code == 401, "members only"
+    c = signup(client(), "abdul")
+    listed = c.get("/models").json()
+    assert [m["name"] for m in listed] == ["edge-2-m46"] and listed[0]["bytes"] == 66
+    assert c.get("/models/edge-2-m46/model.safetensors").content == b"\0" * 64
+    assert c.get("/models/secret/config.json").status_code == 404, "only models Amin lists"
+    assert c.get("/models/edge-2-m46/..%2Fsecret%2Fconfig.json").status_code == 404

@@ -8,12 +8,14 @@ import AppKit
 // Amin design system tokens (resolved values: docs/team/DESIGN.md). Source of truth: docs/team/D4-design-system.md.
 // Mirrors amin/web/app.css :root. Brand colours (aminTeal, aminSaffron...) stay in Theme.swift.
 
-private func hex(_ v: UInt32) -> Color {
+// nonisolated: UIKit and AppKit resolve dynamic colours off the main thread while
+// rendering; under the main-actor default the provider closure would trap.
+nonisolated private func hex(_ v: UInt32) -> Color {
   Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
 }
 
 /// Light, dark, and Increase Contrast variants of each role. watchOS is always dark.
-private func role(_ l: UInt32, _ d: UInt32, lHC: UInt32, dHC: UInt32) -> Color {
+nonisolated private func role(_ l: UInt32, _ d: UInt32, lHC: UInt32, dHC: UInt32) -> Color {
   #if canImport(UIKit) && !os(watchOS)
   func ui(_ v: UInt32) -> UIColor {
     UIColor(red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
