@@ -139,8 +139,8 @@ def prefs(name: str) -> dict:
 
 @dataclass(frozen=True)
 class Source:
-    kind: str  # private | household | project
-    key: str  # user name, "", or project id
+    kind: str  # private | household | project | pack
+    key: str  # user name, "", project id, or pack name
 
     @property
     def folder(self) -> Path:
@@ -148,11 +148,17 @@ class Source:
             return users.docs_dir(self.key)
         if self.kind == "household":
             return users.docs_dir(users.HOUSEHOLD)
+        if self.kind == "pack":
+            from . import packs
+
+            return packs.folder(self.key)
         return project_docs(self.key)
 
     @property
     def prefix(self) -> str:
         # "p." and "h." are the prefixes indexes already hold; keep them.
+        if self.kind == "pack":
+            return f"k.{self.key}."
         return {"private": "p.", "household": "h."}.get(self.kind, f"j.{self.key}.")
 
     def doc_id(self, filename: str) -> str:
@@ -196,6 +202,9 @@ def sources_of(index: str) -> list[Source]:
         if pref["chat_household"]:
             out.append(HOUSEHOLD)
         out += [project_source(p.id) for p in projects_for(key) if p.general_chat]
+        from . import packs
+
+        out += [Source("pack", n) for n in pref.get("packs", []) if packs.info(n)]
         return out
     p = get_project(key)
     if p is None:
@@ -218,6 +227,8 @@ def desired_docs(index: str) -> dict[str, tuple[Source, Path]]:
     out = {}
     for src in sources_of(index):
         folder = src.folder
+        if not folder.exists():
+            continue
         for path in sorted(folder.iterdir()):
             if path.is_file() and not path.name.startswith("."):
                 out[src.doc_id(path.name)] = (src, path)

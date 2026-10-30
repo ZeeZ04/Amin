@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__, history, memory, spaces, users
+from . import __version__, history, memory, packs, spaces, users
 from .answer import Amin
 from .config import settings
 from .ingest import SUPPORTED, chunk_document, make_document
@@ -156,6 +156,7 @@ class ProjectUpdate(BaseModel):
 class Prefs(BaseModel):
     chat_private: bool | None = None
     chat_household: bool | None = None
+    packs: list[str] | None = None  # knowledge packs this person's chat may use
 
 
 def _sign_in(request: Request, response: Response, name: str) -> dict:
@@ -238,6 +239,11 @@ def me(name: str = Depends(current_user)) -> dict:
 @api.patch("/me/prefs")
 def set_prefs(body: Prefs, name: str = Depends(current_user)) -> dict:
     values = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "packs" in values:
+        known = {p["name"] for p in packs.available()}
+        if bad := [n for n in values["packs"] if n not in known]:
+            raise HTTPException(400, f"no such knowledge pack: {', '.join(bad)}")
+        values["packs"] = sorted(set(values["packs"]))
     users.set_prefs(name, **values)
     resync([spaces.chat_index(name)])
     return spaces.prefs(name)
@@ -515,6 +521,15 @@ def delete_memory(fact_id: str, name: str = Depends(current_user)) -> dict:
         raise HTTPException(404, "no such fact")
     _reindex_private(name)
     return {"deleted": fact_id}
+
+
+# -- knowledge packs (Task 3) ------------------------------------------------
+
+
+@api.get("/packs")
+def list_packs(name: str = Depends(current_user)) -> list[dict]:
+    on = set(spaces.prefs(name).get("packs", []))
+    return [{**p, "enabled": p["name"] in on} for p in packs.available()]
 
 
 # -- Amin's own model, for devices to run it themselves (ADR-014) -------------

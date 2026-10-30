@@ -116,7 +116,7 @@ async function showApp(me) {
   $("meRole").textContent = me.admin ? "Admin · can invite people and remove household documents" : "Household member";
   $("adminBox").hidden = !me.admin;
   $("prefPrivate").checked = me.prefs.chat_private; $("prefHousehold").checked = me.prefs.chat_household;
-  greet(); renderSpace(); renderTargets(); renderLibrary(); renderProjects();
+  greet(); renderSpace(); renderTargets(); renderLibrary(); renderProjects(); loadPacks();
   await loadHistory();
   if (W.want) startWake();
 }
@@ -339,6 +339,8 @@ function docParts(docId) {
   if (docId === "p.memory.md") return ["Only me", "Your memory"];
   if (docId.startsWith("h.")) return ["Household", docId.slice(2)];
   if (docId.startsWith("p.")) return ["Only me", docId.slice(2)];
+  const k = /^k\.([a-z0-9-]+)\.(.*)$/.exec(docId);
+  if (k) return [PACKS.find(p => p.name === k[1])?.title ?? "Reference", k[2]];
   const m = /^j\.([a-z0-9]+)\.(.*)$/.exec(docId);
   if (m) return [`Project · ${projectById(m[1])?.name ?? "project"}`, m[2]];
   return ["Library", docId];
@@ -567,6 +569,17 @@ $("teachForm").onsubmit = async e => {
 };
 
 /* -- settings ------------------------------------------------------------------ */
+let PACKS = [];
+async function loadPacks() {
+  try { PACKS = await call("/packs"); } catch { PACKS = []; }
+  if (!PACKS.length) return;
+  $("packList").innerHTML = PACKS.map(p => `<label class="toggle-row"><span class="text"><span class="title">${esc(p.title)}</span><span class="sub">${esc(p.licence)} · ${p.documents} pages</span></span><span class="switch"><input type="checkbox" data-pack="${esc(p.name)}"${p.enabled ? " checked" : ""}><span></span></span></label>`).join("");
+  $("packList").querySelectorAll("[data-pack]").forEach(box => box.onchange = async () => {
+    const on = [...$("packList").querySelectorAll("[data-pack]:checked")].map(b => b.dataset.pack);
+    try { ME.prefs = await patch("/me/prefs", { packs: on }); }
+    catch (err) { box.checked = !box.checked; toast(err.message, true); }
+  });
+}
 for (const [id, key] of [["prefPrivate", "chat_private"], ["prefHousehold", "chat_household"]]) $(id).onchange = async () => {
   try { ME.prefs = await patch("/me/prefs", { [key]: $(id).checked }); }
   catch (err) { $(id).checked = !$(id).checked; toast(err.message, true); }

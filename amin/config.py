@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     # Needs Amin's own model server; with any other provider it stays off.
     router: str = "model"  # model | off
     # Voice mode (amin/voice.py): local Whisper, general + Malayalam specialist.
+    # Knowledge packs (amin/packs.py, Task 3): read-only, openly licensed libraries.
+    packs_path: Path = Path("data/packs")
     # Amin's own models, served to household devices by /models (ADR-014).
     models_path: Path = Path("data/models")
     whisper_model: Path = Path("data/models/whisper-large-v3-turbo")
