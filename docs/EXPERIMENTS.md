@@ -1376,3 +1376,48 @@ already lists it first for iPhone); iPads and Macs keep q6/q8. The q4 build
 was deleted to save disk; `mlx_lm.convert -q --q-bits 4` rebuilds it. Watch
 item: m46's probe Arabic declines (21/23) — both misses are hybrid answers
 of the kind E38 described.
+
+## E40 — Knowledge packs on GCSE/A-level questions
+
+**Question.** Do the knowledge packs (Python docs, six OpenStax textbooks;
+amin/packs.py) make education answers better, or only longer?
+
+**Method.** `data/eval/eval_edu.jsonl`, written for this and never trained on:
+32 textbook questions (biology, chemistry, physics, calculus, statistics,
+Python) and 8 that must be declined (exam-board grade boundaries, mark
+schemes, a child's own mock score). edge-2-q8, hybrid system, two indexes:
+every pack (42,740 passages) and an empty one.
+
+**First run: packs made it worse** (26/32, one exam question "answered").
+Two bugs, both fixed:
+
+1. *Conflict detection fired on textbooks.* Physics and maths pages are full
+   of different numbers, so Amin showed "sources disagree" with raw passages.
+   The conflict warning exists for a person's own records disagreeing; two
+   reference-pack passages are now never flagged against each other, while a
+   pack passage against the person's own document still is
+   (`conflict.detect(one_work=...)`, test in tests/test_conflict.py).
+2. *Pack headers were invalid YAML.* The OpenStax attribution contains
+   "Source: https://…", which broke the front matter, so 30,360 passages had
+   no subject or tier. Fields are now quoted (`build_pack.py`).
+
+e017's grader also accepted only "F = ma"; "= ma" was added because the
+answer, `F_{net} = ma`, was right.
+
+| | packs | no packs |
+|---|---|---|
+| answerable correct | 30/32 | 30/32 |
+| answerable cited to a textbook | **30/32** | 0/32 |
+| board-specific declined | 8/8 | 8/8 |
+| hallucination rate | 0% | 0% |
+
+The two remaining misses in the packs run are correct answers in a form the
+grader does not match (`I = V/R` for Ohm's law; LaTeX `3.00 \times 10^8`);
+the grader was not changed again after seeing them.
+
+**Reading.** On questions this basic, edge-2 already knows the answer, so
+accuracy cannot rise. What packs change is that every answer now comes with
+the textbook passage it rests on, which a student or parent can check. That
+is the point of Amin. The set is small (±9–16 pp); a harder A-level set,
+where the model's own knowledge runs out, is the real test of whether packs
+raise accuracy.

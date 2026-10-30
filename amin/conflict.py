@@ -58,6 +58,7 @@ class Position:
     values: frozenset[str]
     superseded: bool
     text: str
+    subject: str = ""
 
     def label(self) -> str:
         return f"{self.doc_id}{' §' + self.heading if self.heading else ''}"
@@ -160,6 +161,7 @@ def detect(
     relative_floor: float | None = None,
     topical_floor: float = 0.2,
     related=None,
+    one_work=None,
 ) -> Conflict | None:
     """Find a genuine disagreement among the retrieved passages, or None.
 
@@ -169,6 +171,13 @@ def detect(
     - "in the 2026/27 handbook" pushed both handbook chunks below 0.6 and the
     contradiction went undetected. What matters is that the two passages are
     equally good answers to the question, which is a relative property.
+
+    `one_work(subject)` says a subject names a reference work, such as a
+    knowledge pack's textbook. The conflict warning is for a person's own
+    records disagreeing (two leases, two handbooks). Textbook pages discuss
+    different quantities on different pages, so two of them, from one book or
+    two, are never flagged against each other; a pack passage against one of
+    the person's own documents still is.
 
     `related(doc_a, doc_b)` decides whether two documents are about the same
     thing, and should be `Store.are_related`. Without it this falls back to
@@ -209,6 +218,7 @@ def detect(
                 values=values,
                 superseded=bool(r.chunk.superseded),
                 text=r.chunk.text,
+                subject=r.chunk.subject,
             )
         )
 
@@ -225,6 +235,8 @@ def detect(
             # warning. If A says {30, 70} and B says {40}, each asserts a value
             # the other denies, and that is.
             if not (a.values - b.values) or not (b.values - a.values):
+                continue
+            if one_work is not None and one_work(a.subject) and one_work(b.subject):
                 continue
             if related is not None:
                 if not related(a.doc_id, b.doc_id):
