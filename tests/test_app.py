@@ -204,3 +204,28 @@ def test_model_files_are_served_only_to_members_and_only_listed_models(users_dir
     assert c.get("/models/edge-2-m46/model.safetensors").content == b"\0" * 64
     assert c.get("/models/secret/config.json").status_code == 404, "only models Amin lists"
     assert c.get("/models/edge-2-m46/..%2Fsecret%2Fconfig.json").status_code == 404
+
+
+def test_knowledge_packs_are_opt_in_cited_and_removable(users_dir, tmp_path, monkeypatch):
+    import json as _json
+
+    from amin.config import settings
+
+    root = tmp_path / "packs"
+    (root / "physics" / "docs").mkdir(parents=True)
+    (root / "physics" / "pack.json").write_text(_json.dumps(
+        {"title": "OpenStax Physics", "licence": "CC BY 4.0", "attribution": "OpenStax, Rice University"}))
+    (root / "physics" / "docs" / "ch5.md").write_text(
+        "# Newton's laws\n\n## Second law\nThe net force on a body equals its mass times its acceleration, F = ma.\n")
+    monkeypatch.setattr(settings, "packs_path", root)
+
+    abdul = signup(client(), "abdul")
+    q = {"question": "What does Newton's second law say about the net force on a body?"}
+    assert [p["enabled"] for p in abdul.get("/packs").json()] == [False], "off by default"
+    assert not answered(abdul, q)
+    assert abdul.patch("/me/prefs", json={"packs": ["physics"]}).status_code == 200
+    r = abdul.post("/ask", json=q).json()
+    assert r["basis"] == "documents" and any(c.startswith("k.physics.") for c in r["sources"])
+    assert abdul.patch("/me/prefs", json={"packs": ["nonsense"]}).status_code == 400
+    abdul.patch("/me/prefs", json={"packs": []})
+    assert not answered(abdul, q), "switching a pack off removes it from the index"
