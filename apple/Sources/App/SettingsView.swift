@@ -22,19 +22,8 @@ struct SettingsView: View {
 
   var body: some View {
     Form {
+      statusCard
       if let me = model.me {
-        Section {
-          HStack(spacing: 14) {
-            Text(me.name.prefix(1).uppercased())
-              .font(.title2.bold()).foregroundStyle(.white)
-              .frame(width: 52, height: 52).background(Color.aminTeal, in: Circle())
-            VStack(alignment: .leading) {
-              Text(me.name).font(.headline)
-              Text(me.admin ? "Admin · can invite people" : "Household member").font(.subheadline).foregroundStyle(.secondary)
-            }
-          }
-        }
-
         if me.admin {
           Section {
             Button("Create an invite code", systemImage: "person.badge.plus") {
@@ -188,6 +177,8 @@ struct SettingsView: View {
           .font(.callout).foregroundStyle(.secondary)
       } header: { Text("About") }
     }
+    .scrollContentBackground(.hidden)
+    .background(Color.aminBg.ignoresSafeArea())
     .navigationTitle("Settings")
     #if canImport(RevenueCatUI) && (os(iOS) || os(macOS) || os(visionOS))
     .sheet(isPresented: $showPaywall, onDismiss: { Task { await model.account.refreshPlan() } }) { PaywallView() }
@@ -239,6 +230,56 @@ struct SettingsView: View {
       _ = try? await model.client?.setPrefs(prefs)
       try? await model.refresh()
     }
+  }
+
+  /// D5: who you are and what Amin is running on, on the door, before any setting.
+  private var statusCard: some View {
+    Section {
+      DoorPanel(arch: false) {
+        VStack(alignment: .leading, spacing: AminSpace.md) {
+          HStack(spacing: AminSpace.md) {
+            Text(displayName.prefix(1).uppercased())
+              .font(.aminSerif(.title2, weight: .semibold)).foregroundStyle(Color.aminDoor)
+              .frame(width: 52, height: 52).background(Color.aminOnDoor, in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+              Text(displayName.isEmpty ? "Amin" : displayName).font(.aminSerif(.title3, weight: .semibold)).foregroundStyle(Color.aminOnDoor)
+              Text(role).font(.aminCaption).foregroundStyle(Color.aminOnDoor.opacity(0.75))
+            }
+          }
+          HStack(spacing: AminSpace.sm) {
+            chip(model.localModelName != nil ? "Model ready" : (model.client != nil ? "Amin computer" : "No model yet"), "cpu")
+            chip("Memory \(facts.count)", "brain")
+          }
+        }
+        .padding(AminSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+    .listRowBackground(Color.clear)
+    .listRowInsets(EdgeInsets())
+  }
+
+  private func chip(_ text: String, _ icon: String) -> some View {
+    Label(text, systemImage: icon).font(.aminTrust).foregroundStyle(Color.aminOnDoor)
+      .padding(.horizontal, AminSpace.md).padding(.vertical, 6)
+      .background(Color.aminOnDoor.opacity(0.14), in: Capsule())
+  }
+
+  private var displayName: String {
+    if let me = model.me { return me.name }
+    #if os(iOS) || os(macOS) || os(visionOS)
+    return model.account.displayName ?? ""
+    #else
+    return ""
+    #endif
+  }
+
+  private var role: String {
+    if let me = model.me { return me.admin ? "Admin · can invite people" : "Household member" }
+    #if os(iOS) || os(macOS) || os(visionOS)
+    if model.account.isSignedIn { return model.account.isPro ? "Amin Pro" : "Free plan" }
+    #endif
+    return "On this device"
   }
 
   private func prefBinding(_ key: WritableKeyPath<Prefs, Bool>) -> Binding<Bool> {
