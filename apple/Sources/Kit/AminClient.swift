@@ -128,6 +128,31 @@ nonisolated final class AminClient: Engine {
   func remember(_ text: String) async throws -> Fact { try await send("POST", "memory", json: FactBody(text: text)) }
   func forget(_ id: String) async throws { _ = try await send("DELETE", "memory/\(id)", as: OK.self) }
 
+  // MARK: Amin's own model (ADR-014)
+
+  #if os(iOS) || os(macOS) || os(visionOS)
+  func models() async throws -> [ModelInfo] { try await send("GET", "models") }
+
+  /// One model file, downloaded to a temporary location (large: streamed to disk, not memory).
+  func modelFile(_ model: String, _ file: String, progress: @escaping @Sendable (Int64) -> Void = { _ in }) async throws -> URL {
+    let url = base.appending(path: "models/\(model)/\(file)")
+    let (tmp, response) = try await session.download(from: url, delegate: ByteProgress(progress))
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+      throw AminError.server("Couldn't download \(file) from your Amin computer.")
+    }
+    return tmp
+  }
+  #endif
+
+  /// Reports bytes written so a multi-gigabyte file shows real progress.
+  private final class ByteProgress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    let report: @Sendable (Int64) -> Void
+    init(_ report: @escaping @Sendable (Int64) -> Void) { self.report = report }
+    func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didWriteData _: Int64,
+                    totalBytesWritten: Int64, totalBytesExpectedToWrite _: Int64) { report(totalBytesWritten) }
+    func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+  }
+
   // MARK: voice
 
   func transcribe(_ audio: Data, contentType: String, lang: String?) async throws -> Transcript {

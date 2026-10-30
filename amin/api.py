@@ -517,6 +517,53 @@ def delete_memory(fact_id: str, name: str = Depends(current_user)) -> dict:
     return {"deleted": fact_id}
 
 
+# -- Amin's own model, for devices to run it themselves (ADR-014) -------------
+#
+# A phone or iPad on the home network downloads the model from this computer,
+# not from the internet: nothing about the household leaves home, and the
+# weights ship outside the App Store size limit. Only signed-in members can
+# fetch them, and only models in OWN_MODELS.
+
+OWN_MODELS = {
+    # name: what it is for. Sizes are read from disk.
+    "edge-2-q6": "Made for iPad and Mac",      # passes the E38 gate
+    "edge-2-m46": "Made for iPhone",           # mixed 4/6-bit, E39
+    "edge-2-q8": "The fullest model, for Macs",
+}
+
+
+def _model_dir(name: str) -> Path:
+    if name not in OWN_MODELS:
+        raise HTTPException(404, "no such model")
+    d = settings.models_path / name
+    if not (d / "config.json").exists():
+        raise HTTPException(404, "that model is not on this computer")
+    return d
+
+
+@api.get("/models")
+def list_models(_: str = Depends(current_user)) -> list[dict]:
+    out = []
+    for name, purpose in OWN_MODELS.items():
+        d = settings.models_path / name
+        if (d / "config.json").exists():
+            files = [f for f in sorted(d.iterdir()) if f.is_file() and not f.name.startswith(".")]
+            out.append({"name": name, "purpose": purpose, "bytes": sum(f.stat().st_size for f in files),
+                        "files": [{"name": f.name, "bytes": f.stat().st_size} for f in files]})
+    return out
+
+
+@api.get("/models/{name}/{filename}")
+def model_file(name: str, filename: str, _: str = Depends(current_user)):
+    from fastapi.responses import FileResponse
+
+    d = _model_dir(name)
+    f = d / Path(filename).name  # trust boundary: no directory parts
+    if not f.is_file() or f.name.startswith("."):
+        raise HTTPException(404, "no such file")
+    return FileResponse(f)  # supports Range, so a dropped download resumes
+
+
 # -- history -----------------------------------------------------------------
 
 

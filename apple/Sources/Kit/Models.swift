@@ -140,3 +140,13 @@ nonisolated enum AminError: LocalizedError, Equatable {
     }
   }
 }
+
+/// One of Amin's own models, as the Amin computer offers it for download (/models).
+nonisolated struct ModelInfo: Codable, Hashable, Identifiable, Sendable {
+  struct File: Codable, Hashable, Sendable { let name: String; let bytes: Int64 }
+  let name: String
+  let purpose: String
+  let bytes: Int64
+  let files: [File]
+  var id: String { name }
+}
