@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     # -- storage -------------------------------------------------------------
     index_path: Path = REPO_ROOT / "data" / "index" / "amin.db"
+    embed_cache_path: Path = REPO_ROOT / "data" / "index" / "embeddings.db"
     corpus_path: Path = REPO_ROOT / "data" / "corpus"
     private_path: Path = REPO_ROOT / "private"
     # One folder per household account: documents + index. Never committed.

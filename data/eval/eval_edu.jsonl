@@ -1,0 +1,40 @@
+{"id": "e001", "kind": "answerable", "question": "During which phase of the cell cycle is DNA replicated?", "expect_any": ["S phase", "synthesis phase"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e002", "kind": "answerable", "question": "Which enzyme adds nucleotides to a growing DNA strand during replication?", "expect_any": ["DNA polymerase"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e003", "kind": "answerable", "question": "Which base pairs with adenine in DNA?", "expect_any": ["thymine"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e004", "kind": "answerable", "question": "Where in the cell does the Krebs cycle (citric acid cycle) take place in eukaryotes?", "expect_any": ["mitochondrial matrix", "matrix of the mitochondri"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e005", "kind": "answerable", "question": "What are the products of the light-dependent reactions of photosynthesis that are used in the Calvin cycle?", "expect_any": ["ATP and NADPH", "NADPH and ATP"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e006", "kind": "answerable", "question": "What type of cell division produces gametes?", "expect_any": ["meiosis"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e007", "kind": "answerable", "question": "Which organelle is the site of protein synthesis?", "expect_any": ["ribosome"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e008", "kind": "answerable", "question": "What is the movement of water across a semipermeable membrane called?", "expect_any": ["osmosis"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e009", "kind": "answerable", "question": "Which type of transport moves substances against their concentration gradient using energy?", "expect_any": ["active transport"], "lang": "en", "tags": ["edu", "bio"]}
+{"id": "e010", "kind": "answerable", "question": "What is Avogadro's number, approximately?", "expect_any": ["6.022", "6.02"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e011", "kind": "answerable", "question": "What is the pH of a neutral solution at 25 °C?", "expect_any": ["7"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e012", "kind": "answerable", "question": "What type of bond forms when electrons are shared between two atoms?", "expect_any": ["covalent"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e013", "kind": "answerable", "question": "What is the charge of an electron?", "expect_any": ["negative", "−1", "-1"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e014", "kind": "answerable", "question": "What do we call a substance that speeds up a reaction without being consumed?", "expect_any": ["catalyst"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e015", "kind": "answerable", "question": "In the ideal gas law PV = nRT, what does n stand for?", "expect_any": ["moles", "number of moles", "amount of substance"], "lang": "en", "tags": ["edu", "chem"]}
+{"id": "e016", "kind": "answerable", "question": "What is the SI unit of force?", "expect_any": ["newton"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e017", "kind": "answerable", "question": "State Newton's second law of motion as an equation.", "expect_any": ["F = ma", "F=ma", "net force equals mass times acceleration"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e018", "kind": "answerable", "question": "What is the approximate acceleration due to gravity at Earth's surface?", "expect_any": ["9.8"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e019", "kind": "answerable", "question": "What is Ohm's law?", "expect_any": ["V = IR", "V=IR"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e020", "kind": "answerable", "question": "What is the SI unit of electrical resistance?", "expect_any": ["ohm"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e021", "kind": "answerable", "question": "What is the speed of light in a vacuum, approximately?", "expect_any": ["3.00 × 10^8", "3 × 10^8", "3.00 x 10^8", "300,000 km", "3.0 × 10^8", "299"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e022", "kind": "answerable", "question": "What is the derivative of sin x?", "expect_any": ["cos x", "cos(x)"], "lang": "en", "tags": ["edu", "math"]}
+{"id": "e023", "kind": "answerable", "question": "What is the derivative of x^n according to the power rule?", "expect_any": ["nx^(n-1)", "n x^(n−1)", "nx^{n-1}", "n·x^(n-1)", "nx^(n − 1)"], "lang": "en", "tags": ["edu", "math"]}
+{"id": "e024", "kind": "answerable", "question": "What is the integral of 1/x with respect to x?", "expect_any": ["ln|x|", "ln |x|", "ln(x)", "ln x"], "lang": "en", "tags": ["edu", "math"]}
+{"id": "e025", "kind": "answerable", "question": "What does the chain rule let you differentiate?", "expect_any": ["composite", "composition"], "lang": "en", "tags": ["edu", "math"]}
+{"id": "e026", "kind": "answerable", "question": "What is the median of a data set?", "expect_any": ["middle value", "middle"], "lang": "en", "tags": ["edu", "stats"]}
+{"id": "e027", "kind": "answerable", "question": "In a normal distribution, about what percentage of data lies within one standard deviation of the mean?", "expect_any": ["68"], "lang": "en", "tags": ["edu", "stats"]}
+{"id": "e028", "kind": "answerable", "question": "What does a p-value below the significance level lead you to do with the null hypothesis?", "expect_any": ["reject"], "lang": "en", "tags": ["edu", "stats"]}
+{"id": "e029", "kind": "answerable", "question": "Which Python keyword defines a function?", "expect_any": ["def"], "lang": "en", "tags": ["edu", "py"]}
+{"id": "e030", "kind": "answerable", "question": "What does len() return for a list?", "expect_any": ["number of items", "number of elements", "length"], "lang": "en", "tags": ["edu", "py"]}
+{"id": "e031", "kind": "answerable", "question": "What is the difference between a list and a tuple in Python?", "expect_any": ["immutable"], "lang": "en", "tags": ["edu", "py"]}
+{"id": "e032", "kind": "answerable", "question": "Which statement handles exceptions in Python?", "expect_any": ["try"], "lang": "en", "tags": ["edu", "py"]}
+{"id": "u001", "kind": "unanswerable", "question": "What were the grade boundaries for AQA GCSE Biology Paper 1 in June 2025?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u002", "kind": "unanswerable", "question": "What is question 3 on the Edexcel A level Maths Paper 2 from 2024?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u003", "kind": "unanswerable", "question": "Which required practicals are listed in the AQA A level Chemistry specification 7405?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u004", "kind": "unanswerable", "question": "What score did my son get in his GCSE mock exam?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u005", "kind": "unanswerable", "question": "What is the mark scheme answer for Edexcel GCSE Physics 1PH0 paper 1F question 5?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u006", "kind": "unanswerable", "question": "When is my child's school parents' evening this term?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u007", "kind": "unanswerable", "question": "What is the telephone number of the AQA exam officer at our school?", "lang": "en", "tags": ["edu", "board-specific"]}
+{"id": "u008", "kind": "unanswerable", "question": "How many marks is the 2026 Pearson Edexcel GCSE Combined Science paper worth in total?", "lang": "en", "tags": ["edu", "board-specific"]}

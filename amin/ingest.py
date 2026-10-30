@@ -130,6 +130,28 @@ def _sections(body: str) -> list[tuple[str, str]]:
     return out
 
 
+def _split_long(unit: str, limit: int) -> list[str]:
+    """A table, code block or run-on line far over the limit is cut at line
+    breaks, then hard, so no chunk outgrows the embedder's context."""
+    if len(unit) <= 2 * limit:
+        return [unit]
+    out, buf = [], ""
+    for line in unit.splitlines():
+        while len(line) > limit:
+            if buf:
+                out.append(buf)
+                buf = ""
+            out.append(line[:limit])
+            line = line[limit:]
+        if buf and len(buf) + len(line) + 1 > limit:
+            out.append(buf)
+            buf = ""
+        buf = f"{buf}\n{line}" if buf else line
+    if buf.strip():
+        out.append(buf)
+    return [o.strip() for o in out if o.strip()]
+
+
 def _pack(text: str, limit: int, overlap: int) -> list[str]:
     """Pack sentences up to `limit` chars, never splitting mid-sentence."""
     units: list[str] = []
@@ -142,6 +164,7 @@ def _pack(text: str, limit: int, overlap: int) -> list[str]:
             units.append(para)
         else:
             units.extend(s.strip() for s in _SENT_SPLIT.split(para) if s.strip())
+    units = [piece for unit in units for piece in _split_long(unit, limit)]
 
     chunks: list[str] = []
     buf: list[str] = []
