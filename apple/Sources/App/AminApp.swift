@@ -17,7 +17,7 @@ struct AminApp: App {
         }
         CommandGroup(after: .windowArrangement) {
           AmbientCommand()
-          Button("Quick Ask (⌥Space)") { QuickAsk.shared.show() }
+          Button("Quick Ask") { QuickAsk.shared.show() }
         }
       }
     // The JARVIS-style ambient display: put it on a big screen and say "Hey Amin".
@@ -26,7 +26,7 @@ struct AminApp: App {
     }
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 1280, height: 800)
-    // Quick ask from anywhere: the menu-bar door, or ⌥Space.
+    // Quick ask from anywhere: the menu-bar door, or the shortcut chosen in Settings.
     MenuBarExtra("Amin", systemImage: "door.left.hand.open") { QuickAskMenu() }
     #else
     main

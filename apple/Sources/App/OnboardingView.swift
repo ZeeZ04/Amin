@@ -107,6 +107,10 @@ struct OnboardingView: View {
       case .done(let dir):
         Label("Ready on this device", systemImage: "checkmark.circle.fill").foregroundStyle(Color.aminAccentInk)
           .onAppear { model.useDownloadedModel(at: dir) }
+        #if targetEnvironment(simulator)
+        Text("In the Simulator, answers come from your Amin computer: the model itself runs on a real iPhone, iPad or Mac.")
+          .font(.aminCaption).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
+        #endif
       case .failed(let why):
         Text(why).font(.aminCaption).foregroundStyle(Color.aminDanger).multilineTextAlignment(.center)
       }

@@ -11,6 +11,9 @@ struct SettingsView: View {
   @State private var deviceDocs: [LocalLibrary.Document] = []
   @State private var preferLocal = true
   @State private var packs: [Pack] = []
+  #if os(macOS)
+  @State private var shortcut = QuickAskShortcut.current
+  #endif
 
   var body: some View {
     Form {
@@ -123,6 +126,17 @@ struct SettingsView: View {
           } catch { model.error = error.localizedDescription }
           deviceDocs = library.documents()
         }
+      }
+      #endif
+
+      #if os(macOS)
+      Section {
+        Picker("Shortcut", selection: $shortcut) {
+          ForEach(QuickAskShortcut.allCases) { Text($0.label).tag($0) }
+        }
+        .onChange(of: shortcut) { _, s in QuickAsk.shared.apply(s) }
+      } header: { Text("Quick ask") } footer: {
+        Text("Opens a small Amin window from any app. Pick one that Gemini, ChatGPT or Claude are not already using.")
       }
       #endif
 

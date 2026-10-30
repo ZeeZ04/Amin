@@ -240,3 +240,17 @@ def test_pack_front_matter_survives_attributions_with_colons(tmp_path):
     raw = f"---\ntitle: {json.dumps('Biology · Cells')}\ntier: reference\nabout: openstax-biology\nnote: {json.dumps(note)}\n---\n\n# Cells\nText."
     parsed = split_front_matter(raw)
     assert parsed.meta["about"] == "openstax-biology" and parsed.meta["note"] == note
+
+
+def test_reset_password_replaces_it_and_signs_out_everywhere(users_dir):
+    from amin import users
+
+    c = signup(client(), "owner")
+    assert c.get("/me").status_code == 200
+    before = users._load("users.json")["owner"]["session"]
+    users.set_password("owner", "second-pass")
+    assert not users.verify("owner", "secret123") and users.verify("owner", "second-pass")
+    assert c.get("/me").status_code == 401  # the old sign-in no longer works
+    assert users._load("users.json")["owner"]["session"] == before + 1
+    with pytest.raises(ValueError):
+        users.set_password("nobody", "whatever1")

@@ -3,7 +3,38 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// The Mac quick-ask panel (docs/team/D3, DESIGN.md §3): ⌥Space from any app
+/// The shortcut that opens quick ask from any app. ⌥Space is taken by Gemini,
+/// ChatGPT/Codex and Claude on many Macs, so Amin defaults to ⌥⇧Space and the
+/// owner picks another in Settings.
+enum QuickAskShortcut: String, CaseIterable, Identifiable {
+  case optionShiftSpace, controlOptionSpace, optionShiftA, controlSpace, off
+  var id: String { rawValue }
+  static let key = "amin.quickAskShortcut"
+  static var current: QuickAskShortcut {
+    UserDefaults.standard.string(forKey: key).flatMap(Self.init(rawValue:)) ?? .optionShiftSpace
+  }
+  var label: String {
+    switch self {
+    case .optionShiftSpace: "⌥⇧Space"
+    case .controlOptionSpace: "⌃⌥Space"
+    case .optionShiftA: "⌥⇧A"
+    case .controlSpace: "⌃Space (replaces the input-source switch)"
+    case .off: "Off"
+    }
+  }
+  /// Carbon key code and modifiers, or nil when off.
+  var carbon: (key: UInt32, mods: UInt32)? {
+    switch self {
+    case .optionShiftSpace: (UInt32(kVK_Space), UInt32(optionKey | shiftKey))
+    case .controlOptionSpace: (UInt32(kVK_Space), UInt32(controlKey | optionKey))
+    case .optionShiftA: (UInt32(kVK_ANSI_A), UInt32(optionKey | shiftKey))
+    case .controlSpace: (UInt32(kVK_Space), UInt32(controlKey))
+    case .off: nil
+    }
+  }
+}
+
+/// The Mac quick-ask panel (docs/team/D3, DESIGN.md §3): a shortcut from any app
 /// opens a floating field; the answer appears below with its sources. The
 /// hotkey uses Carbon's RegisterEventHotKey, which needs no accessibility
 /// permission. Questions go into the current conversation, so ⌘⏎ continues
@@ -14,13 +45,25 @@ final class QuickAsk {
   private var hotKey: EventHotKeyRef?
   private var model: AppModel?
 
+  private var handlerInstalled = false
+
   func install(model: AppModel) {
     self.model = model
-    guard hotKey == nil else { return }
-    var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-    InstallEventHandler(GetApplicationEventTarget(), quickAskHotKeyPressed, 1, &spec, nil, nil)
+    if !handlerInstalled {
+      var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+      InstallEventHandler(GetApplicationEventTarget(), quickAskHotKeyPressed, 1, &spec, nil, nil)
+      handlerInstalled = true
+    }
+    apply(QuickAskShortcut.current)
+  }
+
+  /// Swap the global shortcut; the old one is released first.
+  func apply(_ shortcut: QuickAskShortcut) {
+    UserDefaults.standard.set(shortcut.rawValue, forKey: QuickAskShortcut.key)
+    if let hotKey { UnregisterEventHotKey(hotKey); self.hotKey = nil }
+    guard let c = shortcut.carbon else { return }
     let id = EventHotKeyID(signature: OSType(0x414D_494E), id: 1)  // 'AMIN'
-    RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
+    RegisterEventHotKey(c.key, c.mods, id, GetApplicationEventTarget(), 0, &hotKey)
   }
 
   func toggle() {
@@ -166,7 +209,7 @@ struct QuickAskView: View {
 struct QuickAskMenu: View {
   @Environment(\.openWindow) private var openWindow
   var body: some View {
-    Button("Quick Ask") { QuickAsk.shared.show() }.keyboardShortcut(.space, modifiers: .option)
+    Button("Quick Ask   \(QuickAskShortcut.current.label)") { QuickAsk.shared.show() }
     Button("Open Amin") { NSApp.activate(); openWindow(id: "main") }
     Button("Ambient Mode") { NSApp.activate(); openWindow(id: "ambient") }
     Divider()
