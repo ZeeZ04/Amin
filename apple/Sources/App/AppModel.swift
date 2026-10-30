@@ -46,6 +46,9 @@ final class AppModel {
     if let saved = UserDefaults.standard.string(forKey: Self.serverKey), let url = URL(string: saved) {
       client = AminClient(base: url)
     }
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("-AminDemo") { loadDemo() }
+    #endif
     restoreLocalModel()
   }
 
@@ -241,4 +244,26 @@ final class AppModel {
     guard let client else { throw AminError.notSignedIn }
     return try await client.chunk(chunkID, project: space.isEmpty ? nil : space)
   }
+
+  #if DEBUG
+  /// Sample turns for design review and store screenshots (`-AminDemo`, Debug builds only):
+  /// a cited answer, a general one and a Malayalam one, with no server or model.
+  private func loadDemo() {
+    UserDefaults.standard.set(true, forKey: "amin.onboarded")
+    phase = .ready
+    if ProcessInfo.processInfo.arguments.contains("-AminDemoEmpty") { return }
+    var a = Turn(question: "When does our tenancy end?")
+    a.answer = Answer(question: a.question, outcome: "answered", basis: "documents",
+                      claims: [Claim(text: "Your tenancy at 14 Elm Road ends on 28 February 2027.", citations: ["h.tenancy.pdf#003"], verdict: "supported"),
+                               Claim(text: "You must give two months' notice if you will not renew.", citations: ["h.tenancy.pdf#007"], verdict: "supported")],
+                      sources: ["h.tenancy.pdf#003": SourceRef(docId: "h.tenancy.pdf", heading: "Term"),
+                                "h.tenancy.pdf#007": SourceRef(docId: "h.tenancy.pdf", heading: "Ending the tenancy")],
+                      latencyMs: 1240)
+    var b = Turn(question: "കേരളത്തിലെ ഏറ്റവും നീളം കൂടിയ നദി ഏതാണ്?")
+    b.answer = Answer(question: b.question, outcome: "general", basis: "general",
+                      claims: [Claim(text: "കേരളത്തിലെ ഏറ്റവും നീളം കൂടിയ നദി പെരിയാർ ആണ്.", citations: [], verdict: "uncited")],
+                      latencyMs: 980)
+    turns = [a, b, Turn(question: "What did the boiler engineer say last visit?")]
+  }
+  #endif
 }

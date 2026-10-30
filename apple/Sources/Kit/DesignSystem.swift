@@ -40,24 +40,31 @@ nonisolated private func role(_ l: UInt32, _ d: UInt32, lHC: UInt32, dHC: UInt32
 
 extension Color {
   // Surfaces
-  static let aminBg = role(0xF7F8F6, 0x0D1615, lHC: 0xFFFFFF, dHC: 0x000000)
-  static let aminSurface = role(0xFFFFFF, 0x131E1D, lHC: 0xFFFFFF, dHC: 0x0D1615)
-  static let aminRaised = role(0xFFFFFF, 0x182524, lHC: 0xFFFFFF, dHC: 0x182524)
-  static let aminSidebar = role(0xEFF2F0, 0x0F1A19, lHC: 0xEFF2F0, dHC: 0x0D1615)
+  static let aminBg = role(0xF6F1E7, 0x0B1716, lHC: 0xFFFCF5, dHC: 0x000000)      // sand paper (D5)
+  static let aminSurface = role(0xFFFCF5, 0x122120, lHC: 0xFFFFFF, dHC: 0x0D1615)
+  static let aminRaised = role(0xFFFFFF, 0x1A2B2A, lHC: 0xFFFFFF, dHC: 0x182524)
+  static let aminSidebar = role(0xEAE3D2, 0x082B29, lHC: 0xEAE3D2, dHC: 0x0D1615)
   // Text
-  static let aminInk = role(0x142826, 0xE5EDEB, lHC: 0x0A1514, dHC: 0xFFFFFF)
+  static let aminInk = role(0x1B2B29, 0xF1EBDD, lHC: 0x0A1514, dHC: 0xFFFFFF)
   static let aminInk2 = role(0x3C504D, 0xC3D0CD, lHC: 0x142826, dHC: 0xFFFFFF)
-  static let aminMuted = role(0x5F706D, 0x8FA19E, lHC: 0x3C504D, dHC: 0xC3D0CD)
+  static let aminMuted = role(0x5E6B66, 0x9FB0AB, lHC: 0x3C504D, dHC: 0xC3D0CD)
   // Brand roles
-  static let aminAccent = role(0x0E5E5A, 0x1F7A72, lHC: 0x0A3F3C, dHC: 0x9BE0D6)      // fills, with aminOnAccent text
+  static let aminAccent = role(0x0E5E5A, 0x2A8C84, lHC: 0x0A3F3C, dHC: 0x9BE0D6)      // fills, with aminOnAccent text
   static let aminOnAccent = role(0xFFFFFF, 0xFFFFFF, lHC: 0xFFFFFF, dHC: 0x0D1615)
   static let aminAccentInk = role(0x0E5E5A, 0x6CC5BA, lHC: 0x0A3F3C, dHC: 0x9BE0D6)   // teal as text or icon
-  static let aminAccentWash = role(0xE3EFEC, 0x173533, lHC: 0xD2E6E2, dHC: 0x1F4744)
+  static let aminAccentWash = role(0xDCEBE6, 0x173533, lHC: 0xD2E6E2, dHC: 0x1F4744)
   static let aminFocus = role(0x0E5E5A, 0xE3A72F, lHC: 0x0A3F3C, dHC: 0xFFD166)       // saffron fails 3:1 on light
   static let aminGold = role(0xE3A72F, 0xE3A72F, lHC: 0xE3A72F, dHC: 0xFFD166)        // decorative only, never text on light
   static let aminOnGold = hex(0x3A2A05)
+  // Lantern Majlis (D5): the lantern glows where Amin thinks or finds a source;
+  // the door is the deep-teal panel that carries the brand on every screen.
+  static let aminLantern = role(0xE3A72F, 0xF2B94B, lHC: 0xC98A12, dHC: 0xFFD166)     // fills and glow
+  static let aminLanternInk = role(0x8A5A00, 0xF2B94B, lHC: 0x6B4600, dHC: 0xFFD166)  // lantern as text, 6:1 on aminBg
+  static let aminDoor = role(0x0A3F3C, 0x0E5E5A, lHC: 0x062B29, dHC: 0x0E5E5A)        // hero panels, user bubble
+  static let aminOnDoor = role(0xF3EFE4, 0xF3EFE4, lHC: 0xFFFFFF, dHC: 0xFFFFFF)      // sand text on the door, 10:1
+  static let aminWashGold = role(0xF7E7BF, 0x3A2D12, lHC: 0xF2DBA0, dHC: 0x4A3A18)    // cited passage, citation pill
   // Lines and status
-  static let aminLine = role(0xE0E6E3, 0x22312F, lHC: 0x5F706D, dHC: 0x8FA19E)
+  static let aminLine = role(0xDDD4BF, 0x243634, lHC: 0x5F706D, dHC: 0x8FA19E)
   static let aminLineStrong = role(0x8A9895, 0x5E726F, lHC: 0x3C504D, dHC: 0xC3D0CD) // control borders, 3:1
   static let aminDanger = role(0xA2322B, 0xEC8A80, lHC: 0x7E1F1A, dHC: 0xFFB3AB)
   static let aminDangerWash = role(0xFBEAE8, 0x3A1E1B, lHC: 0xF6D5D1, dHC: 0x4A1F1B)
@@ -94,12 +101,28 @@ extension Font {
   static let aminTitle = Font.amin(.title2, weight: .semibold)
   static let aminHeadline = Font.amin(.headline, weight: .semibold)
   static let aminBody = Font.amin(.body)
-  static let aminAnswer = Font.amin(.body)                 // answer card text, measure 46rem
+  static let aminAnswer = Font.aminSerif(.body)            // answer card text, measure 46rem (D5: serif voice)
+  static let aminDisplay = Font.aminSerif(.largeTitle, weight: .semibold)  // greetings and screen titles
+  static let aminTrust = Font.system(.footnote, design: .rounded).weight(.semibold)  // "From your documents"
+
+  /// Amin's own voice: New York for Latin, the system face for Arabic, bundled Noto Sans for Malayalam.
+  static func aminSerif(_ style: TextStyle, script: AminScript = .latin, weight: Weight = .regular) -> Font {
+    script == .latin ? .system(style, design: .serif).weight(weight) : .amin(style, script: script, weight: weight)
+  }
   static let aminCaption = Font.amin(.caption)             // citation chip
   static let aminMono = Font.system(.callout, design: .monospaced)
 }
 
 extension AminScript {
+  /// The script a string is mostly written in: the first Arabic or Malayalam letter decides.
+  static func of(_ text: String) -> AminScript {
+    for u in text.unicodeScalars {
+      if (0x0D00...0x0D7F).contains(u.value) { return .malayalam }
+      if (0x0600...0x06FF).contains(u.value) || (0x0750...0x077F).contains(u.value) { return .arabic }
+    }
+    return .latin
+  }
+
   /// Extra line spacing as a fraction of the point size, on top of the system default.
   var extraLeading: CGFloat {
     switch self {
@@ -130,10 +153,10 @@ enum AminSpace {
 }
 
 enum AminRadius {
-  static let sm: CGFloat = 8     // chips, fields' inner elements
-  static let md: CGFloat = 12    // buttons, fields
-  static let lg: CGFloat = 16    // cards
-  static let xl: CGFloat = 22    // sheets, composer
+  static let sm: CGFloat = 10    // chips, fields' inner elements
+  static let md: CGFloat = 14    // buttons, fields
+  static let lg: CGFloat = 20    // cards (D5)
+  static let xl: CGFloat = 28    // sheets, composer
   static let pill: CGFloat = 999 // voice HUD citation chips only
 }
 

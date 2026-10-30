@@ -42,22 +42,31 @@ struct AuthView: View {
   }
 
   private var backdrop: some View {
-    ZStack {
+    ZStack(alignment: .top) {
       Color.aminBg
-      RadialGradient(colors: [Color.aminAccent.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 520)
+      RadialGradient(colors: [Color.aminLantern.opacity(0.10), .clear], center: .top, startRadius: 0, endRadius: 480)
     }
   }
 
+  /// D5 sign-in hero: the door panel, the mark, and a welcome in all three languages.
   private var header: some View {
-    VStack(spacing: AminSpace.lg) {
-      DoorMark().frame(width: 84, height: 84)
-        .shadow(color: Color.aminAccent.opacity(0.25), radius: 18, y: 8)
-      Text(creating ? "Create your Amin account" : "Welcome back")
-        .font(.amin(.largeTitle, weight: .bold)).multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-      Text("Your account holds your plan, nothing else. What you ask and the documents you add stay on this device.")
-        .font(.aminBody).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
+    VStack(spacing: AminSpace.xl) {
+      DoorPanel {
+        VStack(spacing: AminSpace.lg) {
+          DoorMark(tint: .aminOnDoor).frame(width: 96, height: 96)
+          WelcomeLine()
+        }
+        .padding(.top, 56).padding(.bottom, AminSpace.xl)
+      }
+      .frame(maxWidth: 300)
+      VStack(spacing: AminSpace.sm) {
+        Text(creating ? "Create your Amin account" : "Welcome back")
+          .font(.aminSerif(.title, weight: .semibold)).foregroundStyle(Color.aminInk)
+          .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        Text("Your account holds your plan, nothing else. What you ask and the documents you add stay on this device.")
+          .font(.aminBody).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 
@@ -84,18 +93,23 @@ struct AuthView: View {
           .textContentType(creating ? .newPassword : .password)
           .focused($focus, equals: .password)
           .onSubmit(go)
-          .boxedField()
+          .aminField()
       }
 
       Button(action: go) {
         HStack(spacing: AminSpace.sm) {
-          if working { ProgressView().controlSize(.small) }
+          if working { LanternDot(size: 10) }
           Text(creating ? "Create account" : "Sign in").font(.aminHeadline)
         }
-        .frame(maxWidth: .infinity, minHeight: 50)
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .foregroundStyle(canSubmit ? Color.aminOnAccent : Color.aminMuted)
+        .background(canSubmit ? Color.aminAccent : Color.aminLine.opacity(0.6), in: RoundedRectangle(cornerRadius: AminRadius.md))
       }
-      .buttonStyle(.borderedProminent).tint(.aminAccent)
+      .buttonStyle(.plain)
       .disabled(!canSubmit)
+      if !canSubmit && !working, let hint {
+        Text(hint).font(.aminCaption).foregroundStyle(Color.aminMuted).frame(maxWidth: .infinity)
+      }
 
       if !creating {
         Button("Forgot your password?") { forgot() }
@@ -111,8 +125,9 @@ struct AuthView: View {
       }
     }
     .padding(AminSpace.xl)
-    .background(Color.aminSurface, in: RoundedRectangle(cornerRadius: AminRadius.xl))
-    .overlay(RoundedRectangle(cornerRadius: AminRadius.xl).strokeBorder(Color.aminLine))
+    .background(Color.aminSurface, in: RoundedRectangle(cornerRadius: AminRadius.lg))
+    .overlay(RoundedRectangle(cornerRadius: AminRadius.lg).strokeBorder(Color.aminLine))
+    .shadow(color: Color.aminDoor.opacity(0.08), radius: 18, y: 6)
   }
 
   private func confirm(_ address: String) -> some View {
@@ -132,8 +147,14 @@ struct AuthView: View {
     VStack(spacing: AminSpace.md) {
       Label("No analytics. No ads. Your documents are never uploaded.", systemImage: "lock.shield")
         .font(.aminCaption).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
-      Button("Have an Amin computer at home? Connect to it") { connecting = true }
-        .font(.aminCaption.weight(.semibold)).foregroundStyle(Color.aminAccentInk)
+      Button { connecting = true } label: {
+        Label("Have an Amin computer at home? Connect to it", systemImage: "desktopcomputer")
+          .font(.aminCaption.weight(.semibold)).foregroundStyle(Color.aminAccentInk)
+          .padding(.horizontal, AminSpace.lg).padding(.vertical, AminSpace.md)
+          .frame(maxWidth: .infinity)
+          .background(Color.aminAccentWash, in: RoundedRectangle(cornerRadius: AminRadius.md))
+      }
+      .buttonStyle(.plain)
       HStack(spacing: AminSpace.lg) {
         Link("Privacy", destination: URL(string: "https://amin.vercel.app/privacy")!)
         Link("Terms", destination: URL(string: "https://amin.vercel.app/terms")!)
@@ -155,8 +176,17 @@ struct AuthView: View {
         #if os(iOS)
         .textInputAutocapitalization(f == .name ? .words : .never)
         #endif
-        .boxedField()
+        .aminField()
     }
+  }
+
+  /// Why the button is not ready yet (D5: say it, rather than show a blank grey pill).
+  private var hint: String? {
+    if creating && name.trimmingCharacters(in: .whitespaces).isEmpty { return "Add your name to continue." }
+    if !email.contains("@") { return "Enter your email address." }
+    if creating && password.count < 8 { return "Passwords need 8 or more characters." }
+    if password.isEmpty { return "Enter your password." }
+    return nil
   }
 
   private var canSubmit: Bool {
@@ -212,6 +242,30 @@ struct AuthView: View {
     if m.contains("rate limit") { return "Too many tries. Wait a minute and try again." }
     if m.contains("offline") || m.contains("network") { return "You're offline. Connect to the internet to sign in." }
     return error.localizedDescription
+  }
+}
+
+/// "Welcome home" in Amin's three languages, changing every 4 s (still under Reduce Motion).
+private struct WelcomeLine: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var i = 0
+  private let lines: [(String, AminScript)] = [("Welcome home", .latin), ("مرحباً بك", .arabic), ("സ്വാഗതം", .malayalam)]
+
+  var body: some View {
+    Text(lines[i].0)
+      .font(.aminSerif(.title2, script: lines[i].1, weight: .semibold))
+      .foregroundStyle(Color.aminOnDoor)
+      .contentTransition(.opacity)
+      .id(i)
+      .transition(.opacity)
+      .task {
+        guard !reduceMotion else { return }
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .seconds(4))
+          withAnimation(.easeInOut(duration: 0.6)) { i = (i + 1) % lines.count }
+        }
+      }
+      .accessibilityLabel("Welcome home")
   }
 }
 #endif

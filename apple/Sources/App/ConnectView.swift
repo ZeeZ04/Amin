@@ -24,7 +24,7 @@ struct ConnectView: View {
       .padding(.vertical, 40)
       .frame(maxWidth: .infinity)
     }
-    .background(Color.aminTealDeep.opacity(0.04))
+    .background(Color.aminBg.ignoresSafeArea())
     .onAppear { address = model.serverURL?.absoluteString ?? "" }
     .task(id: address) {
       // Ask the server early whether this is its first account, which needs
@@ -37,11 +37,19 @@ struct ConnectView: View {
   }
 
   private var header: some View {
-    VStack(spacing: 14) {
-      DoorMark().frame(width: 72, height: 72)
-      Text("Amin").font(.largeTitle.bold())
-      Text("A private assistant that runs on your own computer. When your documents hold the answer, it shows you the passage.")
-        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+    VStack(spacing: AminSpace.xl) {
+      DoorPanel {
+        DoorMark(tint: .aminOnDoor).frame(width: 80, height: 80)
+          .padding(.top, 48).padding(.bottom, AminSpace.xl)
+      }
+      .frame(maxWidth: 240)
+      VStack(spacing: AminSpace.sm) {
+        Text("Your Amin computer").font(.aminSerif(.title, weight: .semibold)).foregroundStyle(Color.aminInk)
+          .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        Text("Amin runs on a computer in your home. When your documents hold the answer, it shows you the passage.")
+          .font(.aminBody).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 
@@ -62,10 +70,10 @@ struct ConnectView: View {
       field("Name", text: $name, prompt: "abdul", hint: creating ? "Lowercase letters, numbers, - or _." : nil)
         .textContentType(.username)
       VStack(alignment: .leading, spacing: 6) {
-        Text("Password").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+        Text("Password").font(.aminCaption.weight(.semibold)).foregroundStyle(Color.aminMuted)
         SecureField("6 or more characters", text: $password)
           .textContentType(creating ? .newPassword : .password)
-          .boxedField()
+          .aminField()
       }
       if firstAccount {
         Label("This is the first account on this Amin computer. It becomes the admin, who invites everyone else.",
@@ -76,13 +84,23 @@ struct ConnectView: View {
         field("Invite code", text: $invite, prompt: "From the person who runs Amin", hint: nil)
       }
 
+      let ready = !(working || address.isEmpty || name.isEmpty || password.count < 6)
       Button(action: go) {
-        HStack { if working { ProgressView().controlSize(.small) }; Text(creating ? "Create account" : "Sign in") }
-          .frame(maxWidth: .infinity, minHeight: 32)
+        HStack(spacing: AminSpace.sm) {
+          if working { LanternDot(size: 10) }
+          Text(creating ? "Create account" : "Sign in").font(.aminHeadline)
+        }
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .foregroundStyle(ready ? Color.aminOnAccent : Color.aminMuted)
+        .background(ready ? Color.aminAccent : Color.aminLine.opacity(0.6), in: RoundedRectangle(cornerRadius: AminRadius.md))
       }
-      .buttonStyle(.borderedProminent)
-      .controlSize(.large)
-      .disabled(working || address.isEmpty || name.isEmpty || password.count < 6)
+      .buttonStyle(.plain)
+      .disabled(!ready)
+      if !ready && !working {
+        Text(address.isEmpty ? "Enter your Amin computer's address." : name.isEmpty ? "Enter your name on that computer."
+             : "Passwords are 6 or more characters.")
+          .font(.aminCaption).foregroundStyle(Color.aminMuted).frame(maxWidth: .infinity)
+      }
 
       if let error { Text(error).font(.callout).foregroundStyle(.red) }
 
@@ -90,14 +108,23 @@ struct ConnectView: View {
         .font(.footnote).foregroundStyle(.secondary)
 
       #if os(iOS) || os(macOS) || os(visionOS)
-      Divider().padding(.vertical, 6)
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Or run Amin on this device only").font(.headline)
-        Text("Choose the edge-2 model folder. Answers come from the model on this device, with no account and no network.")
-          .font(.callout).foregroundStyle(.secondary)
-        Button("Choose model folder", systemImage: "cpu") { choosingModel = true }
-          .buttonStyle(.bordered)
+      Button { choosingModel = true } label: {
+        HStack(alignment: .top, spacing: AminSpace.md) {
+          Image(systemName: "cpu").font(.title3).foregroundStyle(Color.aminAccentInk)
+            .frame(width: 40, height: 40).background(Color.aminAccentWash, in: RoundedRectangle(cornerRadius: AminRadius.sm))
+          VStack(alignment: .leading, spacing: AminSpace.xs) {
+            Text("Run Amin on this device only").font(.aminHeadline).foregroundStyle(Color.aminInk)
+            Text("Choose the edge-2 model folder. Answers come from the model here, with no network.")
+              .font(.aminCaption).foregroundStyle(Color.aminMuted).fixedSize(horizontal: false, vertical: true)
+          }
+          Spacer(minLength: 0)
+        }
+        .padding(AminSpace.lg)
+        .background(Color.aminSurface, in: RoundedRectangle(cornerRadius: AminRadius.lg))
+        .overlay(RoundedRectangle(cornerRadius: AminRadius.lg).strokeBorder(Color.aminLine))
       }
+      .buttonStyle(.plain)
+      .padding(.top, AminSpace.sm)
       .fileImporter(isPresented: $choosingModel, allowedContentTypes: [.folder]) { result in
         do { try model.useLocalModel(at: result.get()) } catch { self.error = error.localizedDescription }
       }
@@ -107,9 +134,9 @@ struct ConnectView: View {
 
   private func field(_ title: String, text: Binding<String>, prompt: String, hint: String?) -> some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+      Text(title).font(.aminCaption.weight(.semibold)).foregroundStyle(Color.aminMuted)
       TextField(prompt, text: text)
-        .boxedField()
+        .aminField()
         .autocorrectionDisabled()
         #if !os(macOS)
         .textInputAutocapitalization(.never)
