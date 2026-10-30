@@ -1342,3 +1342,37 @@ basis **edge-2-q8 is the default answer model** (`make serve`;
 `OWN_MODEL=amin-3` keeps the previous one). edge-2-q6 is the phone candidate.
 At 5.7 GB it is still heavy for an 8 GB iPhone. Fitting phones is the next
 problem: an E2B student, or mixed-precision quantisation.
+
+## E39 — An iPhone-sized edge-2: plain 4-bit vs mixed 4/6-bit
+
+**Question.** iPhone apps get about 6 GB even with the increased-memory
+entitlement, so edge-2-q6 (5.7 GB) does not fit. Does a ~4 GB build keep
+edge-2's declining, above all in Malayalam, where the earlier 4-bit edge-1
+lost it?
+
+**Method.** Both from edge-2-bf16 with `mlx_lm.convert`: `edge-2-q4` (4-bit
+everywhere, 3.9 GB) and `edge-2-m46` (`--quant-predicate mixed_4_6`: 6-bit on
+the sensitive layers, 4-bit elsewhere, 4.1 GB). Full gate (main, slice m,
+IndicQA-ml test, routing, fallback probe), then paired McNemar against
+edge-2-q6 (`scripts/gate_compare.py`).
+
+| | edge-2-m46 | edge-2-q4 | edge-2-q6 (E38) |
+|---|---|---|---|
+| main answerable / unanswerable | 107/110 · 85/99 | 105/110 · 81/99 | 108/110 · 85/99 |
+| slice m answerable / unanswerable | 56/65 · 68/75 | 56/65 · 70/75 | 57/65 · 67/75 |
+| IndicQA-ml test answerable / declined | 91/108 · 32/42 | 85/108 · 31/42 | 92/108 · 35/42 |
+| routing | 75/76, crisis 14/14 | 75/76, crisis 14/14 | 74/76 |
+| fallback probe (en / ar / ml decline) | 127/127 · 21/23 · 22/25 | 127/127 · 23/23 · 15/25 | 127/127 · 22/23 · 23/25 |
+| size | 4.1 GB | 3.9 GB | 5.7 GB |
+
+Paired against q6, nothing is significantly different for either build
+(m46: every main and slice m row p ≥ 0.5; q4: main unanswerable 81 vs 85,
+p = 0.29). The difference that matters is Malayalam: plain 4-bit drops the
+probe's Malayalam declines to 15/25 and IndicQA answerable by 7, the same
+failure edge-1-q4 had. The mixed build keeps both within a few items of q6.
+
+**Decision.** **edge-2-m46 is the iPhone model** (`ModelDownloader.recommended`
+already lists it first for iPhone); iPads and Macs keep q6/q8. The q4 build
+was deleted to save disk; `mlx_lm.convert -q --q-bits 4` rebuilds it. Watch
+item: m46's probe Arabic declines (21/23) — both misses are hybrid answers
+of the kind E38 described.

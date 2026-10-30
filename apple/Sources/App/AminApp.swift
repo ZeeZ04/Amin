@@ -15,7 +15,10 @@ struct AminApp: App {
         CommandGroup(replacing: .newItem) {
           Button("New Chat") { model.newChat() }.keyboardShortcut("n")
         }
-        CommandGroup(after: .windowArrangement) { AmbientCommand() }
+        CommandGroup(after: .windowArrangement) {
+          AmbientCommand()
+          Button("Quick Ask (⌥Space)") { QuickAsk.shared.show() }
+        }
       }
     // The JARVIS-style ambient display: put it on a big screen and say "Hey Amin".
     Window("Amin Ambient", id: "ambient") {
@@ -23,18 +26,23 @@ struct AminApp: App {
     }
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 1280, height: 800)
+    // Quick ask from anywhere: the menu-bar door, or ⌥Space.
+    MenuBarExtra("Amin", systemImage: "door.left.hand.open") { QuickAskMenu() }
     #else
     main
     #endif
   }
 
   private var main: some Scene {
-    WindowGroup {
+    WindowGroup(id: "main") {
       RootView()
         .environment(model)
         .tint(.aminTeal)
         .task {
           await model.resume()
+          #if os(macOS)
+          QuickAsk.shared.install(model: model)
+          #endif
           #if os(iOS)
           // The Watch asks through this phone, with this phone's sign-in.
           let model = model

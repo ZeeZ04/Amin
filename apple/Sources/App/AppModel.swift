@@ -108,7 +108,7 @@ final class AppModel {
     get { UserDefaults.standard.object(forKey: "amin.preferLocal") as? Bool ?? true }
     set { UserDefaults.standard.set(newValue, forKey: "amin.preferLocal") }
   }
-  private var engine: (any Engine)? { (preferLocal ? local : nil) ?? client ?? local }
+  var engine: (any Engine)? { (preferLocal ? local : nil) ?? client ?? local }
 
   var serverURL: URL? { client?.base }
   var project: Project? { me?.projects.first { $0.id == space } }
