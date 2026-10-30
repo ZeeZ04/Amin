@@ -267,3 +267,32 @@ def test_malayalam_words_are_tokens():
     # atomic chillu and the ZWJ spelling are one word
     assert content_tokens("അവൻ") == content_tokens("അവന്‍")
     assert '"കണ്ടെടുത്ത"' in _fts_query("കണ്ടെടുത്ത എവിടെ?")
+
+
+def test_vector_cache_embeds_each_passage_once(tmp_path):
+    import numpy as np
+
+    from amin.vcache import VectorCache
+
+    calls = []
+
+    def compute(texts):
+        calls.append(list(texts))
+        return np.array([[len(t), 1.0] for t in texts], dtype=np.float32)
+
+    cache = VectorCache(tmp_path / "v.db")
+    first = cache.embed("m", ["a", "bb"], compute)
+    again = VectorCache(tmp_path / "v.db").embed("m", ["bb", "ccc", "a"], compute)
+    assert calls == [["a", "bb"], ["ccc"]]
+    assert again.tolist() == [[2, 1], [3, 1], [1, 1]] and first.tolist() == [[1, 1], [2, 1]]
+    VectorCache(tmp_path / "v.db").embed("other-model", ["a"], compute)
+    assert calls[-1] == ["a"]  # a different model never reuses a vector
+
+
+def test_an_oversized_table_is_split_so_every_chunk_fits_the_embedder():
+    from amin.ingest import _pack
+
+    table = "\n".join(f"| row {i} | " + "x" * 60 + " |" for i in range(400))
+    pieces = _pack("Intro sentence.\n\n" + table, 900, 150)
+    assert len(pieces) > 20 and max(len(p) for p in pieces) <= 2 * 900
+    assert _pack("One. Two. Three.", 900, 150) == ["One. Two. Three."]

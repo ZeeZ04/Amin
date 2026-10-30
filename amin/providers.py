@@ -37,6 +37,17 @@ class Provider(Protocol):
 # ---------------------------------------------------------------------------
 
 
+_vcache = None
+
+
+def _cache():
+    global _vcache
+    if _vcache is None:
+        from .vcache import VectorCache
+        _vcache = VectorCache(settings.embed_cache_path)
+    return _vcache
+
+
 class OllamaProvider:
     name = "ollama"
 
@@ -77,11 +88,21 @@ class OllamaProvider:
                     return
 
     def embed(self, texts: list[str]) -> np.ndarray:
+        return _cache().embed(settings.embed_model, texts, self._embed)
+
+    def _embed(self, texts: list[str]) -> np.ndarray:
         out = []
         for t in texts:
             r = self._client.post(
                 "/api/embeddings", json={"model": settings.embed_model, "prompt": t}
             )
+            # Scripts like Malayalam can take several tokens per character: if a
+            # passage is still over the embed model's context, embed its opening.
+            while r.status_code == 500 and "context length" in r.text and len(t) > 200:
+                t = t[: len(t) // 2]
+                r = self._client.post(
+                    "/api/embeddings", json={"model": settings.embed_model, "prompt": t}
+                )
             r.raise_for_status()
             out.append(r.json()["embedding"])
         return _l2(np.asarray(out, dtype=np.float32))

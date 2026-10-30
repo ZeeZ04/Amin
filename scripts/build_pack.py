@@ -2,6 +2,7 @@
 
     uv run python scripts/build_pack.py python-docs   # docs.python.org text archive (PSF-2.0)
     uv run python scripts/build_pack.py openstax <repo> <slug> "<title>"   # OpenStax (CC BY 4.0)
+    uv run python scripts/build_pack.py warm <slug>...   # embed once, so switching a pack on is instant
 
 Every pack carries its licence and attribution in pack.json, and the
 attribution is repeated at the top of each document, so a cited passage is
@@ -145,6 +146,27 @@ def openstax(repo: str, slug: str, title: str) -> None:
     }, docs)
 
 
+# -- warm the embedding cache --------------------------------------------------------
+
+
+def warm(*names: str) -> None:
+    """Embed every passage of each pack into the shared vector cache (amin/vcache.py)."""
+    import time
+
+    from amin.api import _parse
+    from amin.providers import OllamaProvider
+
+    embedder = OllamaProvider()
+    for name in names:
+        start, n = time.time(), 0
+        for path in sorted((ROOT / name / "docs").glob("*.md")):
+            _, chunks = _parse(path, f"k.{name}.{path.name}")
+            if chunks:
+                embedder.embed([c.text for c in chunks])
+                n += len(chunks)
+        print(f"{name}: {n} passages embedded or already cached in {time.time() - start:.0f}s")
+
+
 if __name__ == "__main__":
     cmd, *args = sys.argv[1:]
-    {"python-docs": python_docs, "openstax": openstax}[cmd](*args)
+    {"python-docs": python_docs, "openstax": openstax, "warm": warm}[cmd](*args)

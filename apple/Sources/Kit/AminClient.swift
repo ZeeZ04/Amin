@@ -77,6 +77,7 @@ nonisolated final class AminClient: Engine {
   func signOut() async throws { _ = try await send("POST", "logout", as: OK.self) }
   func me() async throws -> Me { try await send("GET", "me") }
   func setPrefs(_ prefs: Prefs) async throws -> Prefs { try await send("PATCH", "me/prefs", json: prefs) }
+  func packs() async throws -> [Pack] { try await send("GET", "packs") }
   struct Invite: Decodable { let code: String; let validDays: Int }
   func invite() async throws -> Invite { try await send("POST", "invites") }
 

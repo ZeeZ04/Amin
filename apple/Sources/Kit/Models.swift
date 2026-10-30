@@ -6,6 +6,18 @@ import Foundation
 nonisolated struct Prefs: Codable, Hashable, Sendable {
   var chatPrivate: Bool
   var chatHousehold: Bool
+  /// Knowledge packs this person turned on (amin/packs.py); absent on older servers.
+  var packs: [String]?
+}
+
+/// A read-only reference library on the Amin computer (Task 3).
+nonisolated struct Pack: Codable, Hashable, Identifiable, Sendable {
+  let name: String
+  let title: String
+  let licence: String
+  let documents: Int
+  var enabled: Bool
+  var id: String { name }
 }
 
 nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {

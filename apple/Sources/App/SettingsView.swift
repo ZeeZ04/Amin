@@ -8,6 +8,7 @@ struct SettingsView: View {
   @State private var confirmSignOut = false
   @State private var choosingModel = false
   @State private var preferLocal = true
+  @State private var packs: [Pack] = []
 
   var body: some View {
     Form {
@@ -60,6 +61,20 @@ struct SettingsView: View {
           Toggle("My library", isOn: prefBinding(\.chatPrivate))
           Toggle("Household library", isOn: prefBinding(\.chatHousehold))
         }
+
+        if !packs.isEmpty {
+          Section {
+            ForEach($packs) { $pack in
+              Toggle(isOn: $pack.enabled) {
+                Text(pack.title)
+                Text("\(pack.licence) · \(pack.documents) pages")
+              }
+              .onChange(of: pack.enabled) { savePacks() }
+            }
+          } header: { Text("Reference libraries") } footer: {
+            Text("Open textbooks and documentation kept on your Amin computer. Answers from them are cited like your own documents.")
+          }
+        }
       }
 
       #if os(iOS) || os(macOS) || os(visionOS)
@@ -94,7 +109,10 @@ struct SettingsView: View {
       } header: { Text("About") }
     }
     .navigationTitle("Settings")
-    .task { facts = (try? await model.client?.memory()) ?? [] }
+    .task {
+      facts = (try? await model.client?.memory()) ?? []
+      packs = (try? await model.client?.packs()) ?? []
+    }
     .confirmationDialog("Sign out of Amin on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
       Button("Sign out", role: .destructive) { Task { await model.signOut() } }
     }
@@ -114,6 +132,15 @@ struct SettingsView: View {
     Task {
       try? await model.client?.forget(f.id)
       facts.removeAll { $0.id == f.id }
+    }
+  }
+
+  private func savePacks() {
+    guard var prefs = model.me?.prefs else { return }
+    prefs.packs = packs.filter(\.enabled).map(\.name)
+    Task {
+      _ = try? await model.client?.setPrefs(prefs)
+      try? await model.refresh()
     }
   }
 
