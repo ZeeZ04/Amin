@@ -29,3 +29,11 @@ struct LocalEngineTests {
     #expect(!a.text.contains("2026") && !a.text.contains("2027"), "must not invent a date")
   }
 }
+
+struct WakePhraseTests {
+  @Test(arguments: ["Hey Amin", "hey ameen what's the time", "Hi, Amine", "OK amen", "hey a man"])
+  func `wakes on the name after a greeting`(_ heard: String) { #expect(WakePhrase.matches(heard)) }
+
+  @Test(arguments: ["Amina called earlier", "Hey, I mean it", "Hey Siri", "the amenity fee", "hey amina"])
+  func `stays quiet otherwise`(_ heard: String) { #expect(!WakePhrase.matches(heard)) }
+}

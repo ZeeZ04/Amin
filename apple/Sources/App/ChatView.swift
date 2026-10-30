@@ -8,6 +8,7 @@ struct ChatView: View {
   @State private var draft = ""
   @State private var shownSource: SourceRequest?
   @State private var voice = false
+  @State private var ambient = false
   @FocusState private var composing: Bool
 
   struct SourceRequest: Identifiable, Hashable { let id: String; let number: Int }
@@ -44,6 +45,9 @@ struct ChatView: View {
     .toolbar { toolbar }
     .sourceInspector(item: $shownSource)
     .sheet(isPresented: $history) { HistorySheet() }
+    #if os(iOS)
+    .fullScreenCover(isPresented: $ambient) { AmbientView() }
+    #endif
     #if os(iOS) || os(macOS) || os(visionOS)
     .fullScreenCoverCompat(isPresented: $voice) { VoiceView() }
     #endif
@@ -60,6 +64,11 @@ struct ChatView: View {
       Button("New chat", systemImage: "square.and.pencil") { model.newChat() }
         .disabled(model.turns.isEmpty)
     }
+    #if os(iOS)
+    ToolbarItem(placement: .primaryAction) {
+      Button("Ambient mode", systemImage: "circle.hexagongrid") { ambient = true }
+    }
+    #endif
   }
 
   private var composer: some View {
