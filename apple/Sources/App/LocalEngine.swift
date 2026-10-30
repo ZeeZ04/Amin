@@ -7,9 +7,11 @@ import Tokenizers
 /// Amin's own model (edge-2, Gemma 4 E4B), running on this device through MLX.
 /// Nothing leaves the device: no server, no account (ADR-014).
 ///
-/// v1 answers from the model's own knowledge, labelled "General knowledge",
-/// exactly as the server's hybrid fallback does. Retrieval with citations
-/// over on-device documents is the next step (the Python pipeline in amin/answer.py).
+/// Questions are answered from the owner's documents on this device first
+/// (LocalLibrary: keyword retrieval, the server's grounded prompt, cited
+/// sentences only). When no passage clears the evidence floor, or the model
+/// finds no evidence, it answers from its own knowledge, labelled "General
+/// knowledge", exactly as the server's hybrid fallback does.
 ///
 /// Sizes (E38): 8-bit 7.4 GB, 6-bit 5.7 GB, which Macs and M-series iPads
 /// handle. iPhone apps get about 6 GB even with the increased-memory
@@ -17,6 +19,7 @@ import Tokenizers
 /// MLX does not run in the iOS Simulator; test on a device or the Mac.
 actor LocalEngine: Engine {
   let directory: URL
+  let library: LocalLibrary?
   private var container: ModelContainer?
 
   /// The same rules the server's general answers follow (amin/prompts.py GENERAL_SYSTEM).
@@ -32,7 +35,10 @@ actor LocalEngine: Engine {
     - Answer in the same language the question was asked in.
     """
 
-  init(directory: URL) { self.directory = directory }
+  init(directory: URL, library: LocalLibrary? = try? LocalLibrary()) {
+    self.directory = directory
+    self.library = library
+  }
 
   /// Load once; later calls reuse the weights already in memory.
   func load() async throws -> ModelContainer {
@@ -48,6 +54,22 @@ actor LocalEngine: Engine {
   func ask(_ question: String, project: String?, conversation: String?) async throws -> Answer {
     let started = ContinuousClock.now
     let model = try await load()
+    let elapsed = { Int((ContinuousClock.now - started) / .milliseconds(1)) }
+    if let hits = library?.search(question), !hits.isEmpty {
+      let grounded = ChatSession(
+        model, instructions: Grounded.system,
+        generateParameters: GenerateParameters(maxTokens: 400, temperature: 0),
+        additionalContext: ["enable_thinking": false])
+      let raw = try await grounded.respond(to: Grounded.prompt(question, hits))
+      let claims = Grounded.isNoEvidence(raw) ? [] : Grounded.claims(raw, hits)
+      if !claims.isEmpty {
+        let cited = Set(claims.flatMap(\.citations))
+        let sources = Dictionary(uniqueKeysWithValues: hits.filter { cited.contains($0.chunkId) }
+          .map { ($0.chunkId, SourceRef(docId: $0.chunk.docId, heading: $0.chunk.heading)) })
+        return Answer(question: question, outcome: raw.contains("CONFLICT:") ? "conflict" : "answered",
+                      basis: "documents", claims: claims, sources: sources, latencyMs: elapsed())
+      }
+    }
     let session = ChatSession(
       model,
       instructions: Self.generalSystem,
@@ -55,9 +77,8 @@ actor LocalEngine: Engine {
       additionalContext: ["enable_thinking": false])
     let raw = try await session.respond(to: question)
     let text = Self.clean(raw)
-    let ms = Int((ContinuousClock.now - started) / .milliseconds(1))
     return Answer(question: question, outcome: "general", basis: "general",
-                  claims: [Claim(text: text, citations: [], verdict: "uncited")], latencyMs: ms)
+                  claims: [Claim(text: text, citations: [], verdict: "uncited")], latencyMs: elapsed())
   }
 
   /// Drop any reasoning block and stray source tags (nothing here is cited).

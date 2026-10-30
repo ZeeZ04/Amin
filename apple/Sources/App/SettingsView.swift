@@ -7,6 +7,8 @@ struct SettingsView: View {
   @State private var newFact = ""
   @State private var confirmSignOut = false
   @State private var choosingModel = false
+  @State private var addingDocument = false
+  @State private var deviceDocs: [LocalLibrary.Document] = []
   @State private var preferLocal = true
   @State private var packs: [Pack] = []
 
@@ -90,12 +92,38 @@ struct SettingsView: View {
           Button("Choose model folder", systemImage: "cpu") { choosingModel = true }
         }
       } header: { Text("On this device") } footer: {
-        Text("Amin's own model (edge-2) runs here, so nothing you ask leaves this device. Answers from your documents still come from your Amin computer.")
+        Text("Amin's own model (edge-2) runs here, so nothing you ask leaves this device.")
       }
       .fileImporter(isPresented: $choosingModel, allowedContentTypes: [.folder]) { result in
         do { try model.useLocalModel(at: result.get()) } catch { model.error = error.localizedDescription }
       }
-      .onAppear { preferLocal = model.preferLocal }
+      .onAppear { preferLocal = model.preferLocal; deviceDocs = model.library?.documents() ?? [] }
+
+      if model.localModelName != nil, let library = model.library {
+        Section {
+          ForEach(deviceDocs) { d in
+            Label(d.name, systemImage: "doc.text")
+              .contextMenu { Button("Remove", systemImage: "trash", role: .destructive) { removeDeviceDoc(d, library) } }
+              #if !os(tvOS)
+              .swipeActions { Button("Remove", systemImage: "trash", role: .destructive) { removeDeviceDoc(d, library) } }
+              #endif
+          }
+          Button("Add document", systemImage: "plus") { addingDocument = true }
+        } header: { Text("Documents on this device") } footer: {
+          Text("PDF, text and Markdown. Kept and searched only here; the on-device model answers from them with citations.")
+        }
+        .fileImporter(isPresented: $addingDocument, allowedContentTypes: [.pdf, .plainText, .text, .init(filenameExtension: "md") ?? .text],
+                      allowsMultipleSelection: true) { result in
+          do {
+            for url in try result.get() {
+              let scoped = url.startAccessingSecurityScopedResource()
+              defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+              try library.add(url)
+            }
+          } catch { model.error = error.localizedDescription }
+          deviceDocs = library.documents()
+        }
+      }
       #endif
 
       Section("Amin computer") {
@@ -134,6 +162,13 @@ struct SettingsView: View {
       facts.removeAll { $0.id == f.id }
     }
   }
+
+  #if os(iOS) || os(macOS) || os(visionOS)
+  private func removeDeviceDoc(_ d: LocalLibrary.Document, _ library: LocalLibrary) {
+    do { try library.remove(d.id) } catch { model.error = error.localizedDescription }
+    deviceDocs = library.documents()
+  }
+  #endif
 
   private func savePacks() {
     guard var prefs = model.me?.prefs else { return }
