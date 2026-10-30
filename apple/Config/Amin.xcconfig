@@ -1,0 +1,9 @@
+// Public service settings for the Amin app. Real values go in Secrets.xcconfig
+// (gitignored; copy Secrets.example.xcconfig). With them empty, the account and
+// subscription features hide themselves and the app works as before.
+// xcconfig treats "//" as a comment: write URLs as https:/$()/host.
+AMIN_SUPABASE_URL =
+AMIN_SUPABASE_ANON_KEY =
+AMIN_REVENUECAT_KEY =
+AMIN_HF_MODEL_ORG =
+#include? "Secrets.xcconfig"

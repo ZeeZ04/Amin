@@ -37,6 +37,10 @@ final class AppModel {
   var isLocalOnly: Bool { local != nil && client == nil }
   /// Documents kept on this device, answered from with citations by the local model.
   let library: LocalLibrary? = try? LocalLibrary()
+  #if os(iOS) || os(macOS) || os(visionOS)
+  /// The public Amin account and plan (Supabase + RevenueCat); unused when not configured.
+  let account = Account()
+  #endif
 
   init() {
     if let saved = UserDefaults.standard.string(forKey: Self.serverKey), let url = URL(string: saved) {
@@ -127,8 +131,11 @@ final class AppModel {
 
   /// On launch: a saved server with a live session goes straight in.
   func resume() async {
+    #if os(iOS) || os(macOS) || os(visionOS)
+    await account.restore()
+    #endif
     guard client != nil else {
-      if local != nil { phase = .ready }  // on-device only
+      if local != nil || hasAccount { phase = .ready }  // on-device, with or without an account
       return
     }
     do { try await refresh(); phase = .ready } catch { phase = .connect }
@@ -150,6 +157,26 @@ final class AppModel {
     try await refresh()
     phase = .ready
   }
+
+  var hasAccount: Bool {
+    #if os(iOS) || os(macOS) || os(visionOS)
+    account.isSignedIn
+    #else
+    false
+    #endif
+  }
+
+  /// Signed in to an Amin account: the app runs on this device from here.
+  func accountSignedIn() async {
+    phase = .ready
+  }
+
+  #if os(iOS) || os(macOS) || os(visionOS)
+  func signOutOfAccount() async {
+    await account.signOut()
+    if client == nil { turns = []; conversationID = nil; phase = .connect }
+  }
+  #endif
 
   func signOut() async {
     try? await client?.signOut()

@@ -2,8 +2,8 @@
 import Foundation
 import Observation
 
-/// Copies Amin's own model from the Amin computer on the home network into
-/// this app's storage (ADR-014). Nothing comes from the internet. A file
+/// Copies Amin's own model into this app's storage (ADR-014), from the Amin
+/// computer on the home network or from Hugging Face (ModelSource). A file
 /// already present at full size is skipped, so an interrupted download
 /// resumes where it stopped.
 @Observable
@@ -25,7 +25,7 @@ final class ModelDownloader {
     return order.lazy.compactMap { n in models.first { $0.name == n } }.first
   }
 
-  func download(_ info: ModelInfo, from client: AminClient) async {
+  func download(_ info: ModelInfo, from source: any ModelSource) async {
     let dir = Self.root.appending(path: info.name, directoryHint: .isDirectory)
     do {
       try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -37,7 +37,7 @@ final class ModelDownloader {
           done += f.bytes; state = .downloading(Double(done) / Double(max(info.bytes, 1))); continue
         }
         let before = done, total = Double(max(info.bytes, 1))
-        let tmp = try await client.modelFile(info.name, f.name) { written in
+        let tmp = try await source.modelFile(info.name, f.name) { written in
           Task { @MainActor in self.state = .downloading(Double(before + written) / total) }
         }
         try? FileManager.default.removeItem(at: dest)

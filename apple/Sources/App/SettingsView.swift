@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(RevenueCatUI) && (os(iOS) || os(macOS) || os(visionOS))
+import RevenueCatUI
+#endif
 
 struct SettingsView: View {
   @Environment(AppModel.self) private var model
@@ -9,6 +12,8 @@ struct SettingsView: View {
   @State private var choosingModel = false
   @State private var addingDocument = false
   @State private var deviceDocs: [LocalLibrary.Document] = []
+  @State private var showPaywall = false
+  @State private var confirmDelete = false
   @State private var preferLocal = true
   @State private var packs: [Pack] = []
   #if os(macOS)
@@ -83,6 +88,35 @@ struct SettingsView: View {
       }
 
       #if os(iOS) || os(macOS) || os(visionOS)
+      if case .signedIn(let email) = model.account.status {
+        Section {
+          LabeledContent("Email", value: email)
+          LabeledContent("Plan", value: model.account.isPro ? "Pro" : "Free")
+          if model.account.sellsPro && !model.account.isPro {
+            Button("Upgrade to Pro", systemImage: "sparkles") { showPaywall = true }
+          }
+          if model.account.isPro {
+            Link("Manage subscription", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
+          }
+          Button("Sign out") { Task { await model.signOutOfAccount() } }
+          Button("Delete account", role: .destructive) { confirmDelete = true }
+        } header: { Text("Account") } footer: {
+          Text("Your account holds your email and plan. Your questions and documents are never part of it.")
+        }
+        .confirmationDialog("Delete your Amin account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+          Button("Delete account", role: .destructive) {
+            Task {
+              do { try await model.account.deleteAccount(); await model.signOutOfAccount() }
+              catch { model.error = error.localizedDescription }
+            }
+          }
+        } message: {
+          Text("Your account and plan are deleted at once. Documents on this device stay until you delete the app. Cancel any App Store subscription in your Apple ID settings first.")
+        }
+      }
+      #endif
+
+      #if os(iOS) || os(macOS) || os(visionOS)
       Section {
         if let name = model.localModelName {
           LabeledContent("Model", value: name)
@@ -111,9 +145,13 @@ struct SettingsView: View {
               .swipeActions { Button("Remove", systemImage: "trash", role: .destructive) { removeDeviceDoc(d, library) } }
               #endif
           }
-          Button("Add document", systemImage: "plus") { addingDocument = true }
+          Button("Add document", systemImage: "plus") {
+            if atFreeLimit { showPaywall = true } else { addingDocument = true }
+          }
         } header: { Text("Documents on this device") } footer: {
-          Text("PDF, text and Markdown. Kept and searched only here; the on-device model answers from them with citations.")
+          Text(atFreeLimit || (model.account.sellsPro && !model.account.isPro)
+               ? "PDF, text and Markdown, kept and searched only here. The free plan holds \(Account.freeDocumentLimit) documents; Pro has no limit."
+               : "PDF, text and Markdown. Kept and searched only here; the on-device model answers from them with citations.")
         }
         .fileImporter(isPresented: $addingDocument, allowedContentTypes: [.pdf, .plainText, .text, .init(filenameExtension: "md") ?? .text],
                       allowsMultipleSelection: true) { result in
@@ -146,11 +184,14 @@ struct SettingsView: View {
       }
 
       Section {
-        Text("Amin runs on your own computer. Questions, documents and conversations stay there. When your documents hold the answer, Amin quotes them and shows the passage; otherwise it answers from general knowledge and says so.")
+        Text("Amin runs on your own devices: this one, or your Amin computer at home. Questions, documents and conversations stay there. When your documents hold the answer, Amin quotes them and shows the passage; otherwise it answers from general knowledge and says so.")
           .font(.callout).foregroundStyle(.secondary)
       } header: { Text("About") }
     }
     .navigationTitle("Settings")
+    #if canImport(RevenueCatUI) && (os(iOS) || os(macOS) || os(visionOS))
+    .sheet(isPresented: $showPaywall, onDismiss: { Task { await model.account.refreshPlan() } }) { PaywallView() }
+    #endif
     .task {
       facts = (try? await model.client?.memory()) ?? []
       packs = (try? await model.client?.packs()) ?? []
@@ -181,6 +222,13 @@ struct SettingsView: View {
   private func removeDeviceDoc(_ d: LocalLibrary.Document, _ library: LocalLibrary) {
     do { try library.remove(d.id) } catch { model.error = error.localizedDescription }
     deviceDocs = library.documents()
+  }
+  #endif
+
+  #if os(iOS) || os(macOS) || os(visionOS)
+  /// The free plan's on-device document limit, enforced only when Pro is on sale.
+  private var atFreeLimit: Bool {
+    model.account.sellsPro && !model.account.isPro && deviceDocs.count >= Account.freeDocumentLimit
   }
   #endif
 

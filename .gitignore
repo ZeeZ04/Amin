@@ -25,3 +25,9 @@ __pycache__/
 data/*.log
 graphify-out/
 data/packs/
+
+# Amin app service keys
+apple/Config/Secrets.xcconfig
+backend/supabase/.env
+backend/supabase/.temp/
+site/.vercel/

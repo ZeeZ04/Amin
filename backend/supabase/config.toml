@@ -1,0 +1,25 @@
+# Supabase project config for Amin (`supabase link`, then `supabase db push`
+# and `supabase functions deploy`). See backend/SETUP.md.
+project_id = "amin"
+
+[auth]
+site_url = "https://amin.vercel.app"
+additional_redirect_urls = ["amin://auth-callback", "https://amin.vercel.app/auth/confirmed"]
+enable_signup = true
+minimum_password_length = 8
+password_requirements = "letters_digits"
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+secure_password_change = true
+
+[auth.rate_limit]
+email_sent = 30
+sign_in_sign_ups = 30
+
+[functions.revenuecat-webhook]
+verify_jwt = false   # RevenueCat authenticates with the shared secret instead
+
+[functions.delete-account]
+verify_jwt = true

@@ -8,6 +8,7 @@ struct OnboardingView: View {
   #if os(iOS) || os(macOS) || os(visionOS)
   @State private var downloader = ModelDownloader()
   @State private var offered: ModelInfo?
+  @State private var lookError: String?
   #endif
 
   var body: some View {
@@ -53,6 +54,11 @@ struct OnboardingView: View {
     return false
   }
 
+  #if os(iOS) || os(macOS) || os(visionOS)
+  /// The Amin computer when connected, else Hugging Face.
+  private var source: (any ModelSource)? { model.client ?? HuggingFace.configured }
+  #endif
+
   private func next() { if page < 3 { page += 1 } else { done = true } }
 
   private func header(_ symbol: String?, _ title: String, _ body: String) -> some View {
@@ -74,7 +80,7 @@ struct OnboardingView: View {
       header(nil, "Amin keeps your papers at home",
              "Ask anything. When your documents hold the answer, Amin shows you the passage it came from.")
       VStack(alignment: .leading, spacing: AminSpace.md) {
-        Label("Runs on your own devices. No account with us, no analytics.", systemImage: "lock.shield")
+        Label("Runs on your own devices. No analytics, nothing you ask is uploaded.", systemImage: "lock.shield")
         Label("Every answer says where it came from.", systemImage: "quote.bubble")
         Label("English, العربية and മലയാളം.", systemImage: "globe")
       }
@@ -85,25 +91,28 @@ struct OnboardingView: View {
   @ViewBuilder private var modelPage: some View {
     #if os(iOS) || os(macOS) || os(visionOS)
     VStack(spacing: AminSpace.xl) {
-      header("cpu", "Amin's own model", "Download it once from your Amin computer, and Amin can answer on this device even with no network.")
+      header("cpu", "Amin's own model", model.client != nil
+             ? "Download it once from your Amin computer, and Amin can answer on this device even with no network."
+             : "Download it once, and Amin answers on this device, even with no network. Use Wi-Fi: it is a few gigabytes.")
       switch downloader.state {
       case .idle:
         if let m = offered {
           VStack(spacing: AminSpace.sm) {
             Button("Download \(m.name) · \(ByteCountFormatter.string(fromByteCount: m.bytes, countStyle: .file))") {
-              Task { if let c = model.client { await downloader.download(m, from: c) } }
+              Task { if let source { await downloader.download(m, from: source) } }
             }
             .buttonStyle(.bordered).tint(.aminAccent)
             Text(m.purpose).font(.aminCaption).foregroundStyle(Color.aminMuted)
           }
         } else {
-          Text(model.client == nil ? "Connect to your Amin computer to download the model, or choose a folder in Settings."
-                                   : "Looking for the model on your Amin computer…")
+          Text(source == nil ? "This build has no model download set up. Choose a model folder in Settings."
+                             : lookError ?? "Finding the right model for this device…")
             .font(.aminCaption).foregroundStyle(Color.aminMuted).multilineTextAlignment(.center)
         }
       case .downloading(let f):
         ProgressView(value: f) { Text("Downloading… \(Int(f * 100))%") }.tint(.aminAccent)
-        Text("Keep Amin open on your home Wi-Fi.").font(.aminCaption).foregroundStyle(Color.aminMuted)
+        Text(model.client != nil ? "Keep Amin open on your home Wi-Fi." : "Keep Amin open and on Wi-Fi. It picks up where it stopped if interrupted.")
+          .font(.aminCaption).foregroundStyle(Color.aminMuted)
       case .done(let dir):
         Label("Ready on this device", systemImage: "checkmark.circle.fill").foregroundStyle(Color.aminAccentInk)
           .onAppear { model.useDownloadedModel(at: dir) }
@@ -116,8 +125,9 @@ struct OnboardingView: View {
       }
     }
     .task {
-      guard offered == nil, let c = model.client, let list = try? await c.models() else { return }
-      offered = ModelDownloader.recommended(from: list)
+      guard offered == nil, let source else { return }
+      do { offered = ModelDownloader.recommended(from: try await source.models()) }
+      catch { lookError = error.localizedDescription }
     }
     #else
     header("cpu", "Amin's own model", "This device asks your Amin computer, which runs the model.")
