@@ -107,6 +107,7 @@ targets:
       - Sources/Kit/Models.swift
       - Sources/Kit/AminClient.swift
       - Sources/Kit/WakePhrase.swift
+      - Sources/Kit/LocalLibrary.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

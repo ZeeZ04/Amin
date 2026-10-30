@@ -35,6 +35,8 @@ final class AppModel {
   private(set) var local: (any Engine)?
   private(set) var localModelName: String?
   var isLocalOnly: Bool { local != nil && client == nil }
+  /// Documents kept on this device, answered from with citations by the local model.
+  let library: LocalLibrary? = try? LocalLibrary()
 
   init() {
     if let saved = UserDefaults.standard.string(forKey: Self.serverKey), let url = URL(string: saved) {
@@ -68,7 +70,7 @@ final class AppModel {
     #if os(iOS) || os(macOS) || os(visionOS)
     UserDefaults.standard.removeObject(forKey: Self.localModelKey)
     UserDefaults.standard.set(folder.lastPathComponent, forKey: "amin.downloadedModel")
-    local = LocalEngine(directory: folder)
+    local = LocalEngine(directory: folder, library: library)
     localModelName = folder.lastPathComponent
     #endif
   }
@@ -85,7 +87,7 @@ final class AppModel {
     if let name = UserDefaults.standard.string(forKey: "amin.downloadedModel") {
       let dir = ModelDownloader.root.appending(path: name, directoryHint: .isDirectory)
       if FileManager.default.fileExists(atPath: dir.appending(path: "config.json").path()) {
-        local = LocalEngine(directory: dir); localModelName = name
+        local = LocalEngine(directory: dir, library: library); localModelName = name
         return
       }
     }
@@ -98,7 +100,7 @@ final class AppModel {
     #endif
     guard let url else { return }
     _ = url.startAccessingSecurityScopedResource()  // held for the app's lifetime while the model is in use
-    local = LocalEngine(directory: url)
+    local = LocalEngine(directory: url, library: library)
     localModelName = url.lastPathComponent
     #endif
   }
@@ -201,6 +203,7 @@ final class AppModel {
   }
 
   func source(_ chunkID: String) async throws -> Chunk {
+    if let c = library?.chunk(chunkID) { return c }  // cited from this device's own library
     guard let client else { throw AminError.notSignedIn }
     return try await client.chunk(chunkID, project: space.isEmpty ? nil : space)
   }
