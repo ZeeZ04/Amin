@@ -8,6 +8,27 @@ struct AminApp: App {
   #endif
 
   var body: some Scene {
+    #if os(macOS)
+    main
+      .defaultSize(width: 1100, height: 760)
+      .commands {
+        CommandGroup(replacing: .newItem) {
+          Button("New Chat") { model.newChat() }.keyboardShortcut("n")
+        }
+        CommandGroup(after: .windowArrangement) { AmbientCommand() }
+      }
+    // The JARVIS-style ambient display: put it on a big screen and say "Hey Amin".
+    Window("Amin Ambient", id: "ambient") {
+      AmbientView().environment(model)
+    }
+    .windowStyle(.hiddenTitleBar)
+    .defaultSize(width: 1280, height: 800)
+    #else
+    main
+    #endif
+  }
+
+  private var main: some Scene {
     WindowGroup {
       RootView()
         .environment(model)
@@ -21,16 +42,17 @@ struct AminApp: App {
           #endif
         }
     }
-    #if os(macOS)
-    .defaultSize(width: 1100, height: 760)
-    .commands {
-      CommandGroup(replacing: .newItem) {
-        Button("New Chat") { model.newChat() }.keyboardShortcut("n")
-      }
-    }
-    #endif
   }
 }
+
+#if os(macOS)
+struct AmbientCommand: View {
+  @Environment(\.openWindow) private var openWindow
+  var body: some View {
+    Button("Ambient Mode") { openWindow(id: "ambient") }.keyboardShortcut("a", modifiers: [.command, .shift])
+  }
+}
+#endif
 
 struct RootView: View {
   @Environment(AppModel.self) private var model

@@ -48,11 +48,12 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         UILaunchScreen: {}
         UIApplicationSceneManifest: {UIApplicationSupportsMultipleScenes: true}
-        NSMicrophoneUsageDescription: Amin listens when you talk to it. Your voice is transcribed on your own Amin computer, not in the cloud.
+        NSMicrophoneUsageDescription: Amin listens when you talk to it. Your voice is turned into text on this device or your own Amin computer, never in the cloud.
         NSCameraUsageDescription: Amin can scan a bill, contract or letter so you can ask about it.
         NSLocalNetworkUsageDescription: Amin connects to the Amin computer in your home.
         NSAppTransportSecurity: {NSAllowsLocalNetworking: true}
         NSSiriUsageDescription: Ask Amin a question with Siri.
+        NSSpeechRecognitionUsageDescription: Amin turns your speech into text on this device. Audio is not sent anywhere.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.amin.Amin
@@ -105,6 +106,7 @@ targets:
       - Sources/App/LocalEngine.swift
       - Sources/Kit/Models.swift
       - Sources/Kit/AminClient.swift
+      - Sources/Kit/WakePhrase.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

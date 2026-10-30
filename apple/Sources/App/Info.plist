@@ -32,9 +32,11 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Amin connects to the Amin computer in your home.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Amin listens when you talk to it. Your voice is transcribed on your own Amin computer, not in the cloud.</string>
+	<string>Amin listens when you talk to it. Your voice is turned into text on this device or your own Amin computer, never in the cloud.</string>
 	<key>NSSiriUsageDescription</key>
 	<string>Ask Amin a question with Siri.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Amin turns your speech into text on this device. Audio is not sent anywhere.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -13,40 +13,30 @@ struct VoiceView: View {
     VStack(spacing: 22) {
       Spacer()
       Button(action: voice.tapOrb) {
-        Circle()
-          .fill(RadialGradient(colors: voice.state == .speaking
-                               ? [Color(red: 0.91, green: 0.96, blue: 0.95), Color(red: 0.16, green: 0.55, blue: 0.52)]
-                               : [Color(red: 1, green: 0.9, blue: 0.68), .aminSaffron, Color(red: 0.6, green: 0.42, blue: 0.07)],
-                               center: UnitPoint(x: 0.4, y: 0.35), startRadius: 4, endRadius: 110))
-          .frame(width: 170, height: 170)
-          .scaleEffect(0.82 + voice.level * 0.3)
-          .shadow(color: .aminSaffron.opacity(0.35 + voice.level * 0.45), radius: 30 + voice.level * 60)
-          .saturation(voice.state == .idle ? 0.4 : 1)
-          .animation(.linear(duration: 0.08), value: voice.level)
-          .phaseAnimator([1.0, 0.92], trigger: voice.state) { c, s in
-            c.scaleEffect(voice.state == .thinking || voice.state == .transcribing ? s : 1)
-          }
+        MajlisOrb(phase: voice.orbPhase, level: voice.level)
+          .frame(width: 260, height: 260)
       }
       .buttonStyle(.plain)
-      .accessibilityLabel("Tap to talk or interrupt")
+      .accessibilityHint("Tap to talk, or to interrupt Amin")
 
-      Text(voice.status).font(.title3.weight(.semibold))
-      Text(voice.said).font(.body).multilineTextAlignment(.center).opacity(0.9)
-      ScrollView { Text(voice.reply).font(.callout).multilineTextAlignment(.center).opacity(0.75) }
-        .frame(maxHeight: 180)
+      Text(voice.status).font(.amin(.title3, weight: .semibold)).foregroundStyle(AminHUD.sand)
+      Text(voice.said).font(.amin(.title3)).multilineTextAlignment(.center).foregroundStyle(AminHUD.textSecondary)
+      ScrollView { Text(voice.reply).font(.amin(.body)).multilineTextAlignment(.center).foregroundStyle(AminHUD.sand) }
+        .frame(maxHeight: 200)
       Spacer()
       Button { voice.stop(); dismiss() } label: {
         Label("End conversation", systemImage: "xmark").padding(.horizontal, 8)
       }
       .buttonStyle(.bordered).tint(.aminSand)
-      Label("Your voice is transcribed on your Amin computer, not in the cloud.", systemImage: "lock")
+      Label(model.client == nil ? "Your voice is transcribed on this device, not in the cloud."
+                                : "Your voice is transcribed on your Amin computer, not in the cloud.", systemImage: "lock")
         .font(.caption).opacity(0.7)
     }
     .foregroundStyle(Color.aminSand)
     .padding(28)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(RadialGradient(colors: [Color(red: 0.06, green: 0.35, blue: 0.34), .aminTealDeep, Color(red: 0.02, green: 0.18, blue: 0.17)],
-                               center: UnitPoint(x: 0.5, y: 0.35), startRadius: 20, endRadius: 700).ignoresSafeArea())
+    .background(RadialGradient(colors: [AminHUD.bgCentre, AminHUD.bgEdge, AminHUD.vignette],
+                               center: UnitPoint(x: 0.5, y: 0.38), startRadius: 20, endRadius: 760).ignoresSafeArea())
     .task { await voice.start(model: model) }
     .onDisappear { voice.stop() }
   }
@@ -61,6 +51,17 @@ final class VoiceSession: NSObject, @preconcurrency AVSpeechSynthesizerDelegate 
   private(set) var level: Double = 0
   private(set) var said = ""
   private(set) var reply = ""
+  private var interruptedAt: Date?
+
+  var orbPhase: MajlisOrb.Phase {
+    if let t = interruptedAt, Date.now.timeIntervalSince(t) < AminMotion.interrupt * 4 { return .interrupted }
+    switch state {
+    case .idle: return .idle
+    case .listening: return .listening
+    case .transcribing, .thinking: return .thinking
+    case .speaking: return .speaking
+    }
+  }
 
   private var model: AppModel?
   private var recorder: AVAudioRecorder?
@@ -92,7 +93,7 @@ final class VoiceSession: NSObject, @preconcurrency AVSpeechSynthesizerDelegate 
 
   func tapOrb() {
     switch state {
-    case .speaking: synth.stopSpeaking(at: .immediate)      // interrupt; the loop listens next
+    case .speaking: interruptedAt = .now; synth.stopSpeaking(at: .immediate)  // interrupt; the loop listens next
     case .listening: recorder?.stop()                       // done talking
     case .idle: quietTurns = 0; run()
     default: break
@@ -130,7 +131,7 @@ final class VoiceSession: NSObject, @preconcurrency AVSpeechSynthesizerDelegate 
       try? await Task.sleep(for: .milliseconds(60))
       rec.updateMeters()
       let db = rec.averagePower(forChannel: 0)
-      level = Double(max(0, min(1, (db + 50) / 40)))
+      level = 0.65 * level + 0.35 * Double(max(0, min(1, (db + 50) / 40)))
       if db > speechDB { spoke = true; lastVoice = .now }
       let now = Date.now
       if (spoke && now.timeIntervalSince(lastVoice) > endSilence) || (!spoke && now.timeIntervalSince(started) > noSpeech)
@@ -142,12 +143,18 @@ final class VoiceSession: NSObject, @preconcurrency AVSpeechSynthesizerDelegate 
   }
 
   private func handle(_ audio: Data) async {
-    guard let model, let client = model.client else { return }
+    guard let model else { return }
     state = .transcribing; status = "Transcribing…"
-    guard let heard = try? await client.transcribe(audio, contentType: "audio/mp4", lang: nil), !heard.text.isEmpty else { return }
-    said = heard.text; reply = ""
+    let text: String?
+    if let client = model.client {
+      text = try? await client.transcribe(audio, contentType: "audio/mp4", lang: nil).text
+    } else {
+      text = await OnDeviceSpeech.transcribe(FileManager.default.temporaryDirectory.appending(path: "amin-turn.m4a"))
+    }
+    guard let heard = text?.trimmingCharacters(in: .whitespaces), !heard.isEmpty else { return }
+    said = heard; reply = ""
     state = .thinking; status = "Thinking…"
-    guard let answer = await model.ask(heard.text) else { return }
+    guard let answer = await model.ask(heard) else { return }
     reply = answer.text
     await speak(answer.text)
   }
