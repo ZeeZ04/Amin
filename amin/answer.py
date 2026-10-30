@@ -21,6 +21,7 @@ import time
 import numpy as np
 
 from .config import settings
+from . import packs
 from .conflict import Conflict
 from .conflict import detect as detect_conflict
 from .covenant import Covenant
@@ -195,7 +196,8 @@ class Amin:
         #   genuine clash - two live sources disagree. Show both, pick neither.
         skew_note: Conflict | None = None
         all_retrieved = pool
-        if (clash := detect_conflict(question, pool, related=self.store.are_related)) is not None:
+        if (clash := detect_conflict(question, pool, related=self.store.are_related,
+                                       one_work=lambda s: bool(s) and packs.info(s) is not None)) is not None:
             if not clash.is_version_skew:
                 return finish(self._conflict_answer(question, clash, pool))
             skew_note = clash

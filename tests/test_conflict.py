@@ -200,3 +200,24 @@ def test_conflict_detection_sees_deeper_than_generation(store):
 
 def test_detect_returns_none_without_candidates():
     assert conflict.detect("anything", []) is None
+
+
+def test_two_pages_of_one_textbook_are_not_a_conflict(tmp_path, monkeypatch):
+    from amin import packs
+    from amin.conflict import detect
+    from amin.schema import Chunk, Retrieved, Tier
+
+    def r(cid, text, subject):
+        c = Chunk(chunk_id=cid, doc_id=cid.split("#")[0], ordinal=0, text=text, heading="", tier=Tier.REFERENCE, subject=subject)
+        return Retrieved(chunk_id=cid, chunk=c, score=1.0, coverage=0.9)
+
+    q = "What is the speed of light in a vacuum?"
+    pool = [r("a#1", "The speed of light in a vacuum is 3.00 x 10^8 m/s.", "openstax-physics"),
+            r("b#1", "The speed of light in a vacuum slows to 2.25 x 10^8 m/s in water.", "openstax-physics")]
+    assert detect(q, pool, related=lambda a, b: True) is not None  # without the rule, a false conflict
+    is_pack = lambda s: s.startswith("openstax-")
+    assert detect(q, pool, related=lambda a, b: True, one_work=is_pack) is None
+    pool[1].chunk.subject = "openstax-chemistry"  # two different textbooks: still not a conflict
+    assert detect(q, pool, related=lambda a, b: True, one_work=is_pack) is None
+    pool[1].chunk.subject = "my-notes"  # a pack against the person's own document still is
+    assert detect(q, pool, related=lambda a, b: True, one_work=is_pack) is not None

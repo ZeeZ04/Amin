@@ -14,7 +14,7 @@
 {"id": "e014", "kind": "answerable", "question": "What do we call a substance that speeds up a reaction without being consumed?", "expect_any": ["catalyst"], "lang": "en", "tags": ["edu", "chem"]}
 {"id": "e015", "kind": "answerable", "question": "In the ideal gas law PV = nRT, what does n stand for?", "expect_any": ["moles", "number of moles", "amount of substance"], "lang": "en", "tags": ["edu", "chem"]}
 {"id": "e016", "kind": "answerable", "question": "What is the SI unit of force?", "expect_any": ["newton"], "lang": "en", "tags": ["edu", "phys"]}
-{"id": "e017", "kind": "answerable", "question": "State Newton's second law of motion as an equation.", "expect_any": ["F = ma", "F=ma", "net force equals mass times acceleration"], "lang": "en", "tags": ["edu", "phys"]}
+{"id": "e017", "kind": "answerable", "question": "State Newton's second law of motion as an equation.", "expect_any": ["F = ma", "F=ma", "net force equals mass times acceleration", "= ma"], "lang": "en", "tags": ["edu", "phys"]}
 {"id": "e018", "kind": "answerable", "question": "What is the approximate acceleration due to gravity at Earth's surface?", "expect_any": ["9.8"], "lang": "en", "tags": ["edu", "phys"]}
 {"id": "e019", "kind": "answerable", "question": "What is Ohm's law?", "expect_any": ["V = IR", "V=IR"], "lang": "en", "tags": ["edu", "phys"]}
 {"id": "e020", "kind": "answerable", "question": "What is the SI unit of electrical resistance?", "expect_any": ["ohm"], "lang": "en", "tags": ["edu", "phys"]}

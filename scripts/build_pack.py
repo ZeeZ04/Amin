@@ -70,8 +70,8 @@ def python_docs() -> None:
         if len(md.strip()) < 200:
             continue
         docs["py-" + "-".join(rel.parts) + ".md"] = (
-            f"---\ntitle: Python docs · {'/'.join(rel.parts)}\ntier: reference\nlang: en\n"
-            f"about: python-docs\nnote: {attribution}\n---\n\n{md}\n")
+            f"---\ntitle: {json.dumps('Python docs · ' + '/'.join(rel.parts), ensure_ascii=False)}\ntier: reference\nlang: en\n"
+            f"about: python-docs\nnote: {json.dumps(attribution)}\n---\n\n{md}\n")
     write_pack("python-docs", {
         "title": f"Python {version} documentation",
         "description": "The official Python tutorial, library reference, language reference, how-tos and FAQ.",
@@ -138,8 +138,10 @@ def openstax(repo: str, slug: str, title: str) -> None:
         if f"{fname}.md" in docs:
             fname += "-" + cnxml.parent.name
         docs[f"{fname}.md"] = (
-            f"---\ntitle: {title} · {mtitle}\ntier: reference\nlang: en\nabout: {slug}\n"
-            f"note: {attribution}\n---\n\n{md}\n")
+            # Quoted: an attribution like "Source: https://..." is not valid bare YAML,
+            # and a broken header silently loses the pack's subject and tier.
+            f"---\ntitle: {json.dumps(f'{title} · {mtitle}', ensure_ascii=False)}\ntier: reference\nlang: en\n"
+            f"about: {slug}\nnote: {json.dumps(attribution)}\n---\n\n{md}\n")
     write_pack(slug, {
         "title": title, "description": f"{title}, an open textbook by OpenStax (Rice University).",
         "licence": "CC BY 4.0", "attribution": attribution, "source": f"https://github.com/openstax/{repo}",

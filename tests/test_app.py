@@ -229,3 +229,14 @@ def test_knowledge_packs_are_opt_in_cited_and_removable(users_dir, tmp_path, mon
     assert abdul.patch("/me/prefs", json={"packs": ["nonsense"]}).status_code == 400
     abdul.patch("/me/prefs", json={"packs": []})
     assert not answered(abdul, q), "switching a pack off removes it from the index"
+
+
+def test_pack_front_matter_survives_attributions_with_colons(tmp_path):
+    import json
+
+    from amin.ingest import split_front_matter
+
+    note = "Biology by OpenStax, CC BY 4.0. Source: https://openstax.org."
+    raw = f"---\ntitle: {json.dumps('Biology · Cells')}\ntier: reference\nabout: openstax-biology\nnote: {json.dumps(note)}\n---\n\n# Cells\nText."
+    parsed = split_front_matter(raw)
+    assert parsed.meta["about"] == "openstax-biology" and parsed.meta["note"] == note
