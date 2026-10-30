@@ -96,6 +96,21 @@ def create(name: str, password: str, invite: str | None = None) -> None:
     docs_dir(name)
 
 
+def set_password(name: str, password: str) -> None:
+    """Replace a password and sign the account out everywhere. Only reachable
+    from this computer's command line (`amin reset-password`), which is the
+    recovery path: whoever holds the computer already holds the data."""
+    name = name.strip().lower()
+    if len(password) < 6:
+        raise ValueError("password must be at least 6 characters")
+    reg = _load("users.json")
+    if name not in reg:
+        raise ValueError(f"no account called {name!r}; accounts: {', '.join(sorted(reg)) or 'none'}")
+    salt = secrets.token_hex(16)
+    reg[name].update(salt=salt, hash=_hash(password, salt), session=reg[name].get("session", 0) + 1)
+    _save("users.json", reg)
+
+
 def verify(name: str, password: str) -> bool:
     entry = _load("users.json").get(name.strip().lower())
     if not entry:

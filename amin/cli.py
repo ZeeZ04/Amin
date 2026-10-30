@@ -366,6 +366,29 @@ def bench_cmd(
 
 
 
+@app.command("users")
+def users_cmd():
+    """List the accounts on this computer."""
+    from . import users
+
+    for n in users.names():
+        console.print(f"{n}{'  (admin)' if users.is_admin(n) else ''}")
+
+
+@app.command("reset-password")
+def reset_password(name: str = typer.Argument(..., help="Account name, see `amin users`.")):
+    """Set a new password for an account on this computer and sign it out everywhere."""
+    from . import users
+
+    pw = typer.prompt("New password", hide_input=True, confirmation_prompt=True)
+    try:
+        users.set_password(name, pw)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    console.print(f"Password changed for {name}. Sign in again on each device.")
+
+
 @app.command()
 def stats():
     """What is currently in the index."""

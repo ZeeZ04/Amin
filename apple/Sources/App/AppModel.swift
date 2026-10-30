@@ -110,7 +110,14 @@ final class AppModel {
     get { UserDefaults.standard.object(forKey: "amin.preferLocal") as? Bool ?? true }
     set { UserDefaults.standard.set(newValue, forKey: "amin.preferLocal") }
   }
-  var engine: (any Engine)? { (preferLocal ? local : nil) ?? client ?? local }
+  var engine: (any Engine)? {
+    #if targetEnvironment(simulator)
+    // The model cannot run in the Simulator (no Metal for MLX): use the Amin computer when there is one.
+    return client ?? local
+    #else
+    return (preferLocal ? local : nil) ?? client ?? local
+    #endif
+  }
 
   var serverURL: URL? { client?.base }
   var project: Project? { me?.projects.first { $0.id == space } }

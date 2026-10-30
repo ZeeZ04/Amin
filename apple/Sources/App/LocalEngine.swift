@@ -43,6 +43,10 @@ actor LocalEngine: Engine {
   /// Load once; later calls reuse the weights already in memory.
   func load() async throws -> ModelContainer {
     if let container { return container }
+    #if targetEnvironment(simulator)
+    // MLX runs on the Apple GPU through Metal, which the Simulator does not provide.
+    throw AminError.server("Amin's model can't run in the iOS Simulator. Run Amin on an iPhone, an iPad, or this Mac, or connect to your Amin computer.")
+    #endif
     guard FileManager.default.fileExists(atPath: directory.appending(path: "config.json").path()) else {
       throw AminError.server("No model found in \(directory.lastPathComponent). Choose the edge-2 folder.")
     }
