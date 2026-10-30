@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Amin is going and what is left, as of 2026-10-22. The direction is
+Where Amin is going and what is left, as of 2026-10-30. The direction is
 ADR-014: a public release that runs fully on each person's own devices, in
 English, Arabic and Malayalam.
 
@@ -8,55 +8,43 @@ English, Arabic and Malayalam.
 
 - Grounded pipeline with citation verification, conflict detection and
   refusal gates (E1–E22).
-- Amin's own model: amin-3 (Qwen3-8B, SFT) matches qwen3.6:27b on held-out
-  slices at about 4× the speed (E31).
-- Household accounts, projects and permissions (ADR-013).
-- App redesign: sidebar on tablet and desktop, tabs on phone, a source
-  inspector, in-app dialogs, light and dark themes, bundled Malayalam font.
-- Conversation history, one database per person (`amin/history.py`).
-- Malayalam in the tokenizer, verifier, conflict detector and OCR, plus a
-  Malayalam eval with a baseline (E32).
-- Multilingual safety router: crisis caught 14/14 against 0/14 before (E34).
-- On-device base chosen: Gemma 4 E4B (E33); edge student training (E35).
-- Follow-up questions (E36), and voice mode with "Hey Amin" in the web app (E37).
-- Teach Amin: personal memory, cited and deletable, on web and Apple apps (ADR-015).
-- Native apps for iPhone, iPad, Mac, Vision Pro, Apple TV and Apple Watch, with Siri.
+- Household accounts, projects and permissions (ADR-013); one history
+  database per person; Teach Amin, personal memory that is cited and
+  deletable (ADR-015).
+- Malayalam in the tokenizer, verifier, conflict detector and OCR, with
+  evals (E32); the multilingual safety router, crisis 14/14 (E34); the
+  single-pass routing classifier (Jev's idea, run locally).
+- **Amin's own model, edge-2** (Gemma 4 E4B, SFT then DPO): the default
+  answer model on the Mac (E38). **edge-2-m46** (4.1 GB, mixed 4/6-bit) is
+  the iPhone build; it matches q6 on every paired test (E39).
+- **Native apps** for iPhone, iPad, Mac, Vision Pro, Apple TV and Watch:
+  - the model runs on the device through MLX Swift, and downloads from the
+    Amin computer over the home network, never the internet;
+  - documents on the device, answered from with citations (`LocalLibrary`);
+  - first-run onboarding; the Majlis Orb voice HUD; "Hey Amin" ambient mode
+    with on-device speech; Mac quick ask (⌥Space) and menu-bar door.
+- **Knowledge packs** (Task 3): Python docs and six OpenStax textbooks,
+  opt-in per person, cited like documents, with a shared embedding cache.
 
-## Next: design
+## Next
 
-1. **Interface language.** Arabic and Malayalam interface text, with the
-   full right-to-left layout for Arabic. Answers already follow the
-   question's language; the interface does not yet.
-2. **Document viewer.** Open the whole document with the cited passage
-   highlighted in place, not only the passage.
-3. **Answer progress.** Show the stages while an answer is built: searching,
-   reading, checking sources. Long Malayalam answers make waiting visible.
-4. **History tools.** Rename, search, and pin conversations.
-5. **First run.** A guided start: create the admin, add a first document,
-   ask a first question.
-6. **Status page.** Which model is answering, how fast, and storage used.
-7. **Quality passes.** Accessibility (VoiceOver, keyboard, contrast), a
-   worst-case data stress test (`break-ui`), and a maskable app icon.
-8. **Voice, next steps.** Malayalam speech output (AI4Bharat Indic voices).
-   Real-speaker tests of the wake word and of Malayalam recognition. Siri
-   Shortcuts ("Hey Siri, ask Amin") in the native app.
-
-## Next: model
-
-1. Finish E32 on the teacher, Gemma 4 E4B and Qwen3.5-9B, then choose the
-   base (ADR-014).
-2. Build grounded Malayalam training data: translate the synthetic training
-   corpus with IndicTrans2 (MIT), keeping the exact answer keys.
-3. SFT on the chosen base: the amin-3 mix (to keep English and Arabic) plus
-   Aya human Malayalam, translated Dolly and grounded Malayalam. Then DPO
-   aimed at Malayalam declining, which is 59.6% today.
-4. Fluent review: a family member reads the Aya held-out answers and
-   corrects them; the corrections become the Malayalam gate.
-5. Multilingual embeddings. `bge-m3` is pulled; swapping it in changes
-   retrieval for every language, so it gets its own bench run first.
-6. A local single-pass classifier for routing (medical, legal, financial,
-   crisis), language and question kind. This is Jev's idea, run on Amin's own
-   model.
+1. **Multilingual retrieval.** On the device, add multilingual-e5-small (MIT,
+   about 470 MB; needs the owner's OK to download) as a second ranking signal,
+   so a Malayalam question finds an English document. On the server, bench
+   `bge-m3` (already pulled) against nomic-embed-text.
+2. **Education.** Run the held-out GCSE/A-level set (`data/eval/eval_edu.jsonl`)
+   with and without packs (E40). Add the Oak National Academy pack (OGL v3,
+   needs an API key from the owner). AQA and Pearson material stays out unless
+   the boards grant a licence.
+3. **Coding and AI route** for the Mac: a Gemma 4 31B vs Qwen3.6-27B bake-off
+   on coding questions (disk permitting).
+4. **Voice.** Malayalam speech recognition on the device (WhisperKit with a
+   Malayalam fine-tune; licence to verify) and Malayalam speech output.
+5. **Design.** Interface language (Arabic RTL, Malayalam), the whole-document
+   viewer, answer progress stages, iPad and Mac layouts per DESIGN.md, and a
+   hands-on check of quick ask.
+6. **Fluent review.** A Malayalam speaker reads the held-out answers; the
+   corrections become the Malayalam gate.
 
 ## Later: every device, fully private
 

@@ -224,6 +224,15 @@ listens again, so follow-ups like "and when does it end?" work. Setup:
 `make voice-models`. On an iPhone or Apple Watch, only Siri may listen in the
 background, so there it is "Hey Amin" with the app open (E37).
 
+**Reference libraries.** Under Settings, turn on knowledge packs: the Python
+documentation and OpenStax textbooks (biology, chemistry, physics, calculus,
+statistics, Python), all openly licensed. Answers from them are cited like
+your own documents. Build them with `scripts/build_pack.py`; they are not
+trained into the model, and exam boards' own papers are not included.
+
+**On the Mac**, ⌥Space opens quick ask from any app; the menu-bar door has
+quick ask and ambient mode.
+
 ## The data wall
 
 `private/` and `data/index/` are gitignored. The committed corpus is thirteen
@@ -334,16 +343,17 @@ keeps the 27B.
 - The ablation table under "Measured behaviour" is from the no-model
   provider. Real-model numbers are in "Amin's own model" and
   `docs/EXPERIMENTS.md` E16 onward.
-- Malayalam works but is slow and declines too rarely on amin-3: 83.5%
-  answerable correct, 59.6% correct declines and a p50 of 14.8 s on IndicQA
-  (E32). Qwen3's tokenizer spends 4.7× the tokens on Malayalam, and no
-  fine-tune changes that. The next base model is chosen with it in mind
-  (ADR-014).
+- Malayalam on edge-2 (Gemma 4 E4B, E38): 86% answerable correct and 83%
+  correct declines on IndicQA test (the iPhone build: 1.3 s p50, E39); the earlier amin-3
+  managed 59.6% declines at 14.8 s (E32). Gemma's tokenizer is the reason.
 - The verifier's LLM backend is one small-model call per sentence. That is the
   dominant latency cost and the obvious thing to batch.
-- Phones, watches and TVs cannot yet run the model themselves. Today
-  they reach Amin on a computer in the same household. Fully on-device is
-  the goal (ADR-014, `docs/ROADMAP.md`).
+- iPhones, iPads and Macs run edge-2 themselves (MLX Swift; edge-2-m46 on
+  iPhone, E39) and answer from documents kept on the device with citations.
+  That on-device retrieval is keyword-only for now, so a Malayalam question
+  does not find an English document there; the server's retrieval does not
+  have this limit. Watches and TVs still ask through an iPhone or the Amin
+  computer.
 
 ## License
 
