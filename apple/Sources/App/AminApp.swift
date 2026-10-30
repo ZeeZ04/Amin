@@ -37,6 +37,14 @@ struct AminApp: App {
     WindowGroup(id: "main") {
       RootView()
         .environment(model)
+        #if os(iOS) || os(macOS) || os(visionOS)
+        .onOpenURL { url in  // amin://auth-callback from a confirmation or reset email
+          Task {
+            await model.account.handle(url)
+            if model.account.isSignedIn { await model.accountSignedIn() }
+          }
+        }
+        #endif
         .tint(.aminTeal)
         .task {
           await model.resume()
@@ -68,7 +76,12 @@ struct RootView: View {
 
   var body: some View {
     switch model.phase {
-    case .connect: ConnectView()
+    case .connect:
+      #if os(iOS) || os(macOS) || os(visionOS)
+      if model.account.isConfigured { AuthView() } else { ConnectView() }
+      #else
+      ConnectView()
+      #endif
     case .ready:
       if onboarded { MainView() } else { OnboardingView(done: $onboarded) }
     }

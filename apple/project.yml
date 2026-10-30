@@ -23,6 +23,14 @@ packages:
   SwiftTransformers:
     url: https://github.com/huggingface/swift-transformers
     from: 1.3.0
+  # Public accounts and Pro (decision 2026-10-30): the cloud holds the account
+  # and the plan only. Supabase Auth (MIT), RevenueCat (MIT).
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.0.0
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm
+    from: 5.0.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -41,6 +49,9 @@ targets:
       - Sources/Kit
       - Sources/App
       - Resources
+    configFiles:
+      Debug: Config/Amin.xcconfig
+      Release: Config/Amin.xcconfig
     info:
       path: Sources/App/Info.plist
       properties:
@@ -54,6 +65,13 @@ targets:
         NSAppTransportSecurity: {NSAllowsLocalNetworking: true}
         NSSiriUsageDescription: Ask Amin a question with Siri.
         NSSpeechRecognitionUsageDescription: Amin turns your speech into text on this device. Audio is not sent anywhere.
+        AminSupabaseURL: $(AMIN_SUPABASE_URL)
+        AminSupabaseAnonKey: $(AMIN_SUPABASE_ANON_KEY)
+        AminRevenueCatKey: $(AMIN_REVENUECAT_KEY)
+        AminHFModelOrg: $(AMIN_HF_MODEL_ORG)
+        CFBundleURLTypes:
+          - CFBundleURLName: app.amin.Amin
+            CFBundleURLSchemes: [amin]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.amin.Amin
@@ -76,6 +94,12 @@ targets:
         destinationFilters: [iOS, macOS, visionOS]
       - package: SwiftTransformers
         product: Tokenizers
+        destinationFilters: [iOS, macOS, visionOS]
+      - package: Supabase
+        product: Auth
+        destinationFilters: [iOS, macOS, visionOS]
+      - package: RevenueCat
+        products: [RevenueCat, RevenueCatUI]
         destinationFilters: [iOS, macOS, visionOS]
 
   AminWatch:
