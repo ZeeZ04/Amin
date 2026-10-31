@@ -385,7 +385,7 @@ def reset_password(name: str = typer.Argument(..., help="Account name, see `amin
         users.set_password(name, pw)
     except ValueError as e:
         console.print(f"[red]{e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     console.print(f"Password changed for {name}. Sign in again on each device.")
 
 

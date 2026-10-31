@@ -203,7 +203,6 @@ def test_detect_returns_none_without_candidates():
 
 
 def test_two_pages_of_one_textbook_are_not_a_conflict(tmp_path, monkeypatch):
-    from amin import packs
     from amin.conflict import detect
     from amin.schema import Chunk, Retrieved, Tier
 
@@ -215,7 +214,9 @@ def test_two_pages_of_one_textbook_are_not_a_conflict(tmp_path, monkeypatch):
     pool = [r("a#1", "The speed of light in a vacuum is 3.00 x 10^8 m/s.", "openstax-physics"),
             r("b#1", "The speed of light in a vacuum slows to 2.25 x 10^8 m/s in water.", "openstax-physics")]
     assert detect(q, pool, related=lambda a, b: True) is not None  # without the rule, a false conflict
-    is_pack = lambda s: s.startswith("openstax-")
+    def is_pack(s):
+        return s.startswith("openstax-")
+
     assert detect(q, pool, related=lambda a, b: True, one_work=is_pack) is None
     pool[1].chunk.subject = "openstax-chemistry"  # two different textbooks: still not a conflict
     assert detect(q, pool, related=lambda a, b: True, one_work=is_pack) is None

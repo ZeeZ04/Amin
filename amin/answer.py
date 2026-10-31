@@ -20,8 +20,8 @@ import time
 
 import numpy as np
 
-from .config import settings
 from . import packs
+from .config import settings
 from .conflict import Conflict
 from .conflict import detect as detect_conflict
 from .covenant import Covenant
