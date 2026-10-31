@@ -182,6 +182,14 @@ def app_page() -> str:
     return html
 
 
+@api.get("/jarvis", response_class=HTMLResponse)
+def jarvis_page() -> str:
+    """Jarvis mode: one full-screen voice window for this computer (`amin jarvis`)."""
+    html = (WEB.parent / "jarvis.html").read_text(encoding="utf-8")
+    stamp = hashlib.sha256((WEB.parent / "jarvis.js").read_bytes()).hexdigest()[:10]
+    return html.replace("/static/jarvis.js", f"/static/jarvis.js?v={stamp}")
+
+
 @api.get("/setup")
 def setup_state() -> dict:
     """Lets the sign-in page know whether the next account is the admin."""
