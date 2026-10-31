@@ -121,3 +121,7 @@ voice-models:
 	  d('mlx-community/whisper-large-v3-turbo', local_dir='data/models/whisper-large-v3-turbo'); \
 	  d('mlx-community/whisper-medium-malayalam-mlx', local_dir='data/models/whisper-medium-malayalam'); \
 	  d('mlx-community/whisper-base-mlx', local_dir='data/models/whisper-base')"
+
+jarvis:
+	# Amin at full power on this computer: the voice window, "Hey Amin" to talk.
+	uv run amin jarvis

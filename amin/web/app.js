@@ -108,6 +108,8 @@ $("authForm").onsubmit = async e => {
 const VIEWS = ["chat", "add", "projects", "settings"];
 let VIEW = "chat";
 async function showApp(me) {
+  // Signed in from Jarvis mode's prompt: go back to it.
+  if (new URLSearchParams(location.search).get("then") === "jarvis") { location.replace("/jarvis"); return; }
   ME = me; $("auth").hidden = true; $("app").hidden = false;
   const initial = me.name[0].toUpperCase();
   $("avatar").textContent = $("sideAvatar").textContent = initial;

@@ -366,6 +366,83 @@ def bench_cmd(
 
 
 
+@app.command("jarvis")
+def jarvis(
+    port: int = typer.Option(8765, help="Port for Amin on this computer (localhost only)."),
+    model: str = typer.Option("edge-2-q8", help="Model folder in data/models, if none is running yet."),
+    window: bool = typer.Option(True, help="Open the Jarvis window."),
+):
+    """Amin at full power on this computer: one voice window, "Hey Amin" to talk."""
+    import json
+    import os
+    import shutil
+    import subprocess
+    import sys
+    import time
+    import urllib.request
+    import webbrowser
+
+    def get(url: str, timeout: float = 2.0):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.loads(r.read() or b"{}")
+        except Exception:
+            return None
+
+    started: list[subprocess.Popen] = []
+    host = settings.mlx_host.rstrip("/")
+    served = get(f"{host}/v1/models")
+    if not served:
+        folder = settings.models_path / model
+        if not (folder / "config.json").exists():
+            console.print(f"[red]No model at {folder}. Build or download edge-2 first.[/red]")
+            raise typer.Exit(1)
+        console.print(f"Starting Amin's model ({model}). The first load takes about a minute…")
+        log = open("data/mlx-server.log", "a")
+        started.append(subprocess.Popen(
+            [sys.executable, "-m", "mlx_lm", "server", "--model", str(folder), "--port", host.rsplit(":", 1)[-1],
+             "--chat-template-args", '{"enable_thinking": false}'], stdout=log, stderr=log))
+        for _ in range(240):
+            if served := get(f"{host}/v1/models"):
+                break
+            if started[-1].poll() is not None:
+                console.print("[red]The model server stopped; see data/mlx-server.log.[/red]")
+                raise typer.Exit(1)
+            time.sleep(1)
+    # Ask for exactly the model that is loaded, so a request never waits on a different one.
+    loaded = (served.get("data") or [{}])[0].get("id") or model
+    env = {**os.environ, "AMIN_PROVIDER": "mlx", "AMIN_MLX_MODEL": loaded}
+    url = f"http://localhost:{port}/jarvis"
+    if not get(f"http://127.0.0.1:{port}/health"):
+        started.append(subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "amin.api:api", "--host", "127.0.0.1", "--port", str(port)], env=env))
+        for _ in range(60):
+            if get(f"http://127.0.0.1:{port}/health"):
+                break
+            time.sleep(0.5)
+    console.print(Panel(f"Model: {loaded}\nOpen: {url}\nSay “Hey Amin”. Ctrl-C here to stop.",
+                        title="Amin · Jarvis mode", border_style="cyan"))
+    if window:
+        chrome = "/Applications/Google Chrome.app"
+        if sys.platform == "darwin" and Path(chrome).exists():
+            # An app window: no tabs or address bar, and localhost may use the microphone.
+            subprocess.Popen(["open", "-na", chrome, "--args", f"--app={url}", "--start-fullscreen"])
+        elif shutil.which("google-chrome"):
+            subprocess.Popen(["google-chrome", f"--app={url}"])
+        else:
+            webbrowser.open(url)
+    if not started:
+        return
+    try:
+        while all(p.poll() is None for p in started):
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for p in started:
+            p.terminate()
+
+
 @app.command("users")
 def users_cmd():
     """List the accounts on this computer."""
