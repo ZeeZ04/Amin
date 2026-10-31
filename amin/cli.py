@@ -368,7 +368,7 @@ def bench_cmd(
 
 @app.command("jarvis")
 def jarvis(
-    port: int = typer.Option(8765, help="Port for Amin on this computer (localhost only)."),
+    port: int = typer.Option(8770, help="Port for Amin on this computer (127.0.0.1 only); the next free one if taken."),
     model: str = typer.Option("edge-2-q8", help="Model folder in data/models, if none is running yet."),
     window: bool = typer.Option(True, help="Open the Jarvis window."),
 ):
@@ -376,6 +376,8 @@ def jarvis(
     import json
     import os
     import shutil
+    import signal
+    import socket
     import subprocess
     import sys
     import time
@@ -412,8 +414,24 @@ def jarvis(
     # Ask for exactly the model that is loaded, so a request never waits on a different one.
     loaded = (served.get("data") or [{}])[0].get("id") or model
     env = {**os.environ, "AMIN_PROVIDER": "mlx", "AMIN_MLX_MODEL": loaded}
-    url = f"http://localhost:{port}/jarvis"
-    if not get(f"http://127.0.0.1:{port}/health"):
+    def amin_at(p: int) -> bool:  # an Amin server, not just anything on the port
+        h = get(f"http://127.0.0.1:{p}/health")
+        return isinstance(h, dict) and "answer_model" in h
+
+    def free(p: int) -> bool:  # free on every address, so no other server shadows it
+        for family, addr in ((socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::")):
+            with socket.socket(family, socket.SOCK_STREAM) as sock:
+                try:
+                    sock.bind((addr, p))
+                except OSError:
+                    return False
+        return True
+
+    while not amin_at(port) and not free(port):
+        port += 1
+    # 127.0.0.1, not "localhost": another program may hold the IPv6 side of a port.
+    url = f"http://127.0.0.1:{port}/jarvis"
+    if not amin_at(port):
         started.append(subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "amin.api:api", "--host", "127.0.0.1", "--port", str(port)], env=env))
         for _ in range(60):
@@ -433,6 +451,7 @@ def jarvis(
             webbrowser.open(url)
     if not started:
         return
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt))  # stop children on kill too
     try:
         while all(p.poll() is None for p in started):
             time.sleep(1)
