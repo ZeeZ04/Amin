@@ -1421,3 +1421,34 @@ the textbook passage it rests on, which a student or parent can check. That
 is the point of Amin. The set is small (±9–16 pp); a harder A-level set,
 where the model's own knowledge runs out, is the real test of whether packs
 raise accuracy.
+
+## E41 — Can edge-2 help with code?
+
+**Question.** The planned screen overlay helps while coding, and edge-2's
+coding had never been measured. Is it good enough, or does the overlay need a
+separate model?
+
+**Method.** `data/eval/eval_code.jsonl`: 30 questions (10 error messages, one
+with OCR noise; 10 bugs; 10 short programs) in Python, Swift, JavaScript, shell
+and SQL. `scripts/code_eval.py` asks the model directly, with no retrieval,
+500 tokens at most. The pass mark was 70% useful. edge-2 was graded by hand
+from the first 520 characters of each answer, so a fault later in an answer
+could be missed. The 27B was compared on keywords, and only c15 and c19 were read.
+
+| | edge-2-q8 | qwen3.6:27b |
+|---|---|---|
+| useful (hand-graded) | **28/30** | not hand-graded |
+| keyword hits | 28/30 | 30/30 |
+| median time | 3.9 s | 10.7 s |
+
+**Misses.** c15: edge-2 missed a Swift retain cycle and suggested a wrong
+change. c19: it warned about `rm -rf $BUILD_DIR/*` in general but missed the
+unset variable that makes it `rm -rf /*`. The 27B got both.
+
+**Verdict.** edge-2 passes, so the overlay uses it with no extra model. It is
+weaker at subtle bugs, so treat its reviews as a second opinion.
+
+**Limits.** These are textbook questions written by the author of the test, not
+the owner's real work, and one person's reading graded them. Real code in a
+large project will be harder, so the overlay's trial is the real test.
+
