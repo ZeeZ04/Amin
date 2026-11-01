@@ -65,7 +65,7 @@ account becomes the admin. Then say "Hey Amin". Ctrl-C in the terminal stops
 everything.
 
 To add your own documents, open the address the terminal prints without
-`/jarvis`, and upload them under Documents. They are stored in `data/`, which git
+`/jarvis`, and upload them under Documents. They are stored in `data/users/`, which git
 ignores.
 
 ## How it answers
