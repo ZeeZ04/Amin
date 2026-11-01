@@ -44,6 +44,7 @@ final class QuickAsk {
   private var panel: NSPanel?
   private var hotKey: EventHotKeyRef?
   private var model: AppModel?
+  private var screenHotKey: EventHotKeyRef?
 
   private var handlerInstalled = false
 
@@ -55,6 +56,26 @@ final class QuickAsk {
       handlerInstalled = true
     }
     apply(QuickAskShortcut.current)
+    if screenHotKey == nil {
+      let id = EventHotKeyID(signature: OSType(0x414D_494E), id: 2)
+      RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(optionKey | shiftKey), id, GetApplicationEventTarget(), 0, &screenHotKey)
+    }
+  }
+
+  /// ⌥⇧S: look at the window in front once, then open the panel showing what was captured.
+  /// This is the only way a capture starts; nothing watches the screen.
+  func askAboutScreen() {
+    guard let model else { return }
+    Task {
+      do {
+        model.screen = try await ScreenContext.capture()
+        model.screenError = nil
+      } catch {
+        model.screen = nil
+        model.screenError = error.localizedDescription
+      }
+      show()
+    }
   }
 
   /// Swap the global shortcut; the old one is released first.
@@ -81,7 +102,12 @@ final class QuickAsk {
     panel.makeKeyAndOrderFront(nil)
   }
 
-  func hide() { panel?.orderOut(nil) }
+  /// Closing the panel forgets the captured window.
+  func hide() {
+    panel?.orderOut(nil)
+    model?.screen = nil
+    model?.screenError = nil
+  }
 
   /// ⌘⏎: bring the main window forward, where the exchange already is.
   func continueInMainWindow() {
@@ -115,8 +141,12 @@ private final class KeyPanel: NSPanel {
 }
 
 /// Carbon calls this on the main thread; it cannot carry actor isolation itself.
-nonisolated private func quickAskHotKeyPressed(_: EventHandlerCallRef?, _: EventRef?, _: UnsafeMutableRawPointer?) -> OSStatus {
-  MainActor.assumeIsolated { QuickAsk.shared.toggle() }
+nonisolated private func quickAskHotKeyPressed(_: EventHandlerCallRef?, event: EventRef?, _: UnsafeMutableRawPointer?) -> OSStatus {
+  var id = EventHotKeyID()
+  GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                    MemoryLayout<EventHotKeyID>.size, nil, &id)
+  let hotKey = id.id
+  MainActor.assumeIsolated { hotKey == 2 ? QuickAsk.shared.askAboutScreen() : QuickAsk.shared.toggle() }
   return noErr
 }
 
@@ -133,7 +163,7 @@ struct QuickAskView: View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: AminSpace.md) {
         DoorMark().frame(width: 22, height: 22)
-        TextField("Ask Amin", text: $question)
+        TextField(model.screen == nil ? "Ask Amin" : "Ask about this window, or press Return", text: $question)
           .textFieldStyle(.plain)
           .font(.system(size: 22))
           .focused($focused)
@@ -141,6 +171,29 @@ struct QuickAskView: View {
         if model.isBusy { ProgressView().controlSize(.small) }
       }
       .padding(AminSpace.lg)
+
+      if let screen = model.screen {
+        Divider()
+        HStack(spacing: AminSpace.md) {
+          Image(decorative: screen.image, scale: 1)
+            .resizable().scaledToFit()
+            .frame(width: 88, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: AminRadius.sm))
+          VStack(alignment: .leading, spacing: 2) {
+            Label("Amin can see this \(screen.appName) window", systemImage: "eye")
+              .font(.aminCaption).foregroundStyle(Color.aminInk)
+            Text("One capture, read on this Mac. Forgotten when this panel closes.")
+              .font(.aminCaption).foregroundStyle(Color.aminMuted)
+          }
+          Spacer()
+          Button("Remove", systemImage: "xmark.circle") { model.screen = nil }
+            .buttonStyle(.borderless)
+        }
+        .padding(AminSpace.md)
+      } else if let error = model.screenError {
+        Divider()
+        Text(error).font(.aminCaption).foregroundStyle(Color.aminMuted).padding(AminSpace.lg)
+      }
 
       if let answer {
         Divider()
@@ -188,11 +241,15 @@ struct QuickAskView: View {
   }
 
   private func ask() {
-    let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
+    var q = question.trimmingCharacters(in: .whitespacesAndNewlines)
+    let screen = model.screen
+    if q.isEmpty, screen != nil { q = "What's wrong here, and how do I fix it?" }
     guard !q.isEmpty else { return }
     asked = q
     question = ""
-    Task { answer = await model.ask(q) }
+    Task {
+      if let screen { answer = await model.ask(q, about: screen) } else { answer = await model.ask(q) }
+    }
   }
 }
 
@@ -210,6 +267,7 @@ struct QuickAskMenu: View {
   @Environment(\.openWindow) private var openWindow
   var body: some View {
     Button("Quick Ask   \(QuickAskShortcut.current.label)") { QuickAsk.shared.show() }
+    Button("Ask About This Window   ⌥⇧S") { QuickAsk.shared.askAboutScreen() }
     Button("Open Amin") { NSApp.activate(); openWindow(id: "main") }
     Button("Ambient Mode") { NSApp.activate(); openWindow(id: "ambient") }
     Divider()
