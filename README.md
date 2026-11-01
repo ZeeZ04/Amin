@@ -6,8 +6,9 @@ each sentence. An answer with no document behind it is labelled general
 knowledge. It works in English, Arabic and Malayalam, by text or voice. `أمين`
 means trustworthy.
 
-There is no account, no subscription and no cloud service. Once the models are
-downloaded, your questions and documents stay on your Mac.
+There is no subscription and no cloud service. Once the models are downloaded,
+your questions and documents stay on your Mac. Amin asks for a name and password
+the first time, but that account exists only on this Mac.
 
 ## Requirements
 
@@ -39,7 +40,7 @@ Check that it works, with no model and no network:
 ```bash
 uv run pytest -q
 uv run amin ingest --reset --provider echo
-uv run amin ask "How much notice must I give before the tenancy expires?" --provider echo
+uv run amin bench --provider echo --verifier lexical --no-save
 ```
 
 Download a model, the embeddings and the voice models:
@@ -58,14 +59,14 @@ Amin:
 uv run amin jarvis --model gemma-4-e4b-it-8bit
 ```
 
-The first load takes about a minute. A window opens on `127.0.0.1`. Say "Hey
-Amin" or type. Ctrl-C stops everything.
+The first load takes about a minute. A window opens on `127.0.0.1`. It first
+asks you to sign in: follow the link and create your local account, and the first
+account becomes the admin. Then say "Hey Amin". Ctrl-C in the terminal stops
+everything.
 
-To add your own documents, put them in `private/`, which git ignores:
-
-```bash
-AMIN_PROVIDER=mlx AMIN_MLX_MODEL=gemma-4-e4b-it-8bit uv run amin ingest private --private
-```
+To add your own documents, open the address the terminal prints without
+`/jarvis`, and upload them under Documents. They are stored in `data/`, which git
+ignores.
 
 ## How it answers
 
@@ -118,6 +119,8 @@ plumbing only, because the test provider has no language model.
   "FR-550" with "FR-440". See E11.
 - **`make serve` is reachable by other devices on your network.** It binds to all
   addresses. `amin jarvis` binds to `127.0.0.1` only, so use that.
+- **Sign-in is still there.** It's left over from when Amin served a household,
+  and it's local only. Removing it is planned.
 - **Some code still reaches beyond this Mac if you turn it on.** Installing downloads
   from Hugging Face, PyPI and Ollama. `amin/hosted.py` can use a hosted model if
   you configure one, for benchmarks. Neither happens while you use Amin normally.
@@ -135,7 +138,7 @@ apple/     the SwiftUI app
 data/      synthetic sample documents and evaluation sets
 docs/      architecture, experiments, decisions, training
 reports/   saved benchmark results
-private/   your documents; ignored by git
+private/   for your own files; ignored by git
 archive/   unused: old backend and website
 ```
 
