@@ -1,6 +1,6 @@
-"""Build the public website (site/, deployed by Vercel) from the pages below.
+"""Build the public website (archive/site/, deployed by Vercel) from the pages below.
 
-    uv run python scripts/build_site.py
+    uv run python archive/build_site.py
 
 The site is the landing page plus what the App Store, Google Play and the
 DMCA require: privacy policy, terms, copyright (DMCA) policy, support, and
@@ -15,10 +15,10 @@ from datetime import date
 from html import escape
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "site"
+OUT = Path(__file__).resolve().parent / "site"
 UPDATED = date(2026, 10, 30).strftime("%-d %B %Y")
 
-# Fill these before the first deploy (backend/SETUP.md, step 6).
+# Fill these before the first deploy (archive/backend/SETUP.md, step 6).
 OWNER = {
     "name": "[to fill: your legal name or company]",
     "email": "[to fill: support email]",

@@ -28,6 +28,6 @@ data/packs/
 
 # Amin app service keys
 apple/Config/Secrets.xcconfig
-backend/supabase/.env
-backend/supabase/.temp/
-site/.vercel/
+archive/backend/supabase/.env
+archive/backend/supabase/.temp/
+archive/site/.vercel/

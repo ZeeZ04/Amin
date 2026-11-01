@@ -116,7 +116,7 @@ bench-student:
 # Voice mode (E37): local Whisper. General, Malayalam specialist, wake-word.
 # ---------------------------------------------------------------------------
 voice-models:
-	uv sync --extra dev --extra voice
+	uv sync --extra dev --extra voice --extra train  # jarvis needs train's mlx-lm
 	uv run python -c "from huggingface_hub import snapshot_download as d; \
 	  d('mlx-community/whisper-large-v3-turbo', local_dir='data/models/whisper-large-v3-turbo'); \
 	  d('mlx-community/whisper-medium-malayalam-mlx', local_dir='data/models/whisper-medium-malayalam'); \

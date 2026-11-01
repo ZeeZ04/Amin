@@ -7,7 +7,7 @@ import RevenueCat
 /// The person's Amin account (decision 2026-10-30): Supabase holds the account
 /// and the plan, nothing else. Questions, documents and memory never reach it.
 /// RevenueCat sells Pro and tells Supabase through its webhook
-/// (backend/supabase/functions/revenuecat-webhook), keyed by the Supabase user id.
+/// (archive/backend/supabase/functions/revenuecat-webhook), keyed by the Supabase user id.
 ///
 /// With no keys in Config/Secrets.xcconfig, `isConfigured` is false and the
 /// app works as before: an Amin computer, or a model on this device.
