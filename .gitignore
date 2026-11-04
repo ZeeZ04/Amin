@@ -31,3 +31,6 @@ apple/Config/Secrets.xcconfig
 backend/supabase/.env
 backend/supabase/.temp/
 site/.vercel/
+
+# TTS evaluation samples
+data/voice-eval/

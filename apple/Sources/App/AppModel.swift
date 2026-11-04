@@ -15,6 +15,10 @@ final class AppModel {
 
   /// The open conversation, oldest first. A turn whose answer is nil is in flight.
   private(set) var turns: [Turn] = []
+  #if os(macOS)
+  var screen: ScreenContext?
+  var screenError: String?
+  #endif
   private(set) var conversationID: String?
   /// "" is general chat; otherwise a project id.
   var space: String = ""
@@ -238,6 +242,28 @@ final class AppModel {
       return nil
     }
   }
+
+  #if os(macOS)
+  /// Ask about a captured window. Only the question and answer join the conversation, not the
+  /// screen text, and only the model on this Mac may see it.
+  func ask(_ question: String, about screen: ScreenContext) async -> Answer? {
+    guard !isBusy else { return nil }
+    turns.append(Turn(question: question))
+    let index = turns.count - 1
+    guard let local = local as? LocalEngine else {
+      turns[index].failed = "Choose a model on this Mac first. Screen text never leaves this Mac."
+      return nil
+    }
+    do {
+      let a = try await local.askAboutScreen(question, appName: screen.appName, screenText: screen.text)
+      turns[index].answer = a
+      return a
+    } catch {
+      turns[index].failed = error.localizedDescription
+      return nil
+    }
+  }
+  #endif
 
   func source(_ chunkID: String) async throws -> Chunk {
     if let c = library?.chunk(chunkID) { return c }  // cited from this device's own library

@@ -1,6 +1,15 @@
-# Handoff: where Amin stands (2026-10-31)
+# Handoff: where Amin stands (2026-11-01)
 
 Start new work from this page. The detail lives in README, ROADMAP, EXPERIMENTS and docs/team.
+
+## Direction, decided 2026-11-01
+
+**Amin is the owner's personal Mac assistant, open source on GitHub. There is no App Store or Google Play launch.** Reasons: the model needs more memory than most phones have, and offline only clearly helps a narrow audience.
+
+- **Stopped:** public accounts, Supabase, RevenueCat, the website, Android, HomeView and fitting the model on iPhones. Sections below that mention them are history.
+- **Now:** screen overlay, then design, then training only for measured gaps. The plan is in the owner's session plan; each step has a stop point.
+
+**Screen overlay (first version, built):** ⌥⇧S captures the front window once, reads it on-device with OCR, and asks the local model. Closing the panel forgets the capture. E41: edge-2 scored 28/30 on textbook coding questions, weaker on subtle bugs. Waiting on the owner's real-use trial.
 
 ## Decisions the owner has made
 
