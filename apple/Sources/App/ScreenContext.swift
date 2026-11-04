@@ -7,6 +7,7 @@ import Vision
 /// screen shortcut. It stays in memory and on this Mac: nothing is saved or sent.
 struct ScreenContext {
   let appName: String
+  let bundleID: String?
   let image: CGImage
   let text: String
 
@@ -14,7 +15,8 @@ struct ScreenContext {
   /// over the middle, since terminals and consoles put the newest lines last.
   static let maxCharacters = 8000
 
-  static func capture() async throws -> ScreenContext {
+  /// `scale` below the screen's own saves work when live help reads every few seconds.
+  static func capture(scale: CGFloat? = nil) async throws -> ScreenContext {
     guard CGPreflightScreenCaptureAccess() else {
       CGRequestScreenCaptureAccess()
       throw AminError.server("Allow Amin under System Settings > Privacy & Security > Screen Recording, reopen Amin, then try again.")
@@ -31,14 +33,15 @@ struct ScreenContext {
       throw AminError.server("Amin couldn't find a window to read in \(app.localizedName ?? "that app").")
     }
     let config = SCStreamConfiguration()
-    let scale = NSScreen.main?.backingScaleFactor ?? 2
+    let scale = scale ?? NSScreen.main?.backingScaleFactor ?? 2
     config.width = Int(window.frame.width * scale)
     config.height = Int(window.frame.height * scale)
     let image = try await SCScreenshotManager.captureImage(
       contentFilter: SCContentFilter(desktopIndependentWindow: window), configuration: config)
     let text = try await readText(image)
     guard !text.isEmpty else { throw AminError.server("Amin couldn't read any text in that window.") }
-    return ScreenContext(appName: app.localizedName ?? "this app", image: image, text: limited(text))
+    return ScreenContext(appName: app.localizedName ?? "this app", bundleID: app.bundleIdentifier,
+                         image: image, text: limited(text))
   }
 
   /// ScreenCaptureKit doesn't promise an order, so ask the window server which is on top.

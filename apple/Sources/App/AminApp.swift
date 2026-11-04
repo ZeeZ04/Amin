@@ -27,7 +27,7 @@ struct AminApp: App {
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 1280, height: 800)
     // Quick ask from anywhere: the menu-bar door, or the shortcut chosen in Settings.
-    MenuBarExtra("Amin", systemImage: "door.left.hand.open") { QuickAskMenu() }
+    MenuBarExtra("Amin", systemImage: LiveHelp.shared.isOn ? "eye" : "door.left.hand.open") { QuickAskMenu() }
     #else
     main
     #endif
@@ -50,6 +50,7 @@ struct AminApp: App {
           await model.resume()
           #if os(macOS)
           QuickAsk.shared.install(model: model)
+          LiveHelp.shared.install(model: model)
           #endif
           #if os(iOS)
           // The Watch asks through this phone, with this phone's sign-in.

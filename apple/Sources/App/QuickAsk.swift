@@ -268,6 +268,7 @@ struct QuickAskMenu: View {
   var body: some View {
     Button("Quick Ask   \(QuickAskShortcut.current.label)") { QuickAsk.shared.show() }
     Button("Ask About This Window   ⌥⇧S") { QuickAsk.shared.askAboutScreen() }
+    Button(LiveHelp.shared.isOn ? "Stop Live Help" : "Start Live Help (reads the front window)") { LiveHelp.shared.toggle() }
     Button("Open Amin") { NSApp.activate(); openWindow(id: "main") }
     Button("Ambient Mode") { NSApp.activate(); openWindow(id: "ambient") }
     Divider()
