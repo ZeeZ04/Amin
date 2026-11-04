@@ -96,20 +96,31 @@ actor LocalEngine: Engine {
     """
 
   /// A question about one captured window. It skips document search: the window is the context.
-  func askAboutScreen(_ question: String, appName: String, screenText: String) async throws -> Answer {
+  /// With `onText`, the answer so far is passed on as it is written, so code appears line by line.
+  func askAboutScreen(_ question: String, appName: String, screenText: String, maxTokens: Int = 800,
+                      onText: (@Sendable (String) async -> Void)? = nil) async throws -> Answer {
     let started = ContinuousClock.now
     let session = ChatSession(
       try await load(), instructions: Self.screenSystem,
-      generateParameters: GenerateParameters(maxTokens: 800, temperature: 0.2),
+      generateParameters: GenerateParameters(maxTokens: maxTokens, temperature: 0.2),
       additionalContext: ["enable_thinking": false])
-    let raw = try await session.respond(to: """
+    let prompt = """
       Text read from the \(appName) window:
       <screen>
       \(screenText)
       </screen>
 
       Question: \(question)
-      """)
+      """
+    var raw = ""
+    if let onText {
+      for try await chunk in session.streamResponse(to: prompt) {
+        raw += chunk
+        await onText(Self.clean(raw))
+      }
+    } else {
+      raw = try await session.respond(to: prompt)
+    }
     return Answer(question: question, outcome: "general", basis: "general",
                   claims: [Claim(text: Self.clean(raw), citations: [], verdict: "uncited")],
                   latencyMs: Int((ContinuousClock.now - started) / .milliseconds(1)))

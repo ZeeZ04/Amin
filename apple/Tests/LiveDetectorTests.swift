@@ -33,6 +33,25 @@ struct LiveDetectorTests {
     #expect(!LiveDetector.isQuestion("Why?"))
   }
 
+  @Test func aCodingTaskOnScreenIsFound() {
+    let text = """
+      CS101 Assignment 3
+      Due Friday
+      Task 2: Write a function that returns the second largest number in a list of integers.
+      Your solution should run in O(n).
+      """
+    let found = LiveDetector.find(in: text)
+    #expect(found?.kind == .task)
+    #expect(found?.line.hasPrefix("Task 2") == true)
+    #expect(LiveDetector.isTask("Implement a stack class with push, pop and peek."))
+    #expect(LiveDetector.isTask("Given an array of integers, return the indices of the two numbers that add up to a target."))
+  }
+
+  @Test func everydayInstructionsAreNotTasks() {
+    #expect(!LiveDetector.isTask("Write a thank-you note to grandma"))
+    #expect(!LiveDetector.isTask("Create an account to continue"))
+  }
+
   @Test func theSameErrorHasTheSameKeyWhateverTheLineNumber() {
     let a = LiveDetector.find(in: "main.swift:10: error: value of optional type must be unwrapped")
     let b = LiveDetector.find(in: "main.swift:12: error: value of optional type must be unwrapped")

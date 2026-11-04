@@ -38,6 +38,24 @@ struct LocalEngineTests {
   }
 
   @Test(.enabled(if: FileManager.default.fileExists(atPath: model.appending(path: "config.json").path())))
+  func `writes code for a task on screen, as it goes`() async throws {
+    let screen = """
+      CS101 Assignment 3
+      Task 2: Write a function that returns the second largest number in a list of integers.
+      If the list has fewer than two distinct numbers, return None.
+      """
+    nonisolated final class Seen: @unchecked Sendable { var updates = 0 }
+    let seen = Seen()
+    let a = try await LocalEngine(directory: Self.model, library: nil).askAboutScreen(
+      "Solve this coding task: Task 2: Write a function that returns the second largest number in a list of integers.",
+      appName: "Safari", screenText: screen, maxTokens: 600, onText: { _ in seen.updates += 1 })
+    print("task →", a.text.prefix(300))
+    #expect(a.text.contains("def "))
+    #expect(a.text.contains("None"))
+    #expect(seen.updates > 5)  // streamed, not delivered in one piece
+  }
+
+  @Test(.enabled(if: FileManager.default.fileExists(atPath: model.appending(path: "config.json").path())))
   func `declines personal details it cannot know`() async throws {
     let a = try await LocalEngine(directory: Self.model, library: nil).ask("When does my tenancy agreement end?", project: nil, conversation: nil)
     print("decline →", a.text.prefix(160))

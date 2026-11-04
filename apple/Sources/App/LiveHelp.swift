@@ -17,6 +17,8 @@ final class LiveHelp {
     let found: LiveDetector.Found
     let appName: String
     var answer: String?
+    /// The answer while it is still being written.
+    var draft = ""
     var failed: String?
   }
 
@@ -103,16 +105,27 @@ final class LiveHelp {
     cards.insert(card, at: 0)
     cards = Array(cards.prefix(3))
     showPanel()
-    let question = found.kind == .error ? "Explain this error briefly and give the fix: \(found.line)" : found.line
+    let question = switch found.kind {
+    case .error: "Explain this error briefly and give the fix: \(found.line)"
+    case .task: """
+      Solve this coding task, using the details shown on screen: \(found.line)
+      Write the complete code first, in one code block, in the language the task asks for (Python if it doesn't say). \
+      Then explain it in two or three short lines.
+      """
+    case .question: found.line
+    }
+    let id = card.id
     do {
-      let a = try await local.askAboutScreen(question, appName: screen.appName, screenText: screen.text)
+      let a = try await local.askAboutScreen(
+        question, appName: screen.appName, screenText: screen.text, maxTokens: found.kind == .task ? 1500 : 800,
+        onText: { text in await MainActor.run { LiveHelp.shared.update(id) { $0.draft = text } } })
       update(card.id) { $0.answer = a.text }
     } catch {
       update(card.id) { $0.failed = error.localizedDescription }
     }
   }
 
-  private func update(_ id: UUID, _ change: (inout Card) -> Void) {
+  fileprivate func update(_ id: UUID, _ change: (inout Card) -> Void) {
     if let i = cards.firstIndex(where: { $0.id == id }) { change(&cards[i]) }
   }
 
@@ -168,10 +181,18 @@ private struct LiveCardView: View {
   let card: LiveHelp.Card
   let dismiss: () -> Void
 
+  private var icon: String {
+    switch card.found.kind {
+    case .error: "exclamationmark.triangle"
+    case .task: "chevron.left.forwardslash.chevron.right"
+    case .question: "questionmark.circle"
+    }
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: AminSpace.xs) {
       HStack(alignment: .top) {
-        Label(card.found.line, systemImage: card.found.kind == .error ? "exclamationmark.triangle" : "questionmark.circle")
+        Label(card.found.line, systemImage: icon)
           .font(.aminCaption.bold()).foregroundStyle(Color.aminInk).lineLimit(2)
         Spacer()
         Button("Dismiss", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly).buttonStyle(.borderless)
@@ -179,10 +200,11 @@ private struct LiveCardView: View {
       Text("Seen in \(card.appName)").font(.aminCaption).foregroundStyle(Color.aminMuted)
       if let answer = card.answer {
         ScrollView {
-          Text(answer).font(.aminCaption).foregroundStyle(Color.aminInk).textSelection(.enabled)
+          Text(answer).font(card.found.kind == .task ? .system(.caption, design: .monospaced) : .aminCaption)
+            .foregroundStyle(Color.aminInk).textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxHeight: 220)
+        .frame(maxHeight: card.found.kind == .task ? 320 : 220)
         Button("Copy", systemImage: "doc.on.doc") {
           NSPasteboard.general.clearContents()
           NSPasteboard.general.setString(answer, forType: .string)
@@ -190,8 +212,18 @@ private struct LiveCardView: View {
         .buttonStyle(.borderless).font(.aminCaption)
       } else if let failed = card.failed {
         Text(failed).font(.aminCaption).foregroundStyle(Color.aminMuted)
+      } else if !card.draft.isEmpty {
+        ScrollView {
+          Text(card.draft).font(.system(.caption, design: .monospaced)).foregroundStyle(Color.aminInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .defaultScrollAnchor(.bottom)
+        .frame(maxHeight: 320)
       } else {
-        ProgressView().controlSize(.small)
+        HStack(spacing: AminSpace.sm) {
+          ProgressView().controlSize(.small)
+          Text(card.found.kind == .task ? "Writing the code…" : "Thinking…").font(.aminCaption).foregroundStyle(Color.aminMuted)
+        }
       }
     }
     .padding(AminSpace.sm)

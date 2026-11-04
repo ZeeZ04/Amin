@@ -5,7 +5,7 @@ import Foundation
 /// finds is sent to the model.
 nonisolated enum LiveDetector {
   struct Found: Equatable, Sendable {
-    enum Kind: String, Sendable { case error, question }
+    enum Kind: String, Sendable { case error, task, question }
     let kind: Kind
     /// The line shown on the card as "the question".
     let line: String
@@ -13,11 +13,13 @@ nonisolated enum LiveDetector {
     var key: String { line.lowercased().filter { $0.isLetter || $0 == " " } }
   }
 
-  /// Error lines first: they're the most common reason to look while coding.
-  /// The last match wins, because terminals and logs put the newest at the bottom.
+  /// Error lines first: they're the most common reason to look while coding. Then a
+  /// task to write code, then a question. For errors the last match wins, because
+  /// terminals and logs put the newest at the bottom; a task is usually read top down.
   static func find(in text: String) -> Found? {
     let lines = text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
     if let line = lines.last(where: isError) { return Found(kind: .error, line: clip(line)) }
+    if let line = lines.first(where: isTask) { return Found(kind: .task, line: clip(line)) }
     if let line = lines.last(where: isQuestion) { return Found(kind: .question, line: clip(line)) }
     return nil
   }
@@ -35,6 +37,21 @@ nonisolated enum LiveDetector {
     return !words.isDisjoint(with: codingWords)
   }
 
+  /// An instruction to write code: "Write a function…", "Implement…", "Given an array…, return…",
+  /// or a heading such as "Task 2:" or "Exercise:" followed by a coding word.
+  static func isTask(_ line: String) -> Bool {
+    guard (15...400).contains(line.count) else { return false }
+    let lower = line.lowercased()
+    let opens = lower.range(of: taskPattern, options: .regularExpression) != nil
+    let given = lower.hasPrefix("given ") && lower.contains("return")
+    guard opens || given else { return false }
+    let words = Set(lower.split { !$0.isLetter && $0 != "+" && $0 != "#" }.map(String.init))
+    return !words.isDisjoint(with: codingWords)
+  }
+
+  private static let taskPattern =
+    #"^((task|exercise|problem|question|assignment|challenge)\s*\d*\s*[:.)-]\s*|\d+[.)]\s*)?(write|implement|create|build|code|develop|design|define|modify|complete|fix|refactor)\b"#
+
   private static func clip(_ line: String) -> String { line.count > 160 ? String(line.prefix(157)) + "…" : line }
 
   private static let errorPattern =
@@ -47,5 +64,8 @@ nonisolated enum LiveDetector {
     "rust", "go", "sql", "query", "regex", "bash", "shell", "git", "api", "json", "http", "react", "node",
     "npm", "pip", "xcode", "async", "await", "thread", "pointer", "null", "nil", "optional", "type",
     "implement", "refactor", "complexity", "o(n)", "test", "tests", "pytest", "database", "endpoint",
+    "program", "script", "integer", "integers", "number", "numbers", "input", "output", "return", "returns",
+    "parameter", "argument", "app", "view", "component", "table", "file", "sort", "search", "tree", "node",
+    "linked", "stack", "queue", "hash", "map", "matrix", "character", "characters", "palindrome", "fibonacci",
   ]
 }
