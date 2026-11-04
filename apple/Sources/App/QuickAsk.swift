@@ -45,6 +45,7 @@ final class QuickAsk {
   private var hotKey: EventHotKeyRef?
   private var model: AppModel?
   private var screenHotKey: EventHotKeyRef?
+  private var liveHotKey: EventHotKeyRef?
 
   private var handlerInstalled = false
 
@@ -59,6 +60,10 @@ final class QuickAsk {
     if screenHotKey == nil {
       let id = EventHotKeyID(signature: OSType(0x414D_494E), id: 2)
       RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(optionKey | shiftKey), id, GetApplicationEventTarget(), 0, &screenHotKey)
+    }
+    if liveHotKey == nil {  // ⌥⇧L turns live help on and off
+      let id = EventHotKeyID(signature: OSType(0x414D_494E), id: 3)
+      RegisterEventHotKey(UInt32(kVK_ANSI_L), UInt32(optionKey | shiftKey), id, GetApplicationEventTarget(), 0, &liveHotKey)
     }
   }
 
@@ -146,7 +151,13 @@ nonisolated private func quickAskHotKeyPressed(_: EventHandlerCallRef?, event: E
   GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
                     MemoryLayout<EventHotKeyID>.size, nil, &id)
   let hotKey = id.id
-  MainActor.assumeIsolated { hotKey == 2 ? QuickAsk.shared.askAboutScreen() : QuickAsk.shared.toggle() }
+  MainActor.assumeIsolated {
+    switch hotKey {
+    case 2: QuickAsk.shared.askAboutScreen()
+    case 3: LiveHelp.shared.toggle()
+    default: QuickAsk.shared.toggle()
+    }
+  }
   return noErr
 }
 
@@ -268,7 +279,7 @@ struct QuickAskMenu: View {
   var body: some View {
     Button("Quick Ask   \(QuickAskShortcut.current.label)") { QuickAsk.shared.show() }
     Button("Ask About This Window   ⌥⇧S") { QuickAsk.shared.askAboutScreen() }
-    Button(LiveHelp.shared.isOn ? "Stop Live Help" : "Start Live Help (reads the front window)") { LiveHelp.shared.toggle() }
+    Button(LiveHelp.shared.isOn ? "Stop Live Help   ⌥⇧L" : "Start Live Help   ⌥⇧L") { LiveHelp.shared.toggle() }
     Button("Open Amin") { NSApp.activate(); openWindow(id: "main") }
     Button("Ambient Mode") { NSApp.activate(); openWindow(id: "ambient") }
     Divider()
