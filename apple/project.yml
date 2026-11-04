@@ -132,6 +132,7 @@ targets:
       - Sources/Kit/AminClient.swift
       - Sources/Kit/WakePhrase.swift
       - Sources/Kit/LiveDetector.swift
+      - Sources/Kit/LiveAnswer.swift
       - Sources/Kit/LocalLibrary.swift
     settings:
       base:
